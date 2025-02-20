@@ -1,0 +1,14 @@
+{
+  "nicn": "41111111",
+  "amount": 120,
+  "country": "USA",
+  "region": "78641"
+}
+7etpejwjihebpo60xf4xn0jy8
+
+Refund:
+
+{
+  "sTxId": "5lso8xncfbqwtwok6pjklyh34",
+  "amount": 10
+}
