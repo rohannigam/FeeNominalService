@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace SurchargePOC.Controllers
 {
     [ApiController]
-    [Route("api/ping")]
+    [Route("api/[controller]")]
     public class PingController : ControllerBase
     {
-        [HttpGet]
+        [HttpPost]
         public IActionResult Get()
         {
             return Ok("pong");

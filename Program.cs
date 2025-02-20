@@ -1,17 +1,20 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using FeeNominalService;
-using System.Net.Http.Headers;
+using Destructurama;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+IConfigurationRoot config;
+IConfiguration configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional:false, reloadOnChange: true)
+    .Build();
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
+    .ReadFrom.Configuration(configuration)
+    //.Enrich.FromLogContext()
+    //.WriteTo.Console()
+    .Destructure.UsingAttributes()
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -27,6 +30,7 @@ builder.Services.AddHttpClient("InterpaymentsClient", client =>
 {
     client.BaseAddress = new Uri(ApiConstants.InterpaymentsBaseAddress); // Base URL from the API documentation
     client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue(ApiConstants.AcceptHeader));
+    //The following needs to come from DB - configured per merchant
     client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
         "Bearer", 
         builder.Configuration["Interpayments:TransactionFeeAPIToken"]
@@ -44,34 +48,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
-//app.MapGet("/ping", () => "pong");
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
