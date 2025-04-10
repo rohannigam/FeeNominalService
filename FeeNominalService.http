@@ -1,6 +1,138 @@
-@FeeNominalService_HostAddress = http://localhost:5292
+@FeeNominalService_HostAddress = https://localhost:7139
 
-GET {{FeeNominalService_HostAddress}}/weatherforecast/
-Accept: application/json
+### Authentication Endpoints
 
-###
+### Login
+POST {{FeeNominalService_HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Admin123!"
+}
+
+### Refresh Token
+POST {{FeeNominalService_HostAddress}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "your-refresh-token-here"
+}
+
+### Revoke Token
+POST {{FeeNominalService_HostAddress}}/api/v1/auth/revoke
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+{
+  "refreshToken": "your-refresh-token-here"
+}
+
+### Validate Token
+GET {{FeeNominalService_HostAddress}}/api/v1/auth/validate
+Authorization: Bearer your-jwt-token-here
+
+### Surcharge Endpoints
+
+### Calculate Surcharge
+POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/calculate
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+{
+  "amount": 100.00,
+  "sTxId": "test-transaction-123",
+  "mTxId": "merchant-transaction-456",
+  "country": "US",
+  "region": "CA"
+}
+
+### Batch Calculate Surcharges
+POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/batch
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+[
+  {
+    "amount": 100.00,
+    "sTxId": "test-transaction-123",
+    "mTxId": "merchant-transaction-456",
+    "country": "US",
+    "region": "CA"
+  },
+  {
+    "amount": 200.00,
+    "sTxId": "test-transaction-789",
+    "mTxId": "merchant-transaction-012",
+    "country": "US",
+    "region": "NY"
+  }
+]
+
+### Sale Endpoints
+
+### Process Sale
+POST {{FeeNominalService_HostAddress}}/api/v1/sale/process
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+{
+  "sTxId": "test-sale-123",
+  "amount": 150.00,
+  "currency": "USD",
+  "mTxId": "merchant-sale-456"
+}
+
+### Batch Process Sales
+POST {{FeeNominalService_HostAddress}}/api/v1/sale/batch
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+[
+  {
+    "sTxId": "test-sale-123",
+    "amount": 150.00,
+    "currency": "USD",
+    "mTxId": "merchant-sale-456"
+  },
+  {
+    "sTxId": "test-sale-789",
+    "amount": 250.00,
+    "currency": "USD",
+    "mTxId": "merchant-sale-012"
+  }
+]
+
+### Refund Endpoints
+
+### Process Refund
+POST {{FeeNominalService_HostAddress}}/api/v1/refund/process
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+{
+  "sTxId": "test-refund-123",
+  "amount": 50.00,
+  "mTxId": "merchant-refund-456",
+  "cardToken": "card-token-123"
+}
+
+### Batch Process Refunds
+POST {{FeeNominalService_HostAddress}}/api/v1/refund/batch
+Content-Type: application/json
+Authorization: Bearer your-jwt-token-here
+
+[
+  {
+    "sTxId": "test-refund-123",
+    "amount": 50.00,
+    "mTxId": "merchant-refund-456",
+    "cardToken": "card-token-123"
+  },
+  {
+    "sTxId": "test-refund-789",
+    "amount": 75.00,
+    "mTxId": "merchant-refund-012",
+    "cardToken": "card-token-456"
+  }
+]
