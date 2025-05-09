@@ -28,6 +28,8 @@ For Actual Interpayment Features:
 /api/refunds/process
 
 To do:
-GetUpdatedSurchargeFee
+Move all endpoints to v1
 VoidorDecline
 BulkSales
+Handle Surcharge Exemption
+Start DB work. Set up a postgres instance. Ask for docker image.

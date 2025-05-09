@@ -1,0 +1,166 @@
+  /* Important Notes on Implementation
+  - We want to use API Access key instead of JWT token for the FeeNominalService
+  - We want to swtich to using AWS Secret Manager to store the API Access Key 
+  - We want to use the AWS SDK to get the API Access Key from the Secret Manager so research needed on how to do this
+  - We want to make sure connection between DataCenter (GR2) for MerchantPortal->FeeNominalService->Interpayments is secure
+  - We want to make sure connection between DataCenter (GR2) for XiPayWSServers->FeeNominalService->Interpayments is secure
+  - We can ensure the first half this by making sure the API Access Key is not exposed and is accessed via VPC endpoints
+  */
+
+  /*With respect to supporting mulitple API Keys per single Merchant
+  Based on your requirements, here's my opinion on implementing multiple API keys per merchant:
+
+1. **Database Schema Changes Needed:**
+```sql
+-- Merchant table to store merchant information
+CREATE TABLE merchants (
+    id UUID PRIMARY KEY,
+    merchant_id VARCHAR(50) UNIQUE,  -- External merchant ID from on-prem systems
+    name VARCHAR(255),
+    status VARCHAR(20),
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- API Keys table to store multiple keys per merchant
+CREATE TABLE api_keys (
+    id UUID PRIMARY KEY,
+    merchant_id UUID REFERENCES merchants(id),
+    key VARCHAR(255) UNIQUE,
+    secret VARCHAR(255),
+    description VARCHAR(255),
+    rate_limit INTEGER,
+    allowed_endpoints TEXT[],
+    status VARCHAR(20),  -- ACTIVE, REVOKED, EXPIRED
+    created_at TIMESTAMP,
+    last_rotated_at TIMESTAMP,
+    revoked_at TIMESTAMP,
+    created_by VARCHAR(50),  -- Which on-prem service created this key
+    external_reference_id VARCHAR(255)  -- Reference ID from on-prem system
+);
+
+-- API Key Usage table for audit and rate limiting
+CREATE TABLE api_key_usage (
+    id UUID PRIMARY KEY,
+    api_key_id UUID REFERENCES api_keys(id),
+    endpoint VARCHAR(255),
+    request_count INTEGER,
+    last_used_at TIMESTAMP
+);
+```
+
+2. **Key Management Strategy:**
+- Each API key should have a unique identifier within the merchant's scope
+- Keys can be tagged with their purpose (e.g., "Surcharge Calculation", "Refund Processing")
+- Keys can have different rate limits and endpoint permissions
+- Keys can be created by different on-prem services
+
+3. **API Key Generation Flow:**
+```
+On-Prem Service -> This Service
+1. On-prem service calls with:
+   - External merchant ID
+   - Key purpose/description
+   - Required permissions
+   - External reference ID
+2. This service:
+   - Maps external merchant ID to internal merchant
+   - Generates new API key
+   - Stores with reference to on-prem system
+   - Returns key details
+```
+
+4. **Authentication Flow:**
+```
+On-Prem Service -> This Service
+1. On-prem service includes:
+   - API Key
+   - Merchant ID
+   - Signature
+2. This service:
+   - Validates merchant exists
+   - Finds API key for merchant
+   - Validates key is active
+   - Checks rate limits
+   - Validates signature
+```
+
+5. **Key Features to Consider:**
+- Key expiration dates
+- Key rotation policies
+- Usage tracking per key
+- Different rate limits per key
+- Different endpoint permissions per key
+- Audit logging of key usage
+- Key status tracking
+
+6. **Security Considerations:**
+- Each key should have its own secret
+- Keys should be stored securely (AWS Secrets Manager)
+- Keys should be rotated periodically
+- Keys should be revocable individually
+- Keys should have usage monitoring
+
+7. **Integration Points:**
+- On-prem onboarding portal
+- SOAP web services
+- Internal service authentication
+- External service authentication
+
+8. **Monitoring and Management:**
+- Track key usage per merchant
+- Monitor rate limit compliance
+- Track key creation and revocation
+- Audit key usage patterns
+- Alert on suspicious activity
+
+9. **Key States:**
+- ACTIVE: Key is valid and can be used
+- REVOKED: Key has been manually revoked
+- EXPIRED: Key has reached its expiration date
+- ROTATED: Key has been rotated (old version)
+
+10. **Rate Limiting Strategy:**
+- Per-key rate limits
+- Per-merchant rate limits
+- Per-endpoint rate limits
+- Burst capacity handling
+
+Would you like me to elaborate on any of these aspects or discuss specific implementation details?
+
+  
+  */
+
+/*DB Tables so far
+
+-- Merchants table
+CREATE TABLE merchants (
+    id UUID PRIMARY KEY,
+    external_id VARCHAR(50) UNIQUE,  -- Merchant ID from onboarding portal
+    name VARCHAR(255),
+    status VARCHAR(20),
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    created_by VARCHAR(50)           -- Admin user ID from onboarding portal
+);
+
+-- API Keys table
+CREATE TABLE api_keys (
+    id UUID PRIMARY KEY,
+    merchant_id UUID REFERENCES merchants(id),
+    key VARCHAR(255) UNIQUE,  --Only store public key
+    secret VARCHAR(255), ---DELETE This goes in AWS SEcrets Manger
+    description VARCHAR(255),
+    rate_limit INTEGER,
+    allowed_endpoints TEXT[],
+    status VARCHAR(20),
+    created_at TIMESTAMP,
+    last_rotated_at TIMESTAMP,
+    revoked_at TIMESTAMP,
+    created_by VARCHAR(50),          -- Admin user ID from onboarding portal
+    onboarding_reference VARCHAR(50)  -- Reference ID from onboarding portal
+);
+
+
+
+*/
