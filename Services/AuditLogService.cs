@@ -6,7 +6,7 @@ namespace FeeNominalService.Services
     public interface IAuditLogService
     {
         Task LogAuthenticationAttemptAsync(AuthenticationAttempt attempt);
-        Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(string userId);
+        Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(string merchantId);
         Task<IEnumerable<AuthenticationAttempt>> GetFailedAttemptsAsync(DateTime? since = null);
     }
 
@@ -34,21 +34,20 @@ namespace FeeNominalService.Services
             }
 
             _logger.LogInformation(
-                "Authentication attempt: {AuthenticationType} for user {UserId} - Success: {Success} - IP: {IpAddress}",
-                attempt.AuthenticationType,
-                attempt.UserId,
-                attempt.Success,
+                "Authentication attempt for merchant {MerchantId} - Success: {IsSuccessful} - IP: {IpAddress}",
+                attempt.MerchantId,
+                attempt.IsSuccessful,
                 attempt.IpAddress
             );
 
             return Task.CompletedTask;
         }
 
-        public Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(string userId)
+        public Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(string merchantId)
         {
             lock (_lock)
             {
-                return Task.FromResult(_auditLogs.Where(a => a.UserId == userId));
+                return Task.FromResult(_auditLogs.Where(a => a.MerchantId == merchantId));
             }
         }
 
@@ -56,7 +55,7 @@ namespace FeeNominalService.Services
         {
             lock (_lock)
             {
-                var query = _auditLogs.Where(a => !a.Success);
+                var query = _auditLogs.Where(a => !a.IsSuccessful);
                 if (since.HasValue)
                 {
                     query = query.Where(a => a.Timestamp >= since.Value);

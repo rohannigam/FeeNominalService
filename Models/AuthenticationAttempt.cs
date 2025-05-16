@@ -1,13 +1,17 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace FeeNominalService.Models
 {
     public class AuthenticationAttempt
     {
-        public required string UserId { get; set; }
-        public required string IpAddress { get; set; }
+        [Key]
+        public int Id { get; set; }
+        public string MerchantId { get; set; } = string.Empty;
+        public string IpAddress { get; set; } = string.Empty;
+        public bool IsSuccessful { get; set; }
         public DateTime Timestamp { get; set; }
-        public bool Success { get; set; }
-        public required string AuthenticationType { get; set; } // "JWT" or "APIKey"
         public string? FailureReason { get; set; }
-        public required string UserAgent { get; set; }
+        public string AuthenticationType { get; set; } = "APIKey"; // Default to APIKey
+        public string? UserAgent { get; set; }
     }
 } 
