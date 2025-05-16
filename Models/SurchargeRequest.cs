@@ -14,7 +14,7 @@ public class SurchargeRequest
     public string? nicn { get; set; }
 
     /// <summary>
-    /// Payment processor for the transaction (e.g., VISA, MASTERCARD)
+    /// Processor is very specific to InterPayments and refers to a group of certain Surcharge Settings and Rules.
     /// </summary>
     [Required(ErrorMessage = "Processor is required")]
     public string? processor { get; set; }

@@ -134,61 +134,92 @@ namespace FeeNominalService.Services
         /// <inheritdoc />
         public async Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request)
         {
+            _logger.LogInformation("Updating API key for merchant {MerchantId}", request.MerchantId);
+
+            // 1. First check if merchant exists
             var merchant = await _merchantRepository.GetByExternalIdAsync(request.MerchantId);
             if (merchant == null)
             {
+                _logger.LogWarning("Merchant {MerchantId} not found during API key update", request.MerchantId);
                 throw new KeyNotFoundException($"Merchant {request.MerchantId} not found");
             }
 
+            // 2. Then check if API key exists for this merchant
             var apiKey = await _apiKeyRepository.GetByMerchantIdAsync(merchant.Id);
             if (!apiKey.Any())
             {
-                throw new KeyNotFoundException($"No API key found for merchant {request.MerchantId}");
+                _logger.LogWarning("No API keys found for merchant {MerchantId}", request.MerchantId);
+                throw new KeyNotFoundException($"No API keys found for merchant {request.MerchantId}");
             }
 
+            // 3. Check for active API key
             var activeKey = apiKey.FirstOrDefault(k => k.Status == "ACTIVE");
             if (activeKey == null)
             {
+                _logger.LogWarning("No active API key found for merchant {MerchantId}", request.MerchantId);
                 throw new KeyNotFoundException($"No active API key found for merchant {request.MerchantId}");
             }
 
-            // Validate allowed endpoints
+            // 4. Validate allowed endpoints
             if (request.AllowedEndpoints != null && request.AllowedEndpoints.Any())
             {
-                var validEndpoints = new[] { "surchargefee/calculate", "surchargefee/calculate-batch", "refunds/process" };
+                var validEndpoints = new[] 
+                { 
+                    "/api/v1/surchargefee/calculate",
+                    "/api/v1/surchargefee/calculate-batch",
+                    "/api/v1/refunds/process",
+                    "/api/v1/refunds/process-batch",
+                    "/api/v1/sales/process",
+                    "/api/v1/sales/process-batch",
+                    "/api/v1/cancel",
+                    "/api/v1/cancel/batch"
+                };
                 var invalidEndpoints = request.AllowedEndpoints.Except(validEndpoints).ToList();
                 if (invalidEndpoints.Any())
                 {
+                    _logger.LogWarning("Invalid endpoints requested for merchant {MerchantId}: {Endpoints}", 
+                        request.MerchantId, string.Join(", ", invalidEndpoints));
                     throw new ArgumentException($"Invalid endpoints: {string.Join(", ", invalidEndpoints)}");
                 }
             }
 
-            // Update API key
-            activeKey.Description = request.Description ?? activeKey.Description ?? string.Empty;
-            activeKey.RateLimit = request.RateLimit ?? activeKey.RateLimit;
-            activeKey.AllowedEndpoints = request.AllowedEndpoints ?? activeKey.AllowedEndpoints;
-            await _apiKeyRepository.UpdateAsync(activeKey);
-
-            // Get the secret from AWS Secrets Manager
-            var secretName = $"feenominal/merchants/{request.MerchantId}/apikeys/{activeKey.Key}";
-            var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
-            if (secret == null)
+            try
             {
-                throw new KeyNotFoundException($"API key {activeKey.Key} not found for merchant {request.MerchantId}");
+                // 5. Update API key
+                activeKey.Description = request.Description ?? activeKey.Description ?? string.Empty;
+                activeKey.RateLimit = request.RateLimit ?? activeKey.RateLimit;
+                activeKey.AllowedEndpoints = request.AllowedEndpoints ?? activeKey.AllowedEndpoints;
+                await _apiKeyRepository.UpdateAsync(activeKey);
+                _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", request.MerchantId);
+
+                // 6. Get the secret from AWS Secrets Manager
+                var secretName = $"feenominal/merchants/{request.MerchantId}/apikeys/{activeKey.Key}";
+                var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
+                if (secret == null)
+                {
+                    _logger.LogWarning("Secret not found for API key {ApiKey} of merchant {MerchantId}", 
+                        activeKey.Key, request.MerchantId);
+                    throw new KeyNotFoundException($"Secret not found for API key of merchant {request.MerchantId}");
+                }
+
+                return new ApiKeyInfo
+                {
+                    ApiKey = activeKey.Key,
+                    Description = activeKey.Description,
+                    RateLimit = activeKey.RateLimit,
+                    AllowedEndpoints = activeKey.AllowedEndpoints,
+                    Status = activeKey.Status,
+                    CreatedAt = activeKey.CreatedAt,
+                    LastRotatedAt = activeKey.LastRotatedAt,
+                    RevokedAt = activeKey.RevokedAt,
+                    Secret = secret.Secret
+                };
             }
-
-            return new ApiKeyInfo
+            catch (Exception ex) when (ex is not KeyNotFoundException)
             {
-                ApiKey = activeKey.Key,
-                Description = activeKey.Description,
-                RateLimit = activeKey.RateLimit,
-                AllowedEndpoints = activeKey.AllowedEndpoints,
-                Status = activeKey.Status,
-                CreatedAt = activeKey.CreatedAt,
-                LastRotatedAt = activeKey.LastRotatedAt,
-                RevokedAt = activeKey.RevokedAt,
-                Secret = secret.Secret
-            };
+                _logger.LogError(ex, "Error updating API key for merchant {MerchantId}", request.MerchantId);
+                throw;
+            }
         }
 
         /// <inheritdoc />
