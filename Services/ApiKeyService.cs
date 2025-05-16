@@ -13,7 +13,6 @@ using FeeNominalService.Models.ApiKey.Responses;
 using FeeNominalService.Models.Merchant;
 using FeeNominalService.Models.Configuration;
 using FeeNominalService.Repositories;
-using FeeNominalService.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using FeeNominalService.Data;
 using FeeNominalService.Services.AWS;
@@ -138,19 +137,19 @@ namespace FeeNominalService.Services
             var merchant = await _merchantRepository.GetByExternalIdAsync(request.MerchantId);
             if (merchant == null)
             {
-                throw new NotFoundException($"Merchant {request.MerchantId} not found");
+                throw new KeyNotFoundException($"Merchant {request.MerchantId} not found");
             }
 
             var apiKey = await _apiKeyRepository.GetByMerchantIdAsync(merchant.Id);
             if (!apiKey.Any())
             {
-                throw new NotFoundException($"No API key found for merchant {request.MerchantId}");
+                throw new KeyNotFoundException($"No API key found for merchant {request.MerchantId}");
             }
 
             var activeKey = apiKey.FirstOrDefault(k => k.Status == "ACTIVE");
             if (activeKey == null)
             {
-                throw new NotFoundException($"No active API key found for merchant {request.MerchantId}");
+                throw new KeyNotFoundException($"No active API key found for merchant {request.MerchantId}");
             }
 
             // Validate allowed endpoints
@@ -203,7 +202,7 @@ namespace FeeNominalService.Services
             if (merchant == null)
             {
                 _logger.LogWarning("Merchant {MerchantId} not found during API key revocation", request.MerchantId);
-                throw new NotFoundException($"Merchant {request.MerchantId} not found");
+                throw new KeyNotFoundException($"Merchant {request.MerchantId} not found");
             }
 
             // 2. Get the specific API key
@@ -211,7 +210,7 @@ namespace FeeNominalService.Services
             if (apiKey == null || apiKey.MerchantId != merchant.Id)
             {
                 _logger.LogWarning("API key {ApiKey} not found for merchant {MerchantId}", request.ApiKey, request.MerchantId);
-                throw new NotFoundException($"API key {request.ApiKey} not found for merchant {request.MerchantId}");
+                throw new KeyNotFoundException($"API key {request.ApiKey} not found for merchant {request.MerchantId}");
             }
 
             if (apiKey.Status == "REVOKED")
@@ -276,19 +275,19 @@ namespace FeeNominalService.Services
             var merchant = await _merchantRepository.GetByExternalIdAsync(merchantId);
             if (merchant == null)
             {
-                throw new NotFoundException($"Merchant {merchantId} not found");
+                throw new KeyNotFoundException($"Merchant {merchantId} not found");
             }
 
             var apiKey = await _apiKeyRepository.GetByMerchantIdAsync(merchant.Id);
             if (!apiKey.Any())
             {
-                throw new NotFoundException($"No API key found for merchant {merchantId}");
+                throw new KeyNotFoundException($"No API key found for merchant {merchantId}");
             }
 
             var activeKey = apiKey.FirstOrDefault(k => k.Status == "ACTIVE");
             if (activeKey == null)
             {
-                throw new NotFoundException($"No active API key found for merchant {merchantId}");
+                throw new KeyNotFoundException($"No active API key found for merchant {merchantId}");
             }
 
             // Generate new API key and secret
@@ -352,7 +351,7 @@ namespace FeeNominalService.Services
             var merchant = await _merchantRepository.GetByExternalIdAsync(merchantId);
             if (merchant == null)
             {
-                throw new NotFoundException($"Merchant {merchantId} not found");
+                throw new KeyNotFoundException($"Merchant {merchantId} not found");
             }
 
             // Get API keys from database
@@ -417,13 +416,13 @@ namespace FeeNominalService.Services
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
             if (apiKeyEntity == null)
             {
-                throw new NotFoundException($"API key {apiKey} not found");
+                throw new KeyNotFoundException($"API key {apiKey} not found");
             }
 
             var merchant = await _merchantRepository.GetByIdAsync(apiKeyEntity.MerchantId);
             if (merchant == null)
             {
-                throw new NotFoundException($"Merchant not found for API key {apiKey}");
+                throw new KeyNotFoundException($"Merchant not found for API key {apiKey}");
             }
 
             var secretName = $"feenominal/merchants/{merchant.ExternalId}/apikeys/{apiKey}";

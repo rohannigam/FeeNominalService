@@ -2,42 +2,99 @@
 
 ### Authentication Endpoints
 
-### Login
-POST {{FeeNominalService_HostAddress}}/api/v1/auth/login
+### Note: Request Signing
+# All API requests (except initial API key generation) require a signature for authentication.
+# The signature is calculated using the following components:
+# 1. Timestamp: Current UTC time in ISO 8601 format
+# 2. Nonce: A unique random string for each request
+# 3. Request Body: The JSON body of the request
+# 4. Secret: The API key secret (not the API key itself)
+#
+# Signature Calculation:
+# 1. Concatenate: timestamp + nonce + requestBody
+# 2. Create HMAC-SHA256 hash using the secret key
+# 3. Base64 encode the hash
+#
+# Required Headers:
+# X-API-Key: Your API key
+# X-Timestamp: Current UTC time in ISO 8601 format
+# X-Nonce: Unique random string
+# X-Signature: The calculated signature
+
+### Generate Initial API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/initial-generate
 Content-Type: application/json
 
 {
-  "email": "admin@example.com",
-  "password": "Admin123!"
+  "merchantId": "DEV001",
+  "description": "Initial API key for development",
+  "rateLimit": 1000,
+  "allowedEndpoints": ["*"],
+  "onboardingMetadata": {
+    "adminUserId": "admin",
+    "onboardingReference": "DEV-001"
+  }
 }
 
-### Refresh Token
-POST {{FeeNominalService_HostAddress}}/api/v1/auth/refresh
+### Generate Additional API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/generate
 Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 {
-  "refreshToken": "your-refresh-token-here"
+  "merchantId": "DEV001",
+  "description": "Additional API key for development",
+  "rateLimit": 1000,
+  "allowedEndpoints": ["*"]
 }
 
-### Revoke Token
-POST {{FeeNominalService_HostAddress}}/api/v1/auth/revoke
+### List API Keys
+GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/list?merchantId=DEV001
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Update API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/update
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 {
-  "refreshToken": "your-refresh-token-here"
+  "merchantId": "DEV001",
+  "description": "Updated API key description",
+  "rateLimit": 2000,
+  "allowedEndpoints": ["/api/v1/sales/*", "/api/v1/refunds/*"]
 }
 
-### Validate Token
-GET {{FeeNominalService_HostAddress}}/api/v1/auth/validate
-Authorization: Bearer your-jwt-token-here
+### Revoke API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/revoke
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "merchantId": "DEV001",
+  "apiKey": "api-key-to-revoke"
+}
 
 ### Surcharge Endpoints
 
 ### Calculate Surcharge
-POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/calculate
+POST {{FeeNominalService_HostAddress}}/api/v1/surchargefee/calculate
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 {
   "amount": 100.00,
@@ -48,9 +105,12 @@ Authorization: Bearer your-jwt-token-here
 }
 
 ### Batch Calculate Surcharges
-POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/batch
+POST {{FeeNominalService_HostAddress}}/api/v1/surchargefee/calculate-batch
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 [
   {
@@ -72,9 +132,12 @@ Authorization: Bearer your-jwt-token-here
 ### Sale Endpoints
 
 ### Process Sale
-POST {{FeeNominalService_HostAddress}}/api/v1/sale/process
+POST {{FeeNominalService_HostAddress}}/api/v1/sales/process
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 {
   "sTxId": "test-sale-123",
@@ -84,9 +147,12 @@ Authorization: Bearer your-jwt-token-here
 }
 
 ### Batch Process Sales
-POST {{FeeNominalService_HostAddress}}/api/v1/sale/batch
+POST {{FeeNominalService_HostAddress}}/api/v1/sales/process-batch
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 [
   {
@@ -106,9 +172,12 @@ Authorization: Bearer your-jwt-token-here
 ### Refund Endpoints
 
 ### Process Refund
-POST {{FeeNominalService_HostAddress}}/api/v1/refund/process
+POST {{FeeNominalService_HostAddress}}/api/v1/refunds/process
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 {
   "sTxId": "test-refund-123",
@@ -118,9 +187,12 @@ Authorization: Bearer your-jwt-token-here
 }
 
 ### Batch Process Refunds
-POST {{FeeNominalService_HostAddress}}/api/v1/refund/batch
+POST {{FeeNominalService_HostAddress}}/api/v1/refunds/process-batch
 Content-Type: application/json
-Authorization: Bearer your-jwt-token-here
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 [
   {

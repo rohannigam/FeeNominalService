@@ -9,7 +9,6 @@ using FeeNominalService.Models.Configuration;
 using FeeNominalService.Models.ApiKey;
 using FeeNominalService.Models.Merchant;
 using FeeNominalService.Repositories;
-using FeeNominalService.Exceptions;
 
 namespace FeeNominalService.Services
 {
@@ -104,7 +103,7 @@ namespace FeeNominalService.Services
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null)
                 {
-                    throw new NotFoundException($"Secret not found for API key: {apiKey}");
+                    throw new KeyNotFoundException($"Secret not found for API key: {apiKey}");
                 }
 
                 // 2. Generate signature
