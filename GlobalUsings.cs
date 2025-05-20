@@ -1,0 +1,10 @@
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading.Tasks;
+global using System.Text.Json;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Logging;
+global using FeeNominalService.Data;
+global using FeeNominalService.Models;
+global using FeeNominalService.Models.SurchargeProvider; 

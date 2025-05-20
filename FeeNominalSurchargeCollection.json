@@ -133,12 +133,16 @@
 									"if (!pm.environment.get('onboardingReference')) {",
 									"    pm.environment.set('onboardingReference', 'TEST-REF-001');",
 									"}",
+									"if (!pm.environment.get('testPurpose')) {",
+									"    pm.environment.set('testPurpose', 'GENERAL');",
+									"}",
 									"",
 									"// Set the request body with properly formatted timestamp",
 									"const requestBody = {",
 									"    merchantId: pm.environment.get('merchantId'),",
 									"    description: pm.environment.get('testDescription'),",
 									"    rateLimit: parseInt(pm.environment.get('testRateLimit')),",
+									"    purpose: pm.environment.get('testPurpose'),",
 									"    allowedEndpoints: [",
 									"        '/api/v1/surchargefee/calculate',",
 									"        '/api/v1/surchargefee/calculate-batch',",
@@ -175,6 +179,7 @@
 									"    pm.expect(jsonData).to.have.property('data');",
 									"    pm.expect(jsonData.data).to.have.property('apiKey');",
 									"    pm.expect(jsonData.data).to.have.property('secret');",
+									"    pm.expect(jsonData.data).to.have.property('purpose');",
 									"});",
 									"",
 									"// Store API key and secret in environment",
@@ -202,7 +207,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"{{testDescription}}\",\n    \"rateLimit\": {{testRateLimit}},\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ],\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{$timestamp}}\"\n    }\n}"
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"{{testDescription}}\",\n    \"rateLimit\": {{testRateLimit}},\n    \"purpose\": \"{{testPurpose}}\",\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ],\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{$timestamp}}\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/initial-generate",
@@ -235,6 +240,7 @@
 									"    merchantId: pm.environment.get('merchantId'),",
 									"    description: pm.environment.get('testDescription'),",
 									"    rateLimit: parseInt(pm.environment.get('testRateLimit')),",
+									"    purpose: pm.environment.get('testPurpose'),",
 									"    allowedEndpoints: [",
 									"        '/api/v1/surchargefee/calculate',",
 									"        '/api/v1/surchargefee/calculate-batch',",
@@ -294,6 +300,7 @@
 									"    pm.expect(jsonData.data).to.have.property('apiKey');",
 									"    pm.expect(jsonData.data).to.have.property('secret');",
 									"    pm.expect(jsonData.data).to.have.property('expiresAt');",
+									"    pm.expect(jsonData.data).to.have.property('purpose');",
 									"});",
 									"",
 									"// Store API key and secret in environment",
@@ -304,6 +311,7 @@
 									"    console.log('Subsequent API Key:', jsonData.data.apiKey);",
 									"    console.log('Subsequent Secret:', jsonData.data.secret);",
 									"    console.log('Expires At:', jsonData.data.expiresAt);",
+									"    console.log('Purpose:', jsonData.data.purpose);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -320,7 +328,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"{{testDescription}}\",\n    \"rateLimit\": {{testRateLimit}},\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ],\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{onboardingTimestamp}}\"\n    }\n}"
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"{{testDescription}}\",\n    \"rateLimit\": {{testRateLimit}},\n    \"purpose\": \"{{testPurpose}}\",\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ],\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{onboardingTimestamp}}\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/generate",
@@ -1120,6 +1128,11 @@
 		{
 			"key": "subsequentApiSecret",
 			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "testPurpose",
+			"value": "GENERAL",
 			"type": "string"
 		}
 	]

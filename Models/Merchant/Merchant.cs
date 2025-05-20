@@ -14,7 +14,7 @@ public class Merchant
     /// Unique identifier for the merchant
     /// </summary>
     [Key]
-    [Column("id")]
+    [Column("merchant_id")]
     public Guid Id { get; set; }
 
     /// <summary>

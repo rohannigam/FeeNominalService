@@ -8,6 +8,7 @@ namespace FeeNominalService.Models
     public class AuditLog
     {
         [Key]
+        [Column("audit_log_id")]
         public Guid Id { get; set; }
 
         [Required]

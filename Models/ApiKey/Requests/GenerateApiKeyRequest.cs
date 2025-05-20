@@ -40,6 +40,12 @@ public class GenerateApiKeyRequest
     public string[]? AllowedEndpoints { get; set; }
 
     /// <summary>
+    /// Purpose of the API key (e.g., 'PRODUCTION', 'TESTING', 'INTEGRATION')
+    /// </summary>
+    [StringLength(50)]
+    public string? Purpose { get; set; }
+
+    /// <summary>
     /// Metadata about the onboarding process
     /// </summary>
     [Required]

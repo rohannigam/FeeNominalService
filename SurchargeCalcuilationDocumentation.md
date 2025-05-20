@@ -867,27 +867,25 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "description": "string",
     "rateLimit": "integer",
     "allowedEndpoints": ["string"],
-    "onboardingMetadata": {
-      "adminUserId": "string",
-      "onboardingReference": "string",
-      "onboardingTimestamp": "datetime"
-    }
+    "purpose": "string",
+    "merchantName": "string",
+    "adminUserId": "string",
+    "onboardingReference": "string"
   }
   ```
-- **Response**: `ApiResponse<GenerateApiKeyResponse>`
+- **Response**:
   ```json
   {
-    "message": "Initial API key generated successfully",
-    "success": true,
-    "data": {
-      "apiKey": "string",
-      "secret": "string",
-      "expiresAt": "datetime"
-    }
+    "apiKey": "string",
+    "secret": "string",
+    "expiresAt": "datetime",
+    "rateLimit": "integer",
+    "allowedEndpoints": ["string"],
+    "purpose": "string"
   }
   ```
 
-#### 2. Generate Subsequent API Key
+#### 2. Generate Additional API Key
 - **Endpoint**: `POST /api/v1/onboarding/apikey/generate`
 - **Description**: Generates additional API keys for a merchant
 - **Authentication**: Required (X-API-Key header)
@@ -897,23 +895,37 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "merchantId": "string",
     "description": "string",
     "rateLimit": "integer",
-    "allowedEndpoints": ["string"]
+    "allowedEndpoints": ["string"],
+    "purpose": "string",
+    "merchantName": "string"
   }
   ```
-- **Response**: `ApiResponse<GenerateApiKeyResponse>`
+- **Response**: Same as Initial API Key generation
+
+#### 3. List API Keys
+- **Endpoint**: `GET /api/v1/onboarding/apikey/list`
+- **Description**: Retrieves all API keys for a merchant
+- **Authentication**: Required (X-API-Key header)
+- **Query Parameters**:
+  - `merchantId`: string (required)
+- **Response**:
   ```json
-  {
-    "message": "API key generated successfully",
-    "success": true,
-    "data": {
+  [
+    {
       "apiKey": "string",
-      "secret": "string",
-      "expiresAt": "datetime"
+      "description": "string",
+      "rateLimit": "integer",
+      "allowedEndpoints": ["string"],
+      "status": "string",
+      "createdAt": "datetime",
+      "lastRotatedAt": "datetime",
+      "revokedAt": "datetime",
+      "secret": "string"
     }
-  }
+  ]
   ```
 
-#### 3. Update API Key
+#### 4. Update API Key
 - **Endpoint**: `POST /api/v1/onboarding/apikey/update`
 - **Description**: Updates an existing API key's properties
 - **Authentication**: Required (X-API-Key header)
@@ -926,59 +938,25 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "allowedEndpoints": ["string"]
   }
   ```
-- **Response**: `ApiKeyInfo`
-  ```json
-  {
-    "apiKey": "string",
-    "description": "string",
-    "rateLimit": "integer",
-    "allowedEndpoints": ["string"],
-    "status": "string",
-    "createdAt": "datetime",
-    "lastRotatedAt": "datetime",
-    "revokedAt": "datetime",
-    "isRevoked": "boolean"
-  }
-  ```
+- **Response**: Same as List API Keys response format
 
-#### 4. Revoke API Key
+#### 5. Revoke API Key
 - **Endpoint**: `POST /api/v1/onboarding/apikey/revoke`
 - **Description**: Revokes an existing API key
 - **Authentication**: Required (X-API-Key header)
 - **Request Body**:
   ```json
   {
-    "merchantId": "string"
+    "merchantId": "string",
+    "apiKey": "string"
   }
   ```
-- **Response**: 
+- **Response**:
   ```json
   {
-    "message": "API key revoked successfully"
+    "success": "boolean",
+    "message": "string"
   }
-  ```
-
-#### 5. List API Keys
-- **Endpoint**: `GET /api/v1/onboarding/apikey/list`
-- **Description**: Retrieves all API keys for a merchant
-- **Authentication**: Required (X-API-Key header)
-- **Query Parameters**:
-  - `merchantId`: string (required)
-- **Response**: Array of `ApiKeyInfo`
-  ```json
-  [
-    {
-      "apiKey": "string",
-      "description": "string",
-      "rateLimit": "integer",
-      "allowedEndpoints": ["string"],
-      "status": "string",
-      "createdAt": "datetime",
-      "lastRotatedAt": "datetime",
-      "revokedAt": "datetime",
-      "isRevoked": "boolean"
-    }
-  ]
   ```
 
 ### Merchant Management Endpoints (v1)
@@ -1021,19 +999,22 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 - **Request Body**:
   ```json
   {
-    "nicn": "string",
-    "processor": "string",
     "amount": "decimal",
-    "totalAmount": "decimal",
-    "country": "string",
-    "region": "string",
-    "campaign": ["string"],
-    "data": ["string"],
     "sTxId": "string",
     "mTxId": "string",
-    "cardToken": "string",
-    "entryMethod": "string",
-    "nonSurchargableAmount": "decimal"
+    "country": "string",
+    "region": "string"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "surchargeAmount": "decimal",
+    "totalAmount": "decimal",
+    "sTxId": "string",
+    "mTxId": "string",
+    "provider": "string",
+    "calculatedAt": "datetime"
   }
   ```
 
@@ -1042,6 +1023,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 - **Description**: Calculates surcharge fees for multiple transactions
 - **Authentication**: Required (X-API-Key header)
 - **Request Body**: Array of surcharge fee requests
+- **Response**: Array of surcharge fee responses
 
 ### Sales Endpoints (v1)
 
@@ -1055,9 +1037,18 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "sTxId": "string",
     "amount": "decimal",
     "currency": "string",
-    "paymentMethod": "string",
-    "cardType": "string",
-    "description": "string"
+    "mTxId": "string"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "sTxId": "string",
+    "mTxId": "string",
+    "amount": "decimal",
+    "currency": "string",
+    "status": "string",
+    "processedAt": "datetime"
   }
   ```
 
@@ -1066,6 +1057,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 - **Description**: Processes multiple sale transactions
 - **Authentication**: Required (X-API-Key header)
 - **Request Body**: Array of sale requests
+- **Response**: Array of sale responses
 
 ### Refund Endpoints (v1)
 
@@ -1077,7 +1069,19 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   ```json
   {
     "sTxId": "string",
-    "amount": "decimal"
+    "amount": "decimal",
+    "mTxId": "string",
+    "cardToken": "string"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "sTxId": "string",
+    "mTxId": "string",
+    "amount": "decimal",
+    "status": "string",
+    "processedAt": "datetime"
   }
   ```
 
@@ -1086,6 +1090,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 - **Description**: Processes multiple refund transactions
 - **Authentication**: Required (X-API-Key header)
 - **Request Body**: Array of refund requests
+- **Response**: Array of refund responses
 
 ### Cancellation Endpoints (v1)
 

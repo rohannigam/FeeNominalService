@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using FeeNominalService.Models.ApiKey;
 
 namespace FeeNominalService.Models
 {
@@ -11,33 +12,50 @@ namespace FeeNominalService.Models
     public class AuthenticationAttempt
     {
         [Key]
-        [Column("id")]
-        public int Id { get; set; }
+        [Column("authentication_attempt_id")]
+        public Guid Id { get; set; }
 
         [Required]
         [Column("merchant_id")]
-        [MaxLength(50)]
-        public required string MerchantId { get; set; }
+        public Guid MerchantId { get; set; }
 
         [Required]
-        [Column("is_successful")]
-        public bool IsSuccessful { get; set; }
-
-        [Column("failure_reason")]
-        [MaxLength(255)]
-        public string? FailureReason { get; set; }
-
-        [Required]
-        [Column("timestamp")]
-        public DateTime Timestamp { get; set; }
+        [Column("api_key_id")]
+        public Guid ApiKeyId { get; set; }
 
         [Required]
         [Column("ip_address")]
-        [MaxLength(45)]
-        public required string IpAddress { get; set; }
+        [StringLength(45)]
+        public string IpAddress { get; set; } = null!;
 
+        [Required]
         [Column("user_agent")]
-        [MaxLength(255)]
-        public string? UserAgent { get; set; }
+        [StringLength(500)]
+        public string UserAgent { get; set; } = null!;
+
+        [Required]
+        [Column("status")]
+        [StringLength(20)]
+        public string Status { get; set; } = null!;
+
+        [Required]
+        [Column("attempted_at")]
+        public DateTime AttemptedAt { get; set; } = DateTime.UtcNow;
+
+        [Column("failure_reason")]
+        [StringLength(500)]
+        public string? FailureReason { get; set; }
+
+        [ForeignKey("MerchantId")]
+        public virtual Merchant.Merchant? Merchant { get; set; }
+
+        [ForeignKey("ApiKeyId")]
+        public virtual FeeNominalService.Models.ApiKey.ApiKey? ApiKeyEntity { get; set; }
+
+        /// <summary>
+        /// Indicates whether the authentication attempt was successful
+        /// </summary>
+        [NotMapped]
+        public bool IsSuccessful => Status.Equals("SUCCESS", StringComparison.OrdinalIgnoreCase);
     }
 } 

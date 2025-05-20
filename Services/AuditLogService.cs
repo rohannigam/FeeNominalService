@@ -6,7 +6,7 @@ namespace FeeNominalService.Services
     public interface IAuditLogService
     {
         Task LogAuthenticationAttemptAsync(AuthenticationAttempt attempt);
-        Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(string merchantId);
+        Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(Guid merchantId);
         Task<IEnumerable<AuthenticationAttempt>> GetFailedAttemptsAsync(DateTime? since = null);
     }
 
@@ -43,7 +43,7 @@ namespace FeeNominalService.Services
             return Task.CompletedTask;
         }
 
-        public Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(string merchantId)
+        public Task<IEnumerable<AuthenticationAttempt>> GetAuthenticationAttemptsAsync(Guid merchantId)
         {
             lock (_lock)
             {
@@ -58,7 +58,7 @@ namespace FeeNominalService.Services
                 var query = _auditLogs.Where(a => !a.IsSuccessful);
                 if (since.HasValue)
                 {
-                    query = query.Where(a => a.Timestamp >= since.Value);
+                    query = query.Where(a => a.AttemptedAt >= since.Value);
                 }
                 return Task.FromResult(query);
             }

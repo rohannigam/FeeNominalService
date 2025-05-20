@@ -29,12 +29,40 @@ Content-Type: application/json
   "merchantId": "DEV001",
   "description": "Initial API key for development",
   "rateLimit": 1000,
-  "allowedEndpoints": ["*"],
-  "onboardingMetadata": {
-    "adminUserId": "admin",
-    "onboardingReference": "DEV-001"
-  }
+  "allowedEndpoints": [
+    "/api/v1/surchargefee/calculate",
+    "/api/v1/surchargefee/calculate-batch",
+    "/api/v1/refunds/process",
+    "/api/v1/refunds/process-batch",
+    "/api/v1/sales/process",
+    "/api/v1/sales/process-batch",
+    "/api/v1/cancel",
+    "/api/v1/cancel/batch"
+  ],
+  "purpose": "GENERAL",
+  "merchantName": "Development Merchant",
+  "adminUserId": "admin",
+  "onboardingReference": "DEV-001"
 }
+
+### Response Example:
+# {
+#   "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#   "secret": "sk_test_51NxYz...",
+#   "expiresAt": "2026-05-20T04:52:24.803373Z",
+#   "rateLimit": 1000,
+#   "allowedEndpoints": [
+#     "/api/v1/surchargefee/calculate",
+#     "/api/v1/surchargefee/calculate-batch",
+#     "/api/v1/refunds/process",
+#     "/api/v1/refunds/process-batch",
+#     "/api/v1/sales/process",
+#     "/api/v1/sales/process-batch",
+#     "/api/v1/cancel",
+#     "/api/v1/cancel/batch"
+#   ],
+#   "purpose": "GENERAL"
+# }
 
 ### Generate Additional API Key
 POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/generate
@@ -48,8 +76,38 @@ X-Signature: calculated-signature-here
   "merchantId": "DEV001",
   "description": "Additional API key for development",
   "rateLimit": 1000,
-  "allowedEndpoints": ["*"]
+  "allowedEndpoints": [
+    "/api/v1/surchargefee/calculate",
+    "/api/v1/surchargefee/calculate-batch",
+    "/api/v1/refunds/process",
+    "/api/v1/refunds/process-batch",
+    "/api/v1/sales/process",
+    "/api/v1/sales/process-batch",
+    "/api/v1/cancel",
+    "/api/v1/cancel/batch"
+  ],
+  "purpose": "GENERAL",
+  "merchantName": "Development Merchant"
 }
+
+### Response Example:
+# {
+#   "apiKey": "9kurb2PpvevX22Ex1uroWlhe-DCs1g3H",
+#   "secret": "sk_test_51NxYz...",
+#   "expiresAt": "2026-05-20T04:52:24.803373Z",
+#   "rateLimit": 1000,
+#   "allowedEndpoints": [
+#     "/api/v1/surchargefee/calculate",
+#     "/api/v1/surchargefee/calculate-batch",
+#     "/api/v1/refunds/process",
+#     "/api/v1/refunds/process-batch",
+#     "/api/v1/sales/process",
+#     "/api/v1/sales/process-batch",
+#     "/api/v1/cancel",
+#     "/api/v1/cancel/batch"
+#   ],
+#   "purpose": "GENERAL"
+# }
 
 ### List API Keys
 GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/list?merchantId=DEV001
@@ -57,6 +115,30 @@ X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
+
+### Response Example:
+# [
+#   {
+#     "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#     "description": "Initial API key for development",
+#     "rateLimit": 1000,
+#     "allowedEndpoints": [
+#       "/api/v1/surchargefee/calculate",
+#       "/api/v1/surchargefee/calculate-batch",
+#       "/api/v1/refunds/process",
+#       "/api/v1/refunds/process-batch",
+#       "/api/v1/sales/process",
+#       "/api/v1/sales/process-batch",
+#       "/api/v1/cancel",
+#       "/api/v1/cancel/batch"
+#     ],
+#     "status": "ACTIVE",
+#     "createdAt": "2025-05-20T04:52:24.803373Z",
+#     "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
+#     "revokedAt": null,
+#     "secret": "sk_test_51NxYz..."
+#   }
+# ]
 
 ### Update API Key
 POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/update
@@ -70,8 +152,39 @@ X-Signature: calculated-signature-here
   "merchantId": "DEV001",
   "description": "Updated API key description",
   "rateLimit": 2000,
-  "allowedEndpoints": ["/api/v1/sales/*", "/api/v1/refunds/*"]
+  "allowedEndpoints": [
+    "/api/v1/surchargefee/calculate",
+    "/api/v1/surchargefee/calculate-batch",
+    "/api/v1/refunds/process",
+    "/api/v1/refunds/process-batch",
+    "/api/v1/sales/process",
+    "/api/v1/sales/process-batch",
+    "/api/v1/cancel",
+    "/api/v1/cancel/batch"
+  ]
 }
+
+### Response Example:
+# {
+#   "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#   "description": "Updated API key description",
+#   "rateLimit": 2000,
+#   "allowedEndpoints": [
+#     "/api/v1/surchargefee/calculate",
+#     "/api/v1/surchargefee/calculate-batch",
+#     "/api/v1/refunds/process",
+#     "/api/v1/refunds/process-batch",
+#     "/api/v1/sales/process",
+#     "/api/v1/sales/process-batch",
+#     "/api/v1/cancel",
+#     "/api/v1/cancel/batch"
+#   ],
+#   "status": "ACTIVE",
+#   "createdAt": "2025-05-20T04:52:24.803373Z",
+#   "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
+#   "revokedAt": null,
+#   "secret": "sk_test_51NxYz..."
+# }
 
 ### Revoke API Key
 POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/revoke
@@ -85,6 +198,12 @@ X-Signature: calculated-signature-here
   "merchantId": "DEV001",
   "apiKey": "api-key-to-revoke"
 }
+
+### Response Example:
+# {
+#   "success": true,
+#   "message": "API key revoked successfully"
+# }
 
 ### Surcharge Endpoints
 
@@ -103,6 +222,16 @@ X-Signature: calculated-signature-here
   "country": "US",
   "region": "CA"
 }
+
+### Response Example:
+# {
+#   "surchargeAmount": 3.50,
+#   "totalAmount": 103.50,
+#   "sTxId": "test-transaction-123",
+#   "mTxId": "merchant-transaction-456",
+#   "provider": "DEFAULT",
+#   "calculatedAt": "2025-05-20T04:52:24.803373Z"
+# }
 
 ### Batch Calculate Surcharges
 POST {{FeeNominalService_HostAddress}}/api/v1/surchargefee/calculate-batch
@@ -129,6 +258,26 @@ X-Signature: calculated-signature-here
   }
 ]
 
+### Response Example:
+# [
+#   {
+#     "surchargeAmount": 3.50,
+#     "totalAmount": 103.50,
+#     "sTxId": "test-transaction-123",
+#     "mTxId": "merchant-transaction-456",
+#     "provider": "DEFAULT",
+#     "calculatedAt": "2025-05-20T04:52:24.803373Z"
+#   },
+#   {
+#     "surchargeAmount": 7.00,
+#     "totalAmount": 207.00,
+#     "sTxId": "test-transaction-789",
+#     "mTxId": "merchant-transaction-012",
+#     "provider": "DEFAULT",
+#     "calculatedAt": "2025-05-20T04:52:24.803373Z"
+#   }
+# ]
+
 ### Sale Endpoints
 
 ### Process Sale
@@ -145,6 +294,16 @@ X-Signature: calculated-signature-here
   "currency": "USD",
   "mTxId": "merchant-sale-456"
 }
+
+### Response Example:
+# {
+#   "sTxId": "test-sale-123",
+#   "mTxId": "merchant-sale-456",
+#   "amount": 150.00,
+#   "currency": "USD",
+#   "status": "COMPLETED",
+#   "processedAt": "2025-05-20T04:52:24.803373Z"
+# }
 
 ### Batch Process Sales
 POST {{FeeNominalService_HostAddress}}/api/v1/sales/process-batch
@@ -169,6 +328,26 @@ X-Signature: calculated-signature-here
   }
 ]
 
+### Response Example:
+# [
+#   {
+#     "sTxId": "test-sale-123",
+#     "mTxId": "merchant-sale-456",
+#     "amount": 150.00,
+#     "currency": "USD",
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   },
+#   {
+#     "sTxId": "test-sale-789",
+#     "mTxId": "merchant-sale-012",
+#     "amount": 250.00,
+#     "currency": "USD",
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   }
+# ]
+
 ### Refund Endpoints
 
 ### Process Refund
@@ -185,6 +364,15 @@ X-Signature: calculated-signature-here
   "mTxId": "merchant-refund-456",
   "cardToken": "card-token-123"
 }
+
+### Response Example:
+# {
+#   "sTxId": "test-refund-123",
+#   "mTxId": "merchant-refund-456",
+#   "amount": 50.00,
+#   "status": "COMPLETED",
+#   "processedAt": "2025-05-20T04:52:24.803373Z"
+# }
 
 ### Batch Process Refunds
 POST {{FeeNominalService_HostAddress}}/api/v1/refunds/process-batch
@@ -208,3 +396,21 @@ X-Signature: calculated-signature-here
     "cardToken": "card-token-456"
   }
 ]
+
+### Response Example:
+# [
+#   {
+#     "sTxId": "test-refund-123",
+#     "mTxId": "merchant-refund-456",
+#     "amount": 50.00,
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   },
+#   {
+#     "sTxId": "test-refund-789",
+#     "mTxId": "merchant-refund-012",
+#     "amount": 75.00,
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   }
+# ]

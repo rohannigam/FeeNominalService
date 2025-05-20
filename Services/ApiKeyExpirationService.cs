@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Data;
 using Microsoft.EntityFrameworkCore;
+using FeeNominalService.Models.ApiKey;
 
 namespace FeeNominalService.Services
 {
@@ -48,22 +49,45 @@ namespace FeeNominalService.Services
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var expiredKeys = await context.ApiKeys
-                .Where(k => k.ExpiresAt < DateTime.UtcNow && k.Status == "ACTIVE")
+                .Where(k => k.ExpiresAt < DateTime.UtcNow && k.Status == ApiKeyStatus.Active.ToString())
+                .Select(k => new { k.Id, k.Key, k.Status, k.UpdatedAt })
                 .ToListAsync();
 
             if (expiredKeys.Any())
             {
-                _logger.LogInformation("Found {Count} expired API keys to update.", expiredKeys.Count);
+                _logger.LogInformation("Found {Count} expired API keys to update", expiredKeys.Count);
 
                 foreach (var key in expiredKeys)
                 {
-                    key.Status = "EXPIRED";
-                    key.UpdatedAt = DateTime.UtcNow;
-                    _logger.LogInformation("Marking API key {ApiKey} as expired.", key.Key);
+                    try
+                    {
+                        var apiKey = await context.ApiKeys.FindAsync(key.Id);
+                        if (apiKey != null)
+                        {
+                            apiKey.Status = ApiKeyStatus.Expired.ToString();
+                            apiKey.UpdatedAt = DateTime.UtcNow;
+                            _logger.LogInformation("Marking API key {ApiKey} as expired", key.Key);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("API key {ApiKey} not found in database", key.Key);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error updating API key {ApiKey}", key.Key);
+                    }
                 }
 
-                await context.SaveChangesAsync();
-                _logger.LogInformation("Successfully updated {Count} expired API keys.", expiredKeys.Count);
+                try
+                {
+                    await context.SaveChangesAsync();
+                    _logger.LogInformation("Successfully updated {Count} expired API keys", expiredKeys.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error saving changes to database");
+                }
             }
         }
     }

@@ -27,7 +27,7 @@ namespace FeeNominalService.Models.ApiKey
         /// Unique identifier for the API key
         /// </summary>
         [Key]
-        [Column("id")]
+        [Column("api_key_id")]
         public Guid Id { get; set; }
 
         /// <summary>
@@ -167,5 +167,12 @@ namespace FeeNominalService.Models.ApiKey
         /// Checks if the API key is active
         /// </summary>
         public bool IsActive => Status == ApiKeyStatus.Active.ToString();
+
+        /// <summary>
+        /// Purpose of the API key
+        /// </summary>
+        [StringLength(50)]
+        [Column("purpose")]
+        public string? Purpose { get; set; }
     }
 } 

@@ -14,7 +14,7 @@ namespace FeeNominalService.Models.Merchant
         /// Unique identifier for the status
         /// </summary>
         [Key]
-        [Column("id")]
+        [Column("merchant_status_id")]
         public Guid Id { get; set; }
 
         /// <summary>

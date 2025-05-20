@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FeeNominalService.Services;
 using FeeNominalService.Models.Configuration;
+using System.Security.Claims;
 
 namespace FeeNominalService.Authentication
 {
@@ -14,18 +15,22 @@ namespace FeeNominalService.Authentication
         private readonly IRequestSigningService _requestSigningService;
         private readonly ILogger<ApiKeyAuthHandler> _logger;
         private readonly ApiKeyConfiguration _apiKeyConfig;
+        private readonly IApiKeyService _apiKeyService;
 
         public ApiKeyAuthHandler(
             IOptionsMonitor<AuthenticationSchemeOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
             IRequestSigningService requestSigningService,
-            IOptions<ApiKeyConfiguration> apiKeyConfig)
-            : base(options, logger, encoder)
+            IOptions<ApiKeyConfiguration> apiKeyConfig,
+            ISystemClock clock,
+            IApiKeyService apiKeyService)
+            : base(options, logger, encoder, clock)
         {
             _requestSigningService = requestSigningService;
             _logger = logger.CreateLogger<ApiKeyAuthHandler>();
             _apiKeyConfig = apiKeyConfig.Value;
+            _apiKeyService = apiKeyService;
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()

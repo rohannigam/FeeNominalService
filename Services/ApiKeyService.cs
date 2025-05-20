@@ -494,125 +494,212 @@ namespace FeeNominalService.Services
             return Convert.ToBase64String(hash);
         }
 
-        private string GenerateSecureKey()
+        private string GenerateApiKey()
         {
-            // Generate a longer key to ensure we have enough characters
-            var key = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + 
-                     Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            // Replace URL-unsafe characters and take exactly 32 characters
-            return key.Replace("/", "_")
-                     .Replace("+", "-")
-                     .Replace("=", "")
-                     .Substring(0, 32);
+            return GenerateSecureRandomString(32);
         }
 
-        public async Task<GenerateApiKeyResponse> GenerateInitialApiKeyAsync(GenerateApiKeyRequest request)
+        private string GenerateSecret()
         {
-            _logger.LogInformation("Generating initial API key for merchant {MerchantId}", request.MerchantId);
-
-            var merchant = await _context.Merchants
-                .Include(m => m.Status)
-                .FirstOrDefaultAsync(m => m.ExternalId == request.MerchantId);
-
-            if (merchant == null)
-            {
-                throw new ArgumentException($"Merchant {request.MerchantId} not found");
-            }
-
-            if (merchant.Status.Code != "ACTIVE")
-            {
-                throw new InvalidOperationException($"Merchant {request.MerchantId} is not active");
-            }
-
-            var (apiKey, secret) = _apiKeyGenerator.GenerateApiKeyAndSecret();
-
-            var apiKeyEntity = new ApiKey
-            {
-                MerchantId = merchant.Id,
-                Key = apiKey,
-                Name = request.Description ?? string.Empty,
-                Description = request.Description ?? string.Empty,
-                RateLimit = request.RateLimit ?? 1000,
-                AllowedEndpoints = request.AllowedEndpoints ?? Array.Empty<string>(),
-                Status = "ACTIVE",
-                ExpirationDays = 30,
-                ExpiresAt = DateTime.UtcNow.AddDays(30),
-                CreatedBy = request.OnboardingMetadata?.AdminUserId ?? "system",
-                OnboardingReference = request.OnboardingMetadata?.OnboardingReference
-            };
-
-            _context.ApiKeys.Add(apiKeyEntity);
-            await _context.SaveChangesAsync();
-
-            // Store secret in the correct format and path for the mock
-            var secretName = $"feenominal/merchants/{request.MerchantId}/apikeys/{apiKey}";
-            var secretValue = new ApiKeySecret
-            {
-                ApiKey = apiKey,
-                Secret = secret,
-                MerchantId = request.MerchantId,
-                CreatedAt = DateTime.UtcNow,
-                LastRotated = null,
-                IsRevoked = false,
-                RevokedAt = null,
-                Status = "ACTIVE"
-            };
-            await _secretsManager.StoreSecretAsync(secretName, JsonSerializer.Serialize(secretValue));
-
-            return new GenerateApiKeyResponse
-            {
-                ApiKey = apiKey,
-                Secret = secret,
-                ExpiresAt = apiKeyEntity.ExpiresAt ?? DateTime.UtcNow.AddDays(30)
-            };
+            return GenerateSecureRandomString(64);
         }
 
         public async Task<GenerateApiKeyResponse> GenerateApiKeyAsync(GenerateApiKeyRequest request)
         {
-            _logger.LogInformation("Generating subsequent API key for merchant {MerchantId}", request.MerchantId);
+            _logger.LogInformation("Generating new API key for merchant {MerchantId}", request.MerchantId);
 
-            var merchant = await _context.Merchants
-                .Include(m => m.Status)
-                .FirstOrDefaultAsync(m => m.ExternalId == request.MerchantId);
-
+            // Get merchant
+            var merchant = await _merchantRepository.GetByExternalIdAsync(request.MerchantId);
             if (merchant == null)
             {
-                throw new ArgumentException($"Merchant {request.MerchantId} not found");
+                throw new KeyNotFoundException($"Merchant with ID {request.MerchantId} not found");
             }
 
-            if (merchant.Status.Code != "ACTIVE")
+            // Check if merchant has reached maximum number of active keys
+            var activeKeys = await _apiKeyRepository.GetByMerchantIdAsync(merchant.Id);
+            var activeKeysCount = activeKeys.Count(k => k.Status == "ACTIVE");
+            if (activeKeysCount >= 5) // Maximum 5 active keys per merchant
             {
-                throw new InvalidOperationException($"Merchant {request.MerchantId} is not active");
+                throw new InvalidOperationException("Merchant has reached the maximum number of active API keys (5)");
             }
 
-            var hasActiveKey = await _context.ApiKeys
-                .AnyAsync(k => k.MerchantId == merchant.Id && k.Status == "ACTIVE");
-
-            if (!hasActiveKey)
+            // Get existing active key to reuse its secret
+            var existingKey = activeKeys.FirstOrDefault(k => k.Status == "ACTIVE");
+            string secret;
+            if (existingKey != null)
             {
-                throw new UnauthorizedAccessException("Merchant has no active API keys");
+                // Reuse existing secret
+                var secretName = $"feenominal/merchants/{request.MerchantId}/apikeys/{existingKey.Key}";
+                var secretValue = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
+                if (secretValue == null)
+                {
+                    throw new KeyNotFoundException("Failed to retrieve existing API key secret");
+                }
+                secret = secretValue.Secret;
+            }
+            else
+            {
+                // Generate new secret for first-time setup
+                secret = GenerateSecret();
             }
 
-            var (apiKey, secret) = _apiKeyGenerator.GenerateApiKeyAndSecret();
-
-            var apiKeyEntity = new ApiKey
+            // Generate new API key
+            var apiKey = new ApiKey
             {
-                MerchantId = merchant.Id,
-                Key = apiKey,
-                Name = request.Description ?? string.Empty,
-                Description = request.Description ?? string.Empty,
+                Id = Guid.NewGuid(),
+                Key = GenerateApiKey(),
+                Status = "ACTIVE",
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddYears(1),
                 RateLimit = request.RateLimit ?? 1000,
                 AllowedEndpoints = request.AllowedEndpoints ?? Array.Empty<string>(),
-                Status = "ACTIVE",
-                ExpirationDays = 30,
-                ExpiresAt = DateTime.UtcNow.AddDays(30),
-                CreatedBy = "system"
+                Purpose = request.Purpose,
+                Name = request.MerchantName ?? merchant.Name,
+                Description = request.Description,
+                MerchantId = merchant.Id
             };
 
-            _context.ApiKeys.Add(apiKeyEntity);
-            await _context.SaveChangesAsync();
+            await _apiKeyRepository.CreateAsync(apiKey);
 
-            // Store secret in the correct format and path for the mock
+            // Store secret in AWS Secrets Manager
+            var newSecretName = $"feenominal/merchants/{request.MerchantId}/apikeys/{apiKey.Key}";
+            var newSecretValue = new ApiKeySecret
+            {
+                ApiKey = apiKey.Key,
+                Secret = secret,
+                MerchantId = request.MerchantId,
+                CreatedAt = DateTime.UtcNow,
+                LastRotated = null,
+                IsRevoked = false,
+                RevokedAt = null,
+                Status = "ACTIVE"
+            };
+            await _secretsManager.StoreSecretAsync(newSecretName, JsonSerializer.Serialize(newSecretValue));
+
+            _logger.LogInformation("Generated new API key {ApiKeyId} for merchant {MerchantId}", apiKey.Id, merchant.Id);
+
+            return new GenerateApiKeyResponse
+            {
+                ApiKey = apiKey.Key,
+                Secret = secret,
+                ExpiresAt = apiKey.ExpiresAt ?? DateTime.UtcNow.AddYears(1),
+                RateLimit = apiKey.RateLimit,
+                AllowedEndpoints = apiKey.AllowedEndpoints,
+                Purpose = apiKey.Purpose
+            };
+        }
+
+        /// <summary>
+        /// Regenerates the secret for a merchant's API keys
+        /// </summary>
+        public async Task<ApiKeyResponse> RegenerateSecretAsync(string merchantId)
+        {
+            _logger.LogInformation("Regenerating secret for merchant {MerchantId}", merchantId);
+
+            // Get merchant
+            var merchant = await _merchantRepository.GetByExternalIdAsync(merchantId);
+            if (merchant == null)
+            {
+                throw new KeyNotFoundException($"Merchant with ID {merchantId} not found");
+            }
+
+            // Get all active API keys for the merchant
+            var activeKeys = (await _apiKeyRepository.GetByMerchantIdAsync(merchant.Id))
+                .Where(k => k.Status == "ACTIVE")
+                .ToList();
+            if (!activeKeys.Any())
+            {
+                throw new InvalidOperationException($"No active API keys found for merchant {merchantId}");
+            }
+
+            // Generate new secret
+            var newSecret = GenerateSecureRandomString(64);
+
+            // Store new secret in AWS Secrets Manager
+            await _secretsManager.StoreSecretAsync($"apikey-secret-{merchant.Id}", newSecret);
+
+            // Update all active API keys to mark them as rotated
+            foreach (var key in activeKeys)
+            {
+                key.Status = "ROTATED";
+                key.LastRotatedAt = DateTime.UtcNow;
+                await _apiKeyRepository.UpdateAsync(key);
+            }
+
+            // Generate a new API key with the new secret
+            var newApiKey = new ApiKey
+            {
+                Id = Guid.NewGuid(),
+                Key = GenerateApiKey(),
+                Status = "ACTIVE",
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddYears(1),
+                RateLimit = activeKeys.First().RateLimit,
+                AllowedEndpoints = activeKeys.First().AllowedEndpoints,
+                Purpose = activeKeys.First().Purpose,
+                Name = activeKeys.First().Name,
+                Description = "Regenerated after secret loss",
+                MerchantId = merchant.Id
+            };
+
+            await _apiKeyRepository.CreateAsync(newApiKey);
+
+            _logger.LogInformation("Successfully regenerated secret and created new API key for merchant {MerchantId}", merchantId);
+
+            return new ApiKeyResponse
+            {
+                ApiKey = newApiKey.Key,
+                Secret = newSecret,
+                ExpiresAt = newApiKey.ExpiresAt ?? DateTime.UtcNow.AddYears(1),
+                RateLimit = newApiKey.RateLimit,
+                AllowedEndpoints = newApiKey.AllowedEndpoints,
+                Purpose = newApiKey.Purpose
+            };
+        }
+
+        /// <summary>
+        /// Generates the initial API key and secret for a merchant
+        /// </summary>
+        public async Task<GenerateApiKeyResponse> GenerateInitialApiKeyAsync(GenerateApiKeyRequest request)
+        {
+            _logger.LogInformation("Generating initial API key for merchant {MerchantId}", request.MerchantId);
+
+            // Get merchant
+            var merchant = await _merchantRepository.GetByExternalIdAsync(request.MerchantId);
+            if (merchant == null)
+            {
+                throw new KeyNotFoundException($"Merchant with ID {request.MerchantId} not found");
+            }
+
+            // Check if merchant already has any API keys
+            var existingKeys = await _apiKeyRepository.GetByMerchantIdAsync(merchant.Id);
+            if (existingKeys.Any())
+            {
+                throw new InvalidOperationException($"Merchant {request.MerchantId} already has API keys. Use GenerateApiKeyAsync for additional keys.");
+            }
+
+            // Generate new API key and secret
+            var (apiKey, secret) = _apiKeyGenerator.GenerateApiKeyAndSecret();
+
+            // Create new API key
+            var apiKeyEntity = new ApiKey
+            {
+                Id = Guid.NewGuid(),
+                Key = apiKey,
+                Status = "ACTIVE",
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddYears(1),
+                RateLimit = request.RateLimit ?? 1000,
+                AllowedEndpoints = request.AllowedEndpoints ?? Array.Empty<string>(),
+                Purpose = request.Purpose,
+                Name = request.MerchantName ?? merchant.Name,
+                Description = request.Description,
+                MerchantId = merchant.Id
+            };
+
+            await _apiKeyRepository.CreateAsync(apiKeyEntity);
+
+            // Store secret in AWS Secrets Manager
             var secretName = $"feenominal/merchants/{request.MerchantId}/apikeys/{apiKey}";
             var secretValue = new ApiKeySecret
             {
@@ -627,11 +714,16 @@ namespace FeeNominalService.Services
             };
             await _secretsManager.StoreSecretAsync(secretName, JsonSerializer.Serialize(secretValue));
 
+            _logger.LogInformation("Generated initial API key {ApiKeyId} for merchant {MerchantId}", apiKeyEntity.Id, merchant.Id);
+
             return new GenerateApiKeyResponse
             {
                 ApiKey = apiKey,
                 Secret = secret,
-                ExpiresAt = apiKeyEntity.ExpiresAt ?? DateTime.UtcNow.AddDays(30)
+                ExpiresAt = apiKeyEntity.ExpiresAt ?? DateTime.UtcNow.AddYears(1),
+                RateLimit = apiKeyEntity.RateLimit,
+                AllowedEndpoints = apiKeyEntity.AllowedEndpoints,
+                Purpose = apiKeyEntity.Purpose
             };
         }
     }

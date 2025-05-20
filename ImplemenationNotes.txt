@@ -5,6 +5,16 @@
   - We want to make sure connection between DataCenter (GR2) for MerchantPortal->FeeNominalService->Interpayments is secure
   - We want to make sure connection between DataCenter (GR2) for XiPayWSServers->FeeNominalService->Interpayments is secure
   - We can ensure the first half this by making sure the API Access Key is not exposed and is accessed via VPC endpoints
+
+  TODO:
+  5/17/2025
+  - Service provider tables Implementation (Done)
+  - API Key Rotation Process
+  - Error Handling in API Responses.
+  - Merchant validation endpoints
+  - Onboarding flow documentation.
+  - Network timeouts to providers.
+  - Make changes to code base to reflect all init.sql changes to 'id' fields. (Done)
   */
 
   /*With respect to supporting mulitple API Keys per single Merchant

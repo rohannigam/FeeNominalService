@@ -13,7 +13,7 @@ namespace FeeNominalService.Models.ApiKey
         /// Unique identifier for the usage record
         /// </summary>
         [Key]
-        [Column("id")]
+        [Column("api_key_usage_id")]
         public Guid Id { get; set; }
 
         /// <summary>

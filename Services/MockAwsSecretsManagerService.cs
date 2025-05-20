@@ -103,14 +103,28 @@ namespace FeeNominalService.Services
             });
         }
 
-        public Task<T> GetSecretAsync<T>(string secretName) where T : class
+        public async Task<T> GetSecretAsync<T>(string secretName) where T : class
         {
             _logger.LogInformation("Mock: Getting secret {SecretName}", secretName);
 
             if (_mockSecrets.TryGetValue(secretName, out var secretValue))
             {
-                var result = JsonSerializer.Deserialize<T>(secretValue);
-                return Task.FromResult(result ?? throw new InvalidOperationException($"Failed to deserialize secret {secretName}"));
+                try
+                {
+                    var result = await Task.Run(() => JsonSerializer.Deserialize<T>(secretValue));
+                    if (result == null)
+                    {
+                        _logger.LogWarning("Mock: Failed to deserialize secret {SecretName}", secretName);
+                        throw new InvalidOperationException($"Failed to deserialize secret {secretName}");
+                    }
+                    _logger.LogInformation("Mock: Successfully retrieved secret {SecretName}", secretName);
+                    return result;
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "Mock: Error deserializing secret {SecretName}", secretName);
+                    throw new InvalidOperationException($"Invalid secret format: {ex.Message}");
+                }
             }
 
             _logger.LogWarning("Mock: Secret {SecretName} not found", secretName);
@@ -130,12 +144,27 @@ namespace FeeNominalService.Services
             return Task.CompletedTask;
         }
 
-        public Task StoreSecretAsync(string secretName, string secretValue)
+        public async Task StoreSecretAsync(string secretName, string secretValue)
         {
             _logger.LogInformation("Mock: Storing secret {SecretName}", secretName);
-            _mockSecrets[secretName] = secretValue;
-            _logger.LogInformation("Mock: Successfully stored secret {SecretName}", secretName);
-            return Task.CompletedTask;
+            try
+            {
+                // Validate that the secret value is a valid ApiKeySecret
+                var secret = await Task.Run(() => JsonSerializer.Deserialize<ApiKeySecret>(secretValue));
+                if (secret == null)
+                {
+                    throw new InvalidOperationException("Invalid secret format");
+                }
+
+                // Store the validated secret
+                _mockSecrets[secretName] = secretValue;
+                _logger.LogInformation("Mock: Successfully stored secret {SecretName} with ApiKey {ApiKey}", secretName, secret.ApiKey);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Mock: Failed to store secret {SecretName} - Invalid JSON format", secretName);
+                throw new InvalidOperationException($"Invalid secret format: {ex.Message}");
+            }
         }
 
         public Task<IEnumerable<T>> GetAllSecretsAsync<T>() where T : class
@@ -167,26 +196,30 @@ namespace FeeNominalService.Services
             return Task.FromResult(merchantSecrets.ApiKey);
         }
 
-        public Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
+        public async Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
         {
             try
             {
                 var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
-                var secret = GetSecretAsync<ApiKeySecret>(secretName).GetAwaiter().GetResult();
-                return Task.FromResult(!string.IsNullOrEmpty(secret.ApiKey) && 
-                       secret.ApiKey == apiKey && 
-                       !secret.IsRevoked);
+                var secret = await GetSecretAsync<ApiKeySecret>(secretName);
+                var isValid = !string.IsNullOrEmpty(secret.ApiKey) && 
+                             secret.ApiKey == apiKey && 
+                             !secret.IsRevoked;
+                
+                _logger.LogInformation("Mock: API key validation result for {ApiKey}: {IsValid}", apiKey, isValid);
+                return isValid;
             }
             catch (KeyNotFoundException)
             {
-                return Task.FromResult(false);
+                _logger.LogWarning("Mock: API key {ApiKey} not found for merchant {MerchantId}", apiKey, merchantId);
+                return false;
             }
         }
 
-        public Task RevokeApiKeyAsync(string merchantId, string apiKey)
+        public async Task RevokeApiKeyAsync(string merchantId, string apiKey)
         {
             var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
-            var secret = GetSecretAsync<ApiKeySecret>(secretName).GetAwaiter().GetResult();
+            var secret = await GetSecretAsync<ApiKeySecret>(secretName);
             
             if (secret.ApiKey != apiKey)
             {
@@ -197,7 +230,7 @@ namespace FeeNominalService.Services
             secret.RevokedAt = DateTime.UtcNow;
             secret.Status = "REVOKED";
             
-            return UpdateSecretAsync(secretName, secret);
+            await UpdateSecretAsync(secretName, secret);
         }
     }
 } 
