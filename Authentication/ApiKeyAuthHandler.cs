@@ -23,9 +23,8 @@ namespace FeeNominalService.Authentication
             UrlEncoder encoder,
             IRequestSigningService requestSigningService,
             IOptions<ApiKeyConfiguration> apiKeyConfig,
-            ISystemClock clock,
             IApiKeyService apiKeyService)
-            : base(options, logger, encoder, clock)
+            : base(options, logger, encoder)
         {
             _requestSigningService = requestSigningService;
             _logger = logger.CreateLogger<ApiKeyAuthHandler>();
