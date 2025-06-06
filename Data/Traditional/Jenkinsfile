@@ -1,0 +1,207 @@
+pipeline {
+    agent {
+        docker {
+            image 'postgres:15-alpine'
+            args '-v /var/run/postgresql:/var/run/postgresql'
+        }
+    }
+
+    environment {
+        DB_HOST = credentials('DB_HOST')
+        DB_PORT = credentials('DB_PORT')
+        DB_NAME = credentials('DB_NAME')
+        DB_USER = credentials('DB_USER')
+        DB_PASSWORD = credentials('DB_PASSWORD')
+        SCHEMA_NAME = 'fee_nominal'
+        SLACK_CHANNEL = '#db-deployments'
+        DEPLOYMENT_HISTORY_TABLE = 'deployment_history'
+    }
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'staging', 'prod'], description: 'Select deployment environment')
+        booleanParam(name: 'SKIP_BACKUP', defaultValue: false, description: 'Skip database backup')
+        booleanParam(name: 'SKIP_VALIDATION', defaultValue: false, description: 'Skip SQL validation')
+    }
+
+    stages {
+        stage('Initialize') {
+            steps {
+                script {
+                    // Create deployment history table if not exists
+                    sh '''
+                        PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -c "
+                            CREATE TABLE IF NOT EXISTS $SCHEMA_NAME.$DEPLOYMENT_HISTORY_TABLE (
+                                deployment_id SERIAL PRIMARY KEY,
+                                environment VARCHAR(20) NOT NULL,
+                                start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+                                end_time TIMESTAMP WITH TIME ZONE,
+                                status VARCHAR(20) NOT NULL,
+                                error_message TEXT,
+                                backup_file VARCHAR(255),
+                                deployed_by VARCHAR(100) NOT NULL
+                            );
+                        "
+                    '''
+                }
+            }
+        }
+
+        stage('Validate SQL Files') {
+            when {
+                expression { return !params.SKIP_VALIDATION }
+            }
+            steps {
+                script {
+                    try {
+                        sh '''
+                            for file in *.sql; do
+                                if [ -f "$file" ]; then
+                                    echo "Validating $file..."
+                                    psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -f "$file" -v ON_ERROR_STOP=1
+                                fi
+                            done
+                        '''
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error "SQL validation failed: ${e.message}"
+                    }
+                }
+            }
+        }
+
+        stage('Backup Database') {
+            when {
+                expression { return !params.SKIP_BACKUP }
+            }
+            steps {
+                script {
+                    try {
+                        def timestamp = new Date().format('yyyyMMdd_HHmmss')
+                        def backupFile = "backup_${timestamp}.dump"
+                        sh """
+                            pg_dump -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -F c -f $backupFile
+                        """
+                        // Record backup file in deployment history
+                        sh """
+                            PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -c "
+                                INSERT INTO $SCHEMA_NAME.$DEPLOYMENT_HISTORY_TABLE 
+                                (environment, start_time, status, backup_file, deployed_by)
+                                VALUES ('$params.ENVIRONMENT', CURRENT_TIMESTAMP, 'IN_PROGRESS', '$backupFile', '$BUILD_USER');
+                            "
+                        """
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error "Database backup failed: ${e.message}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Changes') {
+            parallel {
+                stage('Deploy Schema') {
+                    steps {
+                        script {
+                            try {
+                                sh '''
+                                    echo "Deploying schema changes..."
+                                    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -f scripts/1.0.0/Step1_Schema.sql
+                                '''
+                            } catch (Exception e) {
+                                currentBuild.result = 'FAILURE'
+                                error "Schema deployment failed: ${e.message}"
+                            }
+                        }
+                    }
+                }
+                stage('Deploy Data') {
+                    steps {
+                        script {
+                            try {
+                                sh '''
+                                    echo "Deploying data changes..."
+                                    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -f scripts/1.0.0/Step2_Data.sql
+                                '''
+                            } catch (Exception e) {
+                                currentBuild.result = 'FAILURE'
+                                error "Data deployment failed: ${e.message}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            echo "Verifying deployment..."
+                            PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -c "
+                                SELECT COUNT(*) FROM $SCHEMA_NAME.merchants;
+                                SELECT COUNT(*) FROM $SCHEMA_NAME.api_keys;
+                                SELECT COUNT(*) FROM $SCHEMA_NAME.transactions;
+                            "
+                        '''
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error "Deployment verification failed: ${e.message}"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                // Update deployment history
+                sh """
+                    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -c "
+                        UPDATE $SCHEMA_NAME.$DEPLOYMENT_HISTORY_TABLE 
+                        SET status = 'SUCCESS', end_time = CURRENT_TIMESTAMP
+                        WHERE environment = '$params.ENVIRONMENT' 
+                        AND status = 'IN_PROGRESS';
+                    "
+                """
+                // Send success notification
+                slackSend(
+                    channel: env.SLACK_CHANNEL,
+                    color: 'good',
+                    message: "Database deployment to ${params.ENVIRONMENT} completed successfully!"
+                )
+            }
+        }
+        failure {
+            script {
+                // Update deployment history
+                sh """
+                    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -c "
+                        UPDATE $SCHEMA_NAME.$DEPLOYMENT_HISTORY_TABLE 
+                        SET status = 'FAILED', end_time = CURRENT_TIMESTAMP, error_message = '${currentBuild.description}'
+                        WHERE environment = '$params.ENVIRONMENT' 
+                        AND status = 'IN_PROGRESS';
+                    "
+                """
+                // Rollback on failure
+                sh '''
+                    echo "Deployment failed. Rolling back..."
+                    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -d $DB_NAME -U $DB_USER -f scripts/1.0.0/Rollback/rollback.sql
+                '''
+                // Send failure notification
+                slackSend(
+                    channel: env.SLACK_CHANNEL,
+                    color: 'danger',
+                    message: "Database deployment to ${params.ENVIRONMENT} failed! Rolling back changes."
+                )
+            }
+        }
+        always {
+            // Cleanup
+            sh 'rm -f backup_*.dump'
+            // Archive deployment logs
+            archiveArtifacts artifacts: '*.log', allowEmptyArchive: true
+        }
+    }
+} 
