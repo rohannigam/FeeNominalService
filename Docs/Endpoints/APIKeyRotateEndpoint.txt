@@ -1,0 +1,213 @@
+# API Key Rotation Endpoint
+
+**Endpoint:** `/api/v1/onboarding/apikey/rotate`
+
+## Overview
+This endpoint is used to rotate (replace) an existing API key with a new one while maintaining the same secret. This is a security best practice that allows for key rotation without disrupting existing integrations.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Old key is marked as rotated but not immediately revoked
+- All sensitive data is encrypted at rest
+- Secrets are stored in environment-specific secure storage
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Request Body (RotateApiKeyRequest)
+```json
+{
+    "merchantId": "guid",              // Required, internal merchant ID
+    "reason": "string",                // Optional, reason for rotation
+    "onboardingMetadata": {            // Required
+        "adminUserId": "string",       // Required
+        "onboardingReference": "string", // Required
+        "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
+}
+```
+
+## Response (ApiKeyInfo)
+```json
+{
+    "apiKey": "string",               // New API key
+    "description": "string",          // Description
+    "rateLimit": 1000,               // Rate limit value
+    "allowedEndpoints": [            // Allowed endpoints
+        "string"
+    ],
+    "status": "ACTIVE",              // Status
+    "createdAt": "datetime",         // Creation timestamp
+    "lastRotatedAt": "datetime",     // Last rotation timestamp
+    "revokedAt": "datetime",         // Revocation timestamp if applicable
+    "expiresAt": "datetime",         // Expiration timestamp
+    "isRevoked": false,              // Revocation status
+    "isExpired": false               // Expiration status
+}
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `NO_ACTIVE_KEY`: No active key found to rotate
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X POST http://localhost:5000/api/v1/onboarding/apikey/rotate \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "reason": "Regular rotation",
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "ROTATE-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+### Production
+```bash
+curl -X POST https://api.feenominal.com/api/v1/onboarding/apikey/rotate \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "reason": "Security rotation",
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "ROTATE-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates request body structure
+   - Checks merchant exists and has active key
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Gets current active API key
+   - Generates new API key
+   - Marks old key as rotated
+   - Creates new key record
+   - Creates audit trail entry
+
+3. **Secret Management**:
+   - Reuses existing secret
+   - Updates secret metadata
+   - Stores in appropriate location based on environment
+
+4. **Response Generation**:
+   - Returns ApiKeyInfo with new key details
+   - Includes rotation metadata
+   - Includes status information
+
+## Workflow Diagrams
+
+### API Key Rotation Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Secrets
+
+    Client->>API: POST /api/v1/onboarding/apikey/rotate
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Get current active key
+    DB-->>API: Active key details
+    API->>API: Generate new API key
+    API->>DB: Mark old key as rotated
+    API->>DB: Create new key record
+    API->>Secrets: Update secret metadata
+    API->>DB: Create audit trail
+    API-->>Client: Return new key info
+```
+
+### Key Status Transition
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE
+    ACTIVE --> ROTATED: Rotation
+    ROTATED --> REVOKED: Revocation
+    REVOKED --> [*]
+    ACTIVE --> REVOKED: Direct Revocation
+    ACTIVE --> EXPIRED: Time Expired
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|No Active Key| E[404 Not Found]
+    D -->|Invalid Merchant| F[404 Not Found]
+    D -->|Success| G[200 OK]
+    D -->|Error| H[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Rotate keys regularly (e.g., every 90 days)
+   - Monitor for suspicious activity
+   - Keep audit trail of rotations
+   - Implement proper validation
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Handle edge cases gracefully
+   - Maintain audit trail
+
+3. **Performance**:
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+   - Cache frequently accessed data
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular security audits
+   - Plan for key rotation 

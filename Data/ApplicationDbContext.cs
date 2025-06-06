@@ -52,20 +52,29 @@ namespace FeeNominalService.Data
             modelBuilder.Entity<SurchargeProviderConfig>().ToTable("surcharge_provider_configs");
             modelBuilder.Entity<SurchargeProviderConfigHistory>().ToTable("surcharge_provider_config_history");
             modelBuilder.Entity<ApiKeySecret>().ToTable("api_key_secrets");
-            modelBuilder.Entity<MerchantAuditTrail>().ToTable("merchant_audit_trail");
+            modelBuilder.Entity<MerchantAuditTrail>().ToTable("merchant_audit_trail", schema: "fee_nominal");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.MerchantAuditTrailId).HasColumnName("merchant_audit_trail_id");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.MerchantId).HasColumnName("merchant_id");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.Action).HasColumnName("action");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.EntityType).HasColumnName("entity_type");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.PropertyName).HasColumnName("property_name");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.OldValue).HasColumnName("old_value");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.NewValue).HasColumnName("new_value");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.CreatedAt).HasColumnName("created_at");
+            modelBuilder.Entity<MerchantAuditTrail>().Property(e => e.UpdatedBy).IsRequired().HasMaxLength(50).HasColumnName("updated_by");
 
             // Configure MerchantAuditTrail
             modelBuilder.Entity<MerchantAuditTrail>(entity =>
             {
-                entity.HasKey(e => e.AuditTrailId);
-                entity.Property(e => e.AuditTrailId).HasColumnName("audit_trail_id");
+                entity.HasKey(e => e.MerchantAuditTrailId);
+                entity.Property(e => e.MerchantAuditTrailId).HasColumnName("merchant_audit_trail_id");
                 entity.Property(e => e.MerchantId).HasColumnName("merchant_id").IsRequired();
-                entity.Property(e => e.ExternalMerchantId).HasColumnName("external_merchant_id").IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Action).HasColumnName("action").IsRequired().HasMaxLength(50);
-                entity.Property(e => e.FieldName).HasColumnName("field_name").IsRequired().HasMaxLength(100);
+                entity.Property(e => e.EntityType).HasColumnName("entity_type").IsRequired().HasMaxLength(50);
+                entity.Property(e => e.PropertyName).HasColumnName("property_name").HasMaxLength(100);
                 entity.Property(e => e.OldValue).HasColumnName("old_value");
                 entity.Property(e => e.NewValue).HasColumnName("new_value");
-                entity.Property(e => e.Timestamp).HasColumnName("timestamp").IsRequired();
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
                 entity.Property(e => e.UpdatedBy).HasColumnName("updated_by").IsRequired().HasMaxLength(50);
 
                 entity.HasOne(e => e.Merchant)

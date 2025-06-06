@@ -204,15 +204,14 @@ CREATE TABLE IF NOT EXISTS fee_nominal.api_key_secrets (
 CREATE TABLE IF NOT EXISTS fee_nominal.merchant_audit_trail (
     merchant_audit_trail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     merchant_id UUID NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
-    external_merchant_id VARCHAR(50) NOT NULL,
     action VARCHAR(50) NOT NULL,
-    old_values JSONB,
-    new_values JSONB,
-    performed_by VARCHAR(50) NOT NULL,
-    performed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    additional_info JSONB
+    entity_type VARCHAR(50) NOT NULL,
+    property_name VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT,
+    updated_by VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_merchant_audit_trail_merchant FOREIGN KEY (merchant_id) REFERENCES fee_nominal.merchants(merchant_id)
 );
 
 -- =============================================
@@ -254,9 +253,10 @@ CREATE INDEX IF NOT EXISTS idx_batch_transactions_external_source ON fee_nominal
 CREATE INDEX IF NOT EXISTS idx_api_key_secrets_api_key ON fee_nominal.api_key_secrets(api_key);
 CREATE INDEX IF NOT EXISTS idx_api_key_secrets_merchant_id ON fee_nominal.api_key_secrets(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_merchant_id ON fee_nominal.merchant_audit_trail(merchant_id);
-CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_external_merchant_id ON fee_nominal.merchant_audit_trail(external_merchant_id);
-CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_timestamp ON fee_nominal.merchant_audit_trail(timestamp);
+CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_created_at ON fee_nominal.merchant_audit_trail(created_at);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_action ON fee_nominal.merchant_audit_trail(action);
+CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_entity_type ON fee_nominal.merchant_audit_trail(entity_type);
+CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_property_name ON fee_nominal.merchant_audit_trail(property_name);
 CREATE INDEX IF NOT EXISTS idx_merchants_external_merchant_guid ON fee_nominal.merchants(external_merchant_guid);
 
 -- =============================================

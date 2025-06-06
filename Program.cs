@@ -24,6 +24,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
 using FeeNominalService.Repositories;
 using FeeNominalService.Middleware;
+using FeeNominalService.Services.AWS;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,7 +59,12 @@ builder.Services.AddSwaggerGen();
 builder.Services.ConfigureOptions<SwaggerConfiguration>();
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.MaxDepth = 64;
+    });
 builder.Services.AddMemoryCache();
 
 // Add HttpClient factory
@@ -70,26 +76,21 @@ builder.Services.Configure<ApiKeyConfiguration>(builder.Configuration.GetSection
 
 // Add AWS Secrets Manager
 builder.Services.AddAWSService<IAmazonSecretsManager>();
-builder.Services.AddScoped<IAwsSecretsManagerService>(sp =>
+
+// Register services
+if (builder.Environment.IsDevelopment())
 {
-    var env = sp.GetRequiredService<IHostEnvironment>();
-    if (env.IsDevelopment())
-    {
-        return new MockAwsSecretsManagerService(
-            sp.GetRequiredService<ILogger<MockAwsSecretsManagerService>>(),
-            sp.GetRequiredService<IOptions<ApiKeyConfiguration>>()
-        );
-    }
-    return new AwsSecretsManagerService(
-        sp.GetRequiredService<IAmazonSecretsManager>(),
-        sp.GetRequiredService<ILogger<AwsSecretsManagerService>>(),
-        sp.GetRequiredService<IOptions<ApiKeyConfiguration>>()
-    );
-});
+    builder.Services.AddScoped<IAwsSecretsManagerService, FeeNominalService.Services.AWS.LocalApiKeySecretService>();
+}
+else
+{
+    builder.Services.AddScoped<IAwsSecretsManagerService, AwsSecretsManagerService>();
+}
 
 // Register repositories
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IMerchantRepository, MerchantRepository>();
+builder.Services.AddScoped<IMerchantAuditTrailRepository, MerchantAuditTrailRepository>();
 
 // Register services
 builder.Services.AddScoped<IMerchantService, MerchantService>();

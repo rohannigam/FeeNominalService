@@ -1,0 +1,192 @@
+# Merchant Details Endpoint
+
+**Endpoint:** `/api/v1/onboarding/merchants/{merchantId}`
+
+## Overview
+This endpoint is used to retrieve detailed information about a merchant, including their profile, settings, and current status. This is essential for merchant management and monitoring.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Returns only details for the authenticated merchant
+- All sensitive data is encrypted at rest
+- Access is logged in audit trail
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Response (MerchantDetailsResponse)
+```json
+{
+    "merchantId": "guid",                    // Merchant ID
+    "externalMerchantId": "string",          // External merchant identifier
+    "merchantName": "string",                // Merchant's business name
+    "status": "string",                      // Current merchant status
+    "createdAt": "datetime",                 // When merchant was created
+    "updatedAt": "datetime",                 // When merchant was last updated
+    "settings": {                            // Merchant settings
+        "defaultCurrency": "string",         // Default currency code
+        "timezone": "string",                // Merchant's timezone
+        "notificationPreferences": {         // Notification settings
+            "email": ["string"],             // Email addresses
+            "webhook": "string"              // Webhook URL
+        }
+    },
+    "limits": {                              // Merchant limits
+        "rateLimit": 0,                      // API rate limit
+        "maxApiKeys": 0,                     // Maximum allowed API keys
+        "maxWebhooks": 0                     // Maximum allowed webhooks
+    },
+    "metadata": {                            // Additional metadata
+        "key": "value"
+    },
+    "statistics": {                          // Merchant statistics
+        "totalTransactions": 0,              // Total transactions
+        "activeApiKeys": 0,                  // Number of active API keys
+        "lastActivity": "datetime"           // Last activity timestamp
+    }
+}
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X GET "http://localhost:5000/api/v1/onboarding/merchants/123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+### Production
+```bash
+curl -X GET "https://api.feenominal.com/api/v1/onboarding/merchants/123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates merchant ID parameter
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Retrieves merchant details
+   - Retrieves merchant settings
+   - Retrieves merchant statistics
+   - Creates audit trail entry for the request
+
+3. **Response Generation**:
+   - Formats merchant details
+   - Includes all relevant information
+   - Applies any necessary transformations
+   - Sorts data logically
+
+## Workflow Diagrams
+
+### Merchant Details Retrieval Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Audit
+
+    Client->>API: GET /merchants/{id}
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Get merchant details
+    DB-->>API: Merchant data
+    API->>DB: Get merchant statistics
+    DB-->>API: Statistics data
+    API->>Audit: Create access audit entry
+    API-->>Client: Return merchant details
+```
+
+### Data Aggregation Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validate Merchant}
+    B -->|Invalid| C[404 Not Found]
+    B -->|Valid| D[Get Basic Details]
+    D --> E[Get Settings]
+    E --> F[Get Statistics]
+    F --> G[Format Response]
+    G --> H[Create Audit]
+    H --> I[Return Response]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Invalid Merchant| E[404 Not Found]
+    D -->|Success| F[200 OK]
+    D -->|Error| G[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Validate all input fields
+   - Track all access in audit trail
+   - Implement proper validation
+   - Monitor for suspicious activity
+   - Implement rate limiting
+   - Encrypt sensitive data
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Handle edge cases gracefully
+   - Maintain audit trail
+   - Validate merchant status
+
+3. **Performance**:
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+   - Cache frequently accessed data
+   - Use efficient data loading
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular security audits
+   - Review audit logs
+   - Update merchant statistics
+   - Maintain data consistency 

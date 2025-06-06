@@ -1,0 +1,316 @@
+# Surcharge Provider Endpoints
+
+## Overview
+This document covers all endpoints related to managing surcharge providers in the system. These endpoints allow for creating, retrieving, updating, and managing surcharge provider configurations, with special consideration for Interpayments integration.
+
+## Base Endpoint
+`/api/v1/surcharge-providers`
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- All sensitive data is encrypted at rest
+- Provider credentials are stored securely
+- Access is logged in audit trail
+
+## Common Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Endpoints
+
+### 1. Create Surcharge Provider
+**POST** `/api/v1/surcharge-providers`
+
+#### Request Body
+```json
+{
+    "name": "string",                // Required, max 100 chars
+    "code": "string",                // Required, max 20 chars
+    "description": "string",         // Optional
+    "baseUrl": "string",            // Required, max 255 chars
+    "authenticationType": "string",  // Required, max 50 chars
+    "credentialsSchema": {           // Required
+        "required_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
+        ]
+    },
+    "status": "string"              // Required, max 20 chars
+}
+```
+
+#### Example: Adding Interpayments Provider
+```bash
+curl -X POST "https://api.feenominal.com/api/v1/surcharge-providers" \
+  -H "Content-Type: application/json" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -d '{
+    "name": "Interpayments",
+    "code": "INTERPAY",
+    "description": "Interpayments Surcharge Provider",
+    "baseUrl": "https://api.interpayments.com/v1",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            }
+        ]
+    },
+    "status": "active"
+}'
+```
+
+### 2. Get All Surcharge Providers
+**GET** `/api/v1/surcharge-providers`
+
+#### Example Request
+```bash
+curl -X GET "https://api.feenominal.com/api/v1/surcharge-providers" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+### 3. Get Surcharge Provider by ID
+**GET** `/api/v1/surcharge-providers/{providerId}`
+
+#### Example Request
+```bash
+curl -X GET "https://api.feenominal.com/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+### 4. Update Surcharge Provider
+**PUT** `/api/v1/surcharge-providers/{providerId}`
+
+#### Request Body
+```json
+{
+    "name": "string",                // Required, max 100 chars
+    "description": "string",         // Optional
+    "baseUrl": "string",            // Required, max 255 chars
+    "authenticationType": "string",  // Required, max 50 chars
+    "credentialsSchema": {           // Required
+        "required_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
+        ]
+    },
+    "status": "string"              // Required, max 20 chars
+}
+```
+
+#### Example: Updating Interpayments Provider
+```bash
+curl -X PUT "https://api.feenominal.com/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+  -H "Content-Type: application/json" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -d '{
+    "name": "Interpayments Updated",
+    "description": "Updated Interpayments Configuration",
+    "baseUrl": "https://api.interpayments.com/v2",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            },
+            {
+                "name": "token_endpoint",
+                "type": "string",
+                "description": "JWT Token Endpoint"
+            }
+        ]
+    },
+    "status": "active"
+}'
+```
+
+### 5. Delete Surcharge Provider
+**DELETE** `/api/v1/surcharge-providers/{providerId}`
+
+#### Example Request
+```bash
+curl -X DELETE "https://api.feenominal.com/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+## Response Formats
+
+### Success Response
+```json
+{
+    "id": "guid",                    // Provider ID
+    "name": "string",                // Provider name
+    "code": "string",                // Provider code
+    "description": "string",         // Provider description
+    "baseUrl": "string",            // Base URL
+    "authenticationType": "string",  // Authentication type
+    "credentialsSchema": {           // Credentials schema
+        "required_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
+        ]
+    },
+    "status": "string",             // Provider status
+    "createdAt": "datetime",        // Creation timestamp
+    "updatedAt": "datetime"         // Last update timestamp
+}
+```
+
+### Error Response
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `PROVIDER_NOT_FOUND`: Provider does not exist
+- `DUPLICATE_CODE`: Provider code already exists
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Workflow Diagrams
+
+### Provider Management Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Audit
+
+    Client->>API: Request
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Perform operation
+    DB-->>API: Operation result
+    API->>Audit: Log action
+    API-->>Client: Return response
+```
+
+### Provider Creation Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validate Input}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Check Duplicate}
+    D -->|Exists| E[409 Conflict]
+    D -->|New| F[Create Provider]
+    F --> G[Store Credentials]
+    G --> H[Return Response]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Invalid Provider| E[404 Not Found]
+    D -->|Duplicate| F[409 Conflict]
+    D -->|Success| G[200 OK]
+    D -->|Error| H[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Always use HTTPS
+   - Implement proper authentication
+   - Encrypt sensitive data
+   - Monitor access patterns
+   - Regular security audits
+
+2. **Error Handling**:
+   - Return meaningful errors
+   - Log all errors
+   - Handle edge cases
+   - Maintain audit trail
+   - Validate input data
+
+3. **Performance**:
+   - Cache provider data
+   - Optimize queries
+   - Monitor response times
+   - Use proper indexing
+   - Implement rate limiting
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular backups
+   - Version control
+   - Update provider configurations
+   - Monitor provider health 

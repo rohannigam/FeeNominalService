@@ -62,4 +62,9 @@ public class ApiKeyConfiguration
     /// Request time window in minutes
     /// </summary>
     public int RequestTimeWindowMinutes { get; set; } = 5;
+
+    /// <summary>
+    /// Allowed endpoints for the API key
+    /// </summary>
+    public string[] AllowedEndpoints { get; set; } = Array.Empty<string>();
 } 

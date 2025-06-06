@@ -1,0 +1,196 @@
+# Merchant Audit Trail Endpoint
+
+**Endpoint:** `/api/v1/onboarding/merchants/{merchantId}/audit-trail`
+
+## Overview
+This endpoint is used to retrieve the audit trail for a merchant, including all actions performed on the merchant's account, API keys, and related resources. This is essential for security monitoring and compliance.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Returns only audit trail for the authenticated merchant
+- All sensitive data is encrypted at rest
+- Audit trail entries cannot be modified
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Query Parameters
+- `startDate`: Optional, filter entries from this date (ISO 8601)
+- `endDate`: Optional, filter entries until this date (ISO 8601)
+- `actionType`: Optional, filter by action type (e.g., "API_KEY_GENERATED")
+- `page`: Optional, page number for pagination (default: 1)
+- `pageSize`: Optional, items per page (default: 50, max: 100)
+
+## Response (AuditTrailResponse)
+```json
+{
+    "items": [
+        {
+            "id": "guid",                    // Audit trail entry ID
+            "merchantId": "guid",            // Merchant ID
+            "actionType": "string",          // Type of action
+            "entityType": "string",          // Type of entity affected
+            "entityId": "string",            // ID of affected entity
+            "oldValue": "string",            // Previous value
+            "newValue": "string",            // New value
+            "performedBy": "string",         // User who performed the action
+            "performedAt": "datetime",       // When the action was performed
+            "ipAddress": "string",           // IP address of the request
+            "userAgent": "string",           // User agent of the request
+            "metadata": {                    // Additional metadata
+                "key": "value"
+            }
+        }
+    ],
+    "totalCount": 0,                        // Total number of entries
+    "pageCount": 0,                         // Total number of pages
+    "currentPage": 1,                       // Current page number
+    "pageSize": 50                          // Items per page
+}
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `INVALID_DATE_RANGE`: Invalid date range specified
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X GET "http://localhost:5000/api/v1/onboarding/merchants/123e4567-e89b-12d3-a456-426614174000/audit-trail?startDate=2024-01-01T00:00:00Z&endDate=2024-03-20T23:59:59Z&actionType=API_KEY_GENERATED&page=1&pageSize=50" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+### Production
+```bash
+curl -X GET "https://api.feenominal.com/api/v1/onboarding/merchants/123e4567-e89b-12d3-a456-426614174000/audit-trail?startDate=2024-01-01T00:00:00Z&endDate=2024-03-20T23:59:59Z&actionType=API_KEY_GENERATED&page=1&pageSize=50" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates merchant ID parameter
+   - Validates date range and pagination parameters
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Retrieves audit trail entries
+   - Applies filters (date range, action type)
+   - Applies pagination
+   - Creates audit trail entry for the request
+
+3. **Response Generation**:
+   - Returns paginated audit trail entries
+   - Includes pagination metadata
+   - Includes total counts
+   - Sorts by performedAt (newest first)
+
+## Workflow Diagrams
+
+### Audit Trail Retrieval Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Audit
+
+    Client->>API: GET /merchants/{id}/audit-trail
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Get merchant audit trail
+    DB-->>API: Audit trail entries
+    API->>API: Apply filters & pagination
+    API->>Audit: Create access audit entry
+    API-->>Client: Return audit trail
+```
+
+### Data Filtering Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validate Merchant}
+    B -->|Invalid| C[404 Not Found]
+    B -->|Valid| D[Get Audit Trail]
+    D --> E[Apply Date Filter]
+    E --> F[Apply Action Filter]
+    F --> G[Apply Pagination]
+    G --> H[Format Response]
+    H --> I[Create Audit]
+    I --> J[Return Response]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Invalid Merchant| E[404 Not Found]
+    D -->|Invalid Date Range| F[400 Bad Request]
+    D -->|Success| G[200 OK]
+    D -->|Error| H[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Validate all input fields
+   - Track all access in audit trail
+   - Implement proper validation
+   - Monitor for suspicious activity
+   - Implement rate limiting
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Handle edge cases gracefully
+   - Maintain audit trail
+   - Validate date ranges
+
+3. **Performance**:
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+   - Cache frequently accessed data
+   - Use efficient pagination
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular security audits
+   - Review audit logs
+   - Archive old audit entries
+   - Implement data retention policies 

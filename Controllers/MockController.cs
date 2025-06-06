@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FeeNominalService.Services;
 using FeeNominalService.Models.ApiKey;
+using FeeNominalService.Services.AWS;
 
 namespace FeeNominalService.Controllers
 {

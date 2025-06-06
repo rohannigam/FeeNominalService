@@ -13,11 +13,6 @@ namespace FeeNominalService.Models.ApiKey
         public string ApiKey { get; set; } = string.Empty;
 
         /// <summary>
-        /// The API key secret
-        /// </summary>
-        public string Secret { get; set; } = string.Empty;
-
-        /// <summary>
         /// Optional description of the API key
         /// </summary>
         public string Description { get; set; } = string.Empty;

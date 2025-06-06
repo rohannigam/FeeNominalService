@@ -10,7 +10,101 @@
 			"name": "API Key Management (v1)",
 			"item": [
 				{
-					"name": "Get All Merchant API Keys",
+					"name": "Initial API Key Generation",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate UTC timestamp",
+									"const now = new Date();",
+									"const utcTimestamp = now.toISOString();",
+									"",
+									"pm.environment.set('timestamp', utcTimestamp);",
+									"",
+									"// Generate random nonce",
+									"const nonce = Math.random().toString(36).substring(2, 12);",
+									"pm.environment.set('nonce', nonce);",
+									"",
+									"// Generate random 4-digit merchant ID",
+									"const randomMerchantId = Math.floor(1000 + Math.random() * 9000).toString();",
+									"pm.environment.set('externalMerchantId', randomMerchantId);",
+									"",
+									"// Generate random merchant name",
+									"const adjectives = ['Global', 'Premium', 'Elite', 'Prime', 'Royal', 'Supreme', 'Ultimate', 'Grand', 'Mega', 'Super'];",
+									"const nouns = ['Merchant', 'Trading', 'Commerce', 'Retail', 'Business', 'Enterprise', 'Ventures', 'Solutions', 'Services', 'Group'];",
+									"const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];",
+									"const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];",
+									"const randomMerchantName = `${randomAdjective} ${randomNoun} ${randomMerchantId}`;",
+									"pm.environment.set('merchantName', randomMerchantName);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save API key and secret from response",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set(\"merchantId\", jsonData.merchantId);",
+									"pm.environment.set(\"externalMerchantId\", jsonData.externalMerchantId);",
+									"pm.environment.set(\"merchantName\", jsonData.merchantName);",
+									"pm.environment.set(\"apiKey\", jsonData.apiKey);",
+									"pm.environment.set(\"apiSecret\", jsonData.secret);",
+									"pm.environment.set(\"apiKeyId\", jsonData.apiKeyId);",
+									"pm.environment.set(\"rateLimit\", jsonData.rateLimit);",
+									"pm.environment.set(\"allowedEndpoints\", JSON.stringify(jsonData.allowedEndpoints));",
+									"pm.environment.set(\"expiresAt\", jsonData.expiresAt);",
+									"pm.environment.set(\"createdAt\", jsonData.createdAt);",
+									"",
+									"// Log all saved values for verification",
+									"console.log(\"Saved merchantId: \" + pm.environment.get(\"merchantId\"));",
+									"console.log(\"Saved externalMerchantId: \" + pm.environment.get(\"externalMerchantId\"));",
+									"console.log(\"Saved merchantName: \" + pm.environment.get(\"merchantName\"));",
+									"console.log(\"Saved apiKey: \" + pm.environment.get(\"apiKey\"));",
+									"console.log(\"Saved apiSecret: \" + pm.environment.get(\"apiSecret\"));",
+									"console.log(\"Saved apiKeyId: \" + pm.environment.get(\"apiKeyId\"));",
+									"console.log(\"Saved rateLimit: \" + pm.environment.get(\"rateLimit\"));",
+									"console.log(\"Saved allowedEndpoints: \" + pm.environment.get(\"allowedEndpoints\"));",
+									"console.log(\"Saved expiresAt: \" + pm.environment.get(\"expiresAt\"));",
+									"console.log(\"Saved createdAt: \" + pm.environment.get(\"createdAt\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Timestamp",
+								"value": "{{timestamp}}",
+								"type": "text"
+							},
+							{
+								"key": "X-Nonce",
+								"value": "{{nonce}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"externalMerchantId\": \"{{externalMerchantId}}\",\n    \"merchantName\": \"{{merchantName}}\",\n    \"description\": \"{{apiKeyDescription}}\",\n    \"rateLimit\": {{apiKeyRateLimit}},\n    \"allowedEndpoints\": {{apiKeyAllowedEndpoints}},\n    \"purpose\": \"{{apiKeyPurpose}}\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{timestamp}}\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/initial-generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "onboarding", "apikey", "initial-generate"]
+						}
+					}
+				},
+				{
+					"name": "Generate API Key",
 					"event": [
 						{
 							"listen": "prerequest",
@@ -18,6 +112,309 @@
 								"exec": [
 									"// Generate timestamp and nonce",
 									"const timestamp = new Date().toISOString();",
+									"const nonce = pm.variables.replaceIn('{{$guid}}');",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment. Please run Initial API Key Generation first.');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment. Please run Initial API Key Generation first.');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment. Please run Initial API Key Generation first.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign",
+									"const data = timestamp + nonce + pm.request.body.raw;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(data, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Log values for debugging",
+									"console.log('Using Merchant ID:', merchantId);",
+									"console.log('Using API Key:', apiKey);",
+									"console.log('Generated Timestamp:', timestamp);",
+									"console.log('Generated Nonce:', nonce);",
+									"console.log('Generated Signature:', signature);",
+									"console.log('Data being signed:', data);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save the API key and secret from the response",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.success && response.data) {",
+									"        pm.environment.set('apiKey', response.data.apiKey);",
+									"        pm.environment.set('apiSecret', response.data.secret);",
+									"        console.log('Saved new API key and secret to environment');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"API Key for testing\",\n    \"rateLimit\": 1000,\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\"\n    ],\n    \"purpose\": \"TESTING\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"test-admin\",\n        \"onboardingReference\": \"{{$guid}}\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "onboarding", "apikey", "generate"]
+						}
+					}
+				},
+				{
+					"name": "Rotate API Key",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = pm.variables.replaceIn('{{$guid}}');",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"if (!secret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID and API key from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"const apiKey = pm.environment.get('apiKey');",
+									"",
+									"if (!merchantId || !apiKey) {",
+									"    console.error('Merchant ID or API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce + pm.request.body.raw;",
+									"console.log('Data being signed:', dataToSign);",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Log values for debugging",
+									"console.log('Using Merchant ID:', merchantId);",
+									"console.log('Using API Key:', apiKey);",
+									"console.log('Generated Timestamp:', timestamp);",
+									"console.log('Generated Nonce:', nonce);",
+									"console.log('Generated Signature:', signature);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('apiKey');",
+									"        pm.expect(jsonData.data).to.have.property('secret');",
+									"        ",
+									"        // Save new API key and secret to environment",
+									"        pm.environment.set('apiKey', jsonData.data.apiKey);",
+									"        pm.environment.set('apiSecret', jsonData.data.secret);",
+									"        ",
+									"        console.log('New API Key saved:', jsonData.data.apiKey);",
+									"        console.log('New API Secret saved:', jsonData.data.secret);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/rotate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "onboarding", "apikey", "rotate"]
+						}
+					}
+				},
+				{
+					"name": "Update API Key",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce + pm.request.body.raw;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\",\n    \"description\": \"{{apiKeyDescription}}\",\n    \"rateLimit\": {{apiKeyRateLimit}},\n    \"allowedEndpoints\": {{apiKeyAllowedEndpoints}}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/update",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "onboarding", "apikey", "update"]
+						}
+					}
+				},
+				{
+					"name": "Revoke API Key",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce + pm.request.body.raw;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"admin123\",\n        \"onboardingReference\": \"TEST-REF-005\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/revoke",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "onboarding", "apikey", "revoke"]
+						}
+					}
+				},
+				{
+					"name": "Get All Merchant API Keys",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
 									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
 									"// Get request body",
@@ -111,92 +508,110 @@
 					}
 				},
 				{
-					"name": "Generate Initial API Key",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Set default values if not already set",
-									"if (!pm.environment.get('merchantId')) {",
-									"    pm.environment.set('merchantId', 'DEV001');",
-									"}",
-									"if (!pm.environment.get('testDescription')) {",
-									"    pm.environment.set('testDescription', 'Test API Key');",
-									"}",
-									"if (!pm.environment.get('testRateLimit')) {",
-									"    pm.environment.set('testRateLimit', '1000');",
-									"}",
-									"if (!pm.environment.get('adminUserId')) {",
-									"    pm.environment.set('adminUserId', 'admin123');",
-									"}",
-									"if (!pm.environment.get('onboardingReference')) {",
-									"    pm.environment.set('onboardingReference', 'TEST-REF-001');",
-									"}",
-									"if (!pm.environment.get('testPurpose')) {",
-									"    pm.environment.set('testPurpose', 'GENERAL');",
-									"}",
-									"",
-									"// Set the request body with properly formatted timestamp",
-									"const requestBody = {",
-									"    merchantId: pm.environment.get('merchantId'),",
-									"    description: pm.environment.get('testDescription'),",
-									"    rateLimit: parseInt(pm.environment.get('testRateLimit')),",
-									"    purpose: pm.environment.get('testPurpose'),",
-									"    allowedEndpoints: [",
-									"        '/api/v1/surchargefee/calculate',",
-									"        '/api/v1/surchargefee/calculate-batch',",
-									"        '/api/v1/refunds/process',",
-									"        '/api/v1/refunds/process-batch',",
-									"        '/api/v1/sales/process',",
-									"        '/api/v1/sales/process-batch',",
-									"        '/api/v1/cancel',",
-									"        '/api/v1/cancel/batch'",
-									"    ],",
-									"    onboardingMetadata: {",
-									"        adminUserId: pm.environment.get('adminUserId'),",
-									"        onboardingReference: pm.environment.get('onboardingReference'),",
-									"        onboardingTimestamp: new Date().toISOString()",
-									"    }",
-									"};",
-									"",
-									"pm.request.body.raw = JSON.stringify(requestBody);"
-								],
-								"type": "text/javascript"
+					"name": "Get Merchant by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
 							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('data');",
-									"    pm.expect(jsonData.data).to.have.property('apiKey');",
-									"    pm.expect(jsonData.data).to.have.property('secret');",
-									"    pm.expect(jsonData.data).to.have.property('purpose');",
-									"});",
-									"",
-									"// Store API key and secret in environment",
-									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.data) {",
-									"    pm.environment.set('apiKey', jsonData.data.apiKey);",
-									"    pm.environment.set('apiSecret', jsonData.data.secret);",
-									"    pm.environment.set('initialApiKey', jsonData.data.apiKey);",
-									"    pm.environment.set('initialApiSecret', jsonData.data.secret);",
-									"    console.log('Stored API Key:', jsonData.data.apiKey);",
-									"    console.log('Stored Secret:', jsonData.data.secret);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/merchants/{{merchantId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"onboarding",
+								"merchants",
+								"{{merchantId}}"
+							]
 						}
-					],
+					}
+				},
+				{
+					"name": "Get Merchant by External ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/merchants/external/{{externalMerchantId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"onboarding",
+								"merchants",
+								"external",
+								"{{externalMerchantId}}"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Merchant by External GUID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/merchants/external-guid/{{externalMerchantGuid}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"onboarding",
+								"merchants",
+								"external-guid",
+								"{{externalMerchantGuid}}"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Merchant Audit Trail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/onboarding/merchants/{{merchantId}}/audit-trail",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"onboarding",
+								"merchants",
+								"{{merchantId}}",
+								"audit-trail"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Merchant Status",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -207,10 +622,10 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"{{testDescription}}\",\n    \"rateLimit\": {{testRateLimit}},\n    \"purpose\": \"{{testPurpose}}\",\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ],\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{$timestamp}}\"\n    }\n}"
+							"raw": "{\n    \"statusId\": \"{{statusId}}\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/initial-generate",
+							"raw": "{{baseUrl}}/api/v1/onboarding/merchants/{{merchantId}}/status",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -218,101 +633,45 @@
 								"api",
 								"v1",
 								"onboarding",
-								"apikey",
-								"initial-generate"
+								"merchants",
+								"{{merchantId}}",
+								"status"
 							]
 						}
 					}
-				},
+				}
+			]
+		},
+		{
+			"name": "Surcharge Provider Management",
+			"item": [
 				{
-					"name": "Generate Subsequent API Key",
+					"name": "Create Surcharge Provider",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
 								"exec": [
 									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
 									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    merchantId: pm.environment.get('merchantId'),",
-									"    description: pm.environment.get('testDescription'),",
-									"    rateLimit: parseInt(pm.environment.get('testRateLimit')),",
-									"    purpose: pm.environment.get('testPurpose'),",
-									"    allowedEndpoints: [",
-									"        '/api/v1/surchargefee/calculate',",
-									"        '/api/v1/surchargefee/calculate-batch',",
-									"        '/api/v1/refunds/process',",
-									"        '/api/v1/refunds/process-batch',",
-									"        '/api/v1/sales/process',",
-									"        '/api/v1/sales/process-batch',",
-									"        '/api/v1/cancel',",
-									"        '/api/v1/cancel/batch'",
-									"    ],",
-									"    onboardingMetadata: {",
-									"        adminUserId: pm.environment.get('adminUserId'),",
-									"        onboardingReference: pm.environment.get('onboardingReference'),",
-									"        onboardingTimestamp: timestamp",
-									"    }",
-									"});",
-									"",
 									"// Get secret from environment",
-									"const secret = pm.environment.get('initialApiSecret');",
-									"console.log('Using secret for signature:', secret);",
+									"const secret = pm.environment.get('apiSecret');",
 									"",
 									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
+									"const dataToSign = timestamp + nonce + pm.request.body.raw;",
 									"",
 									"// Generate HMAC-SHA256 signature",
 									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
 									"",
 									"// Set headers",
 									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('initialApiKey') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
 									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
 									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Log the response",
-									"console.log('Response:', pm.response.json());",
-									"",
-									"// Verify response status",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"// Verify response structure",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('data');",
-									"    pm.expect(jsonData.data).to.have.property('apiKey');",
-									"    pm.expect(jsonData.data).to.have.property('secret');",
-									"    pm.expect(jsonData.data).to.have.property('expiresAt');",
-									"    pm.expect(jsonData.data).to.have.property('purpose');",
-									"});",
-									"",
-									"// Store API key and secret in environment",
-									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.data) {",
-									"    pm.environment.set('subsequentApiKey', jsonData.data.apiKey);",
-									"    pm.environment.set('subsequentApiSecret', jsonData.data.secret);",
-									"    console.log('Subsequent API Key:', jsonData.data.apiKey);",
-									"    console.log('Subsequent Secret:', jsonData.data.secret);",
-									"    console.log('Expires At:', jsonData.data.expiresAt);",
-									"    console.log('Purpose:', jsonData.data.purpose);",
-									"}"
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
 								],
 								"type": "text/javascript"
 							}
@@ -328,49 +687,224 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"{{testDescription}}\",\n    \"rateLimit\": {{testRateLimit}},\n    \"purpose\": \"{{testPurpose}}\",\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ],\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{onboardingTimestamp}}\"\n    }\n}"
+							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"code\": \"{{providerCode}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"status\": \"{{providerStatus}}\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/generate",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"onboarding",
-								"apikey",
-								"generate"
-							]
+							"raw": "{{baseUrl}}/api/v1/surcharge-providers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "surcharge-providers"]
 						}
 					}
 				},
 				{
-					"name": "Update API Key",
+					"name": "Get All Surcharge Providers",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
 								"exec": [
 									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge-providers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "surcharge-providers"]
+						}
+					}
+				},
+				{
+					"name": "Get Surcharge Provider by ID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge-providers/{{providerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "surcharge-providers", "{{providerId}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Surcharge Provider",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce + pm.request.body.raw;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"status\": \"{{providerStatus}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge-providers/{{providerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "surcharge-providers", "{{providerId}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Surcharge Provider",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge-providers/{{providerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "surcharge-providers", "{{providerId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Surcharge Fee",
+			"item": [
+				{
+					"name": "Calculate Surcharge Fee",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
 									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
 									"// Get request body",
 									"const requestBody = JSON.stringify({",
-									"    merchantId: pm.environment.get('merchantId'),",
-									"    description: 'Updated API Key Description',",
-									"    rateLimit: 2000,",
-									"    allowedEndpoints: [",
-									"        '/api/v1/surchargefee/calculate',",
-									"        '/api/v1/surchargefee/calculate-batch',",
-									"        '/api/v1/refunds/process',",
-									"        '/api/v1/refunds/process-batch',",
-									"        '/api/v1/sales/process',",
-									"        '/api/v1/sales/process-batch',",
-									"        '/api/v1/cancel',",
-									"        '/api/v1/cancel/batch'",
-									"    ]",
+									"    nicn: pm.environment.get('nicn'),",
+									"    processor: pm.environment.get('processor'),",
+									"    amount: parseFloat(pm.environment.get('amount')),",
+									"    totalAmount: parseFloat(pm.environment.get('totalAmount')),",
+									"    country: pm.environment.get('country'),",
+									"    region: pm.environment.get('region'),",
+									"    campaign: JSON.parse(pm.environment.get('campaign')),",
+									"    data: JSON.parse(pm.environment.get('data')),",
+									"    sTxId: pm.environment.get('sTxId'),",
+									"    mTxId: pm.environment.get('mTxId'),",
+									"    cardToken: pm.environment.get('cardToken'),",
+									"    entryMethod: pm.environment.get('entryMethod'),",
+									"    nonSurchargableAmount: parseFloat(pm.environment.get('nonSurchargableAmount'))",
 									"});",
 									"",
 									"// Get secret from environment",
@@ -391,168 +925,10 @@
 									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
 									"",
 									"// Set the request body",
-									"pm.request.body.raw = requestBody;",
-									"",
-									"// Store values in environment for debugging",
-									"pm.environment.set('lastTimestamp', timestamp);",
-									"pm.environment.set('lastNonce', nonce);",
-									"pm.environment.set('lastRequestBody', requestBody);",
-									"pm.environment.set('lastSignature', signature);"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Log the values used for signature generation",
-									"console.log('Request Details:');",
-									"console.log('Timestamp:', pm.environment.get('lastTimestamp'));",
-									"console.log('Nonce:', pm.environment.get('lastNonce'));",
-									"console.log('Request Body:', pm.environment.get('lastRequestBody'));",
-									"console.log('Secret Used:', pm.environment.get('apiSecret'));",
-									"console.log('Generated Signature:', pm.environment.get('lastSignature'));",
-									"",
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('apiKey');",
-									"    pm.expect(jsonData).to.have.property('description');",
-									"    pm.expect(jsonData).to.have.property('rateLimit');",
-									"    pm.expect(jsonData).to.have.property('allowedEndpoints');",
-									"    pm.expect(jsonData).to.have.property('status');",
-									"    pm.expect(jsonData).to.have.property('createdAt');",
-									"    pm.expect(jsonData).to.have.property('lastRotatedAt');",
-									"    pm.expect(jsonData).to.have.property('revokedAt');",
-									"    pm.expect(jsonData).to.have.property('isRevoked');",
-									"});",
-									"",
-									"pm.test('Updated fields match request', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.description).to.eql('Updated API Key Description');",
-									"    pm.expect(jsonData.rateLimit).to.eql(2000);",
-									"    pm.expect(jsonData.allowedEndpoints).to.include('/api/v1/refunds/process');",
-									"    pm.expect(jsonData.allowedEndpoints).to.include('/api/v1/refunds/process-batch');",
-									"    pm.expect(jsonData.allowedEndpoints).to.include('/api/v1/sales/process');",
-									"    pm.expect(jsonData.allowedEndpoints).to.include('/api/v1/sales/process-batch');",
-									"    pm.expect(jsonData.allowedEndpoints).to.include('/api/v1/cancel');",
-									"    pm.expect(jsonData.allowedEndpoints).to.include('/api/v1/cancel/batch');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"Updated API Key Description\",\n    \"rateLimit\": 2000,\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/refunds/process\",\n        \"/api/v1/refunds/process-batch\",\n        \"/api/v1/sales/process\",\n        \"/api/v1/sales/process-batch\",\n        \"/api/v1/cancel\",\n        \"/api/v1/cancel/batch\"\n    ]\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/update",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"onboarding",
-								"apikey",
-								"update"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Surcharge Fee",
-			"item": [
-				{
-					"name": "Calculate Surcharge Fee",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    amount: parseFloat(pm.environment.get('testAmount')),",
-									"    currency: pm.environment.get('testCurrency'),",
-									"    transactionId: pm.environment.get('testTransactionId'),",
-									"    metadata: JSON.parse(pm.environment.get('testMetadata'))",
-									"});",
-									"",
-									"// Get API key and secret from environment",
-									"const apiKey = pm.environment.get('apiKey');",
-									"const secret = pm.environment.get('apiSecret');",
-									"const merchantId = pm.environment.get('merchantId');",
-									"",
-									"console.log('Using API Key:', apiKey);",
-									"console.log('Using Secret:', secret);",
-									"console.log('Using Merchant ID:', merchantId);",
-									"",
-									"// Create data string to sign (matching backend format)",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature using secret",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
 									"pm.request.body.raw = requestBody;"
 								],
 								"type": "text/javascript"
 							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Log the values used for signature generation",
-									"console.log('Request Details:');",
-									"console.log('Timestamp:', pm.environment.get('lastTimestamp'));",
-									"console.log('Nonce:', pm.environment.get('lastNonce'));",
-									"console.log('Request Body:', pm.environment.get('lastRequestBody'));",
-									"console.log('Secret Used:', pm.environment.get('apiSecret'));",
-									"console.log('Generated Signature:', pm.environment.get('lastSignature'));",
-									"",
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('data');",
-									"    pm.expect(jsonData.data).to.have.property('surchargeAmount');",
-									"    pm.expect(jsonData.data).to.have.property('totalAmount');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
 						}
 					],
 					"request": {
@@ -565,7 +941,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"amount\": {{testAmount}},\n    \"currency\": \"{{testCurrency}}\",\n    \"transactionId\": \"{{testTransactionId}}\",\n    \"metadata\": {{testMetadata}}\n}"
+							"raw": "{\n    \"nicn\": \"{{nicn}}\",\n    \"processor\": \"{{processor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{totalAmount}},\n    \"country\": \"{{country}}\",\n    \"region\": \"{{region}}\",\n    \"campaign\": {{campaign}},\n    \"data\": {{data}},\n    \"sTxId\": \"{{sTxId}}\",\n    \"mTxId\": \"{{mTxId}}\",\n    \"cardToken\": \"{{cardToken}}\",\n    \"entryMethod\": \"{{entryMethod}}\",\n    \"nonSurchargableAmount\": {{nonSurchargableAmount}}\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/surchargefee/calculate",
@@ -580,21 +956,106 @@
 							]
 						}
 					}
-				},
+				}
+			]
+		},
+		{
+			"name": "Sales",
+			"item": [
 				{
-					"name": "Calculate Batch Surcharge Fee",
+					"name": "Process Sale",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
 								"exec": [
 									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
 									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
 									"// Get request body",
 									"const requestBody = JSON.stringify({",
-									"    transactions: [",
+									"    nicn: pm.environment.get('nicn'),",
+									"    processor: pm.environment.get('processor'),",
+									"    amount: parseFloat(pm.environment.get('amount')),",
+									"    totalAmount: parseFloat(pm.environment.get('totalAmount')),",
+									"    country: pm.environment.get('country'),",
+									"    region: pm.environment.get('region'),",
+									"    campaign: JSON.parse(pm.environment.get('campaign')),",
+									"    data: JSON.parse(pm.environment.get('data')),",
+									"    sTxId: pm.environment.get('sTxId'),",
+									"    mTxId: pm.environment.get('mTxId'),",
+									"    cardToken: pm.environment.get('cardToken'),",
+									"    entryMethod: pm.environment.get('entryMethod'),",
+									"    nonSurchargableAmount: parseFloat(pm.environment.get('nonSurchargableAmount'))",
+									"});",
+									"",
+									"// Get secret from environment",
+									"const secret = pm.environment.get('apiSecret');",
+									"console.log('Using secret for signature:', secret);",
+									"",
+									"// Create data string to sign",
+									"const dataToSign = timestamp + nonce + requestBody;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Set the request body",
+									"pm.request.body.raw = requestBody;"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"nicn\": \"{{nicn}}\",\n    \"processor\": \"{{processor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{totalAmount}},\n    \"country\": \"{{country}}\",\n    \"region\": \"{{region}}\",\n    \"campaign\": {{campaign}},\n    \"data\": {{data}},\n    \"sTxId\": \"{{sTxId}}\",\n    \"mTxId\": \"{{mTxId}}\",\n    \"cardToken\": \"{{cardToken}}\",\n    \"entryMethod\": \"{{entryMethod}}\",\n    \"nonSurchargableAmount\": {{nonSurchargableAmount}}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/sales/process",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"sales",
+								"process"
+							]
+						}
+					}
+				},
+				{
+					"name": "Process Batch Sales",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get request body",
+									"const requestBody = JSON.stringify({",
+									"    sales: [",
 									"        {",
 									"            nicn: pm.environment.get('nicn1'),",
 									"            processor: 'VISA',",
@@ -662,403 +1123,18 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"transactions\": [\n        {\n            \"nicn\": \"{{nicn1}}\",\n            \"processor\": \"VISA\",\n            \"amount\": 100.00,\n            \"totalAmount\": 100.00,\n            \"country\": \"US\",\n            \"region\": \"CA\",\n            \"campaign\": [\"SUMMER2024\"],\n            \"data\": [\"ECOMMERCE\"],\n            \"sTxId\": \"{{sTxId1}}\",\n            \"mTxId\": \"{{mTxId1}}\",\n            \"cardToken\": \"{{cardToken1}}\",\n            \"entryMethod\": \"DIPPED\",\n            \"nonSurchargableAmount\": 0\n        },\n        {\n            \"nicn\": \"{{nicn2}}\",\n            \"processor\": \"MASTERCARD\",\n            \"amount\": 200.00,\n            \"totalAmount\": 200.00,\n            \"country\": \"US\",\n            \"region\": \"NY\",\n            \"campaign\": [\"SUMMER2024\"],\n            \"data\": [\"ECOMMERCE\"],\n            \"sTxId\": \"{{sTxId2}}\",\n            \"mTxId\": \"{{mTxId2}}\",\n            \"cardToken\": \"{{cardToken2}}\",\n            \"entryMethod\": \"DIPPED\",\n            \"nonSurchargableAmount\": 0\n        }\n    ]\n}"
+							"raw": "{\n    \"sales\": [\n        {\n            \"nicn\": \"{{nicn1}}\",\n            \"processor\": \"VISA\",\n            \"amount\": 100.00,\n            \"totalAmount\": 100.00,\n            \"country\": \"US\",\n            \"region\": \"CA\",\n            \"campaign\": [\"SUMMER2024\"],\n            \"data\": [\"ECOMMERCE\"],\n            \"sTxId\": \"{{sTxId1}}\",\n            \"mTxId\": \"{{mTxId1}}\",\n            \"cardToken\": \"{{cardToken1}}\",\n            \"entryMethod\": \"DIPPED\",\n            \"nonSurchargableAmount\": 0\n        },\n        {\n            \"nicn\": \"{{nicn2}}\",\n            \"processor\": \"MASTERCARD\",\n            \"amount\": 200.00,\n            \"totalAmount\": 200.00,\n            \"country\": \"US\",\n            \"region\": \"NY\",\n            \"campaign\": [\"SUMMER2024\"],\n            \"data\": [\"ECOMMERCE\"],\n            \"sTxId\": \"{{sTxId2}}\",\n            \"mTxId\": \"{{mTxId2}}\",\n            \"cardToken\": \"{{cardToken2}}\",\n            \"entryMethod\": \"DIPPED\",\n            \"nonSurchargableAmount\": 0\n        }\n    ]\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/surchargefee/calculate-batch",
+							"raw": "{{baseUrl}}/api/v1/sales/process-batch",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"surchargefee",
-								"calculate-batch"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Refunds",
-			"item": [
-				{
-					"name": "Process Refund",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    sTxId: pm.environment.get('sTxId'),",
-									"    amount: 50.00,",
-									"    mTxId: pm.environment.get('mTxId'),",
-									"    cardToken: pm.environment.get('cardToken')",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('data');",
-									"    pm.expect(jsonData.data).to.have.property('transactionId');",
-									"    pm.expect(jsonData.data).to.have.property('refundAmount');",
-									"    pm.expect(jsonData.data).to.have.property('status');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"sTxId\": \"{{sTxId}}\",\n    \"amount\": 50.00,\n    \"mTxId\": \"{{mTxId}}\",\n    \"cardToken\": \"{{cardToken}}\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/refunds/process",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"refunds",
-								"process"
-							]
-						}
-					}
-				},
-				{
-					"name": "Process Batch Refunds",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    refunds: [",
-									"        {",
-									"            sTxId: pm.environment.get('sTxId1'),",
-									"            amount: 10.00,",
-									"            mTxId: pm.environment.get('mTxId1'),",
-									"            cardToken: pm.environment.get('cardToken1')",
-									"        },",
-									"        {",
-									"            sTxId: pm.environment.get('sTxId2'),",
-									"            amount: 20.00,",
-									"            mTxId: pm.environment.get('mTxId2'),",
-									"            cardToken: pm.environment.get('cardToken2')",
-									"        }",
-									"    ]",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('results');",
-									"    pm.expect(jsonData.results).to.be.an('array');",
-									"    pm.expect(jsonData.results.length).to.equal(2);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"refunds\": [\n        {\n            \"sTxId\": \"{{sTxId1}}\",\n            \"amount\": 10.00,\n            \"mTxId\": \"{{mTxId1}}\",\n            \"cardToken\": \"{{cardToken1}}\"\n        },\n        {\n            \"sTxId\": \"{{sTxId2}}\",\n            \"amount\": 20.00,\n            \"mTxId\": \"{{mTxId2}}\",\n            \"cardToken\": \"{{cardToken2}}\"\n        }\n    ]\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/refunds/process-batch",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"refunds",
+								"sales",
 								"process-batch"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Cancellations",
-			"item": [
-				{
-					"name": "Process Cancel",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    sTxId: pm.environment.get('sTxId'),",
-									"    sAmount: '100.00',",
-									"    sCurrency: 'CHF',",
-									"    sDescription: 'Test cancellation',",
-									"    sReference: pm.environment.get('testCancelId')",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('data');",
-									"    pm.expect(jsonData.data).to.have.property('transactionId');",
-									"    pm.expect(jsonData.data).to.have.property('status');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"sTxId\": \"{{sTxId}}\",\n    \"sAmount\": \"100.00\",\n    \"sCurrency\": \"CHF\",\n    \"sDescription\": \"Test cancellation\",\n    \"sReference\": \"{{testCancelId}}\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cancel",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"cancel"
-							]
-						}
-					}
-				},
-				{
-					"name": "Process Batch Cancellations",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    cancellations: [",
-									"        {",
-									"            sTxId: pm.environment.get('sTxId1'),",
-									"            sAmount: '100.00',",
-									"            sCurrency: 'CHF',",
-									"            sDescription: 'Test cancellation 1',",
-									"            sReference: 'CAN123'",
-									"        },",
-									"        {",
-									"            sTxId: pm.environment.get('sTxId2'),",
-									"            sAmount: '200.00',",
-									"            sCurrency: 'CHF',",
-									"            sDescription: 'Test cancellation 2',",
-									"            sReference: 'CAN124'",
-									"        }",
-									"    ]",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"// Verify response",
-									"pm.test('Status code is 200', function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Response has required fields', function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('results');",
-									"    pm.expect(jsonData.results).to.be.an('array');",
-									"    pm.expect(jsonData.results.length).to.equal(2);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"cancellations\": [\n        {\n            \"sTxId\": \"{{sTxId1}}\",\n            \"sAmount\": \"100.00\",\n            \"sCurrency\": \"CHF\",\n            \"sDescription\": \"Test cancellation 1\",\n            \"sReference\": \"CAN123\"\n        },\n        {\n            \"sTxId\": \"{{sTxId2}}\",\n            \"sAmount\": \"200.00\",\n            \"sCurrency\": \"CHF\",\n            \"sDescription\": \"Test cancellation 2\",\n            \"sReference\": \"CAN124\"\n        }\n    ]\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/cancel/batch",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"cancel",
-								"batch"
 							]
 						}
 					}
@@ -1101,6 +1177,16 @@
 			"type": "string"
 		},
 		{
+			"key": "externalMerchantId",
+			"value": "EXT001",
+			"type": "string"
+		},
+		{
+			"key": "externalMerchantGuid",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
 			"key": "apiKey",
 			"value": "",
 			"type": "string"
@@ -1111,28 +1197,208 @@
 			"type": "string"
 		},
 		{
-			"key": "initialApiKey",
+			"key": "statusId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "string"
+		},
+		{
+			"key": "nicn",
+			"value": "NICN001",
+			"type": "string"
+		},
+		{
+			"key": "nicn1",
+			"value": "NICN001",
+			"type": "string"
+		},
+		{
+			"key": "nicn2",
+			"value": "NICN002",
+			"type": "string"
+		},
+		{
+			"key": "processor",
+			"value": "VISA",
+			"type": "string"
+		},
+		{
+			"key": "amount",
+			"value": "100.00",
+			"type": "string"
+		},
+		{
+			"key": "totalAmount",
+			"value": "100.00",
+			"type": "string"
+		},
+		{
+			"key": "country",
+			"value": "US",
+			"type": "string"
+		},
+		{
+			"key": "region",
+			"value": "CA",
+			"type": "string"
+		},
+		{
+			"key": "campaign",
+			"value": "[\"SUMMER2024\"]",
+			"type": "string"
+		},
+		{
+			"key": "data",
+			"value": "[\"ECOMMERCE\"]",
+			"type": "string"
+		},
+		{
+			"key": "sTxId",
+			"value": "STX001",
+			"type": "string"
+		},
+		{
+			"key": "sTxId1",
+			"value": "STX001",
+			"type": "string"
+		},
+		{
+			"key": "sTxId2",
+			"value": "STX002",
+			"type": "string"
+		},
+		{
+			"key": "mTxId",
+			"value": "MTX001",
+			"type": "string"
+		},
+		{
+			"key": "mTxId1",
+			"value": "MTX001",
+			"type": "string"
+		},
+		{
+			"key": "mTxId2",
+			"value": "MTX002",
+			"type": "string"
+		},
+		{
+			"key": "cardToken",
+			"value": "CARD001",
+			"type": "string"
+		},
+		{
+			"key": "cardToken1",
+			"value": "CARD001",
+			"type": "string"
+		},
+		{
+			"key": "cardToken2",
+			"value": "CARD002",
+			"type": "string"
+		},
+		{
+			"key": "entryMethod",
+			"value": "DIPPED",
+			"type": "string"
+		},
+		{
+			"key": "nonSurchargableAmount",
+			"value": "0",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyName",
+			"value": "Test API Key",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyDescription",
+			"value": "Test API Key Description",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyRateLimit",
+			"value": "1000",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyAllowedEndpoints",
+			"value": "[\"/api/v1/transactions\", \"/api/v1/batch\"]",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyExpirationDays",
+			"value": "30",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyId",
 			"value": "",
 			"type": "string"
 		},
 		{
-			"key": "initialApiSecret",
-			"value": "",
+			"key": "apiKeyStatus",
+			"value": "ACTIVE",
 			"type": "string"
 		},
 		{
-			"key": "subsequentApiKey",
-			"value": "",
+			"key": "apiKeyPurpose",
+			"value": "INITIAL",
 			"type": "string"
 		},
 		{
-			"key": "subsequentApiSecret",
-			"value": "",
+			"key": "merchantName",
+			"value": "Test Merchant",
 			"type": "string"
 		},
 		{
-			"key": "testPurpose",
-			"value": "GENERAL",
+			"key": "adminUserId",
+			"value": "admin123",
+			"type": "string"
+		},
+		{
+			"key": "onboardingReference",
+			"value": "TEST-REF-001",
+			"type": "string"
+		},
+		{
+			"key": "providerName",
+			"value": "Test Provider",
+			"type": "string"
+		},
+		{
+			"key": "providerCode",
+			"value": "TEST",
+			"type": "string"
+		},
+		{
+			"key": "providerDescription",
+			"value": "Test Surcharge Provider",
+			"type": "string"
+		},
+		{
+			"key": "providerBaseUrl",
+			"value": "https://api.test-provider.com",
+			"type": "string"
+		},
+		{
+			"key": "providerAuthType",
+			"value": "API_KEY",
+			"type": "string"
+		},
+		{
+			"key": "providerCredentialsSchema",
+			"value": "{\"required_fields\":[{\"name\":\"api_key\",\"type\":\"string\",\"description\":\"API Key for authentication\"}]}",
+			"type": "string"
+		},
+		{
+			"key": "providerStatus",
+			"value": "ACTIVE",
+			"type": "string"
+		},
+		{
+			"key": "providerId",
+			"value": "",
 			"type": "string"
 		}
 	]

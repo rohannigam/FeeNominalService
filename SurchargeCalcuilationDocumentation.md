@@ -10,6 +10,7 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
 1. **Controllers**
    - `OnboardingController`: Handles merchant onboarding and API key management
    - `SurchargeFeeController`: Manages surcharge fee calculations
+   - `SurchargeProviderController`: Manages surcharge provider configurations
    - `SalesController`: Processes sale transactions
    - `RefundsController`: Handles refund operations
    - `CancelController`: Manages transaction cancellations
@@ -22,6 +23,7 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
    - `MerchantService`: Manages merchant information
    - `AuditService`: Handles audit logging
    - `SurchargeFeeService`: Calculates surcharge fees
+   - `SurchargeProviderService`: Manages surcharge provider configurations
    - `SaleService`: Processes sales
    - `RefundService`: Handles refunds
    - `CancelService`: Manages cancellations
@@ -30,6 +32,7 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
    - Transaction-related models (Transaction, BatchTransaction)
    - API Key models (ApiKey, ApiKeyUsage)
    - Merchant models (Merchant, MerchantStatus)
+   - Surcharge Provider models (SurchargeProvider, ProviderCredentials)
    - Request/Response models for each operation
    - Audit and logging models
 
@@ -537,7 +540,7 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
      - `action`: Type of action performed
      - `old_values`: Previous state (JSONB)
      - `new_values`: New state (JSONB)
-     - `performed_by`: User who made the change
+     - `updated_by`: User who made the change
      - `ip_address`: Requester's IP
      - `user_agent`: Requester's user agent
    - Usage: Change tracking and compliance
@@ -573,6 +576,32 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
      - `success`: Whether attempt succeeded
      - `timestamp`: Attempt timestamp
    - Usage: Security monitoring and threat detection
+
+### Additional Tables
+
+9. **surcharge_providers**
+   - Purpose: Stores surcharge provider configurations
+   - Key Fields:
+     - `id`: Unique provider identifier
+     - `name`: Provider name
+     - `code`: Provider code
+     - `description`: Provider description
+     - `base_url`: Provider API base URL
+     - `authentication_type`: Authentication method
+     - `credentials_schema`: JSON schema for credentials
+     - `status`: Provider status
+     - `created_at`: Creation timestamp
+     - `updated_at`: Last update timestamp
+   - Usage: Surcharge provider management
+
+10. **provider_credentials**
+    - Purpose: Stores encrypted provider credentials
+    - Key Fields:
+      - `provider_id`: Reference to surcharge_providers
+      - `credentials`: Encrypted credentials (JSONB)
+      - `created_at`: Creation timestamp
+      - `updated_at`: Last update timestamp
+    - Usage: Secure credential storage
 
 ### Database Features
 
@@ -704,7 +733,7 @@ The database includes test data for development:
        al.action,
        al.old_values,
        al.new_values,
-       al.performed_by,
+       al.updated_by,
        al.ip_address
    FROM audit_logs al
    WHERE al.entity_type = 'API_KEY'
@@ -723,6 +752,28 @@ The database includes test data for development:
    WHERE al.entity_type = 'MERCHANT'
    AND al.action = 'UPDATE'
    ORDER BY al.performed_at DESC;
+   ```
+
+5. **Surcharge Provider Management**
+   ```sql
+   -- Get active surcharge providers
+   SELECT 
+       sp.name,
+       sp.code,
+       sp.base_url,
+       sp.authentication_type,
+       sp.status
+   FROM surcharge_providers sp
+   WHERE sp.status = 'active';
+
+   -- Get provider credentials (admin only)
+   SELECT 
+       sp.name,
+       pc.credentials,
+       pc.updated_at
+   FROM surcharge_providers sp
+   JOIN provider_credentials pc ON sp.id = pc.provider_id
+   WHERE sp.code = 'INTERPAY';
    ```
 
 ### AWS RDS Deployment
@@ -1121,6 +1172,130 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 - **Endpoint**: `GET /api/v1/ping`
 - **Description**: Checks if the API is up and running
 - **Authentication**: None
+
+### Surcharge Provider Endpoints (v1)
+
+#### 1. Create Surcharge Provider
+- **Endpoint**: `POST /api/v1/surcharge-providers`
+- **Description**: Creates a new surcharge provider configuration
+- **Authentication**: Required (X-API-Key header)
+- **Request Body**:
+  ```json
+  {
+    "name": "string",                // Required, max 100 chars
+    "code": "string",                // Required, max 20 chars
+    "description": "string",         // Optional
+    "baseUrl": "string",            // Required, max 255 chars
+    "authenticationType": "string",  // Required, max 50 chars
+    "credentialsSchema": {           // Required
+        "required_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
+        ]
+    },
+    "status": "string"              // Required, max 20 chars
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "id": "guid",
+    "name": "string",
+    "code": "string",
+    "description": "string",
+    "baseUrl": "string",
+    "authenticationType": "string",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
+        ]
+    },
+    "status": "string",
+    "createdAt": "datetime",
+    "updatedAt": "datetime"
+  }
+  ```
+
+#### 2. Get All Surcharge Providers
+- **Endpoint**: `GET /api/v1/surcharge-providers`
+- **Description**: Retrieves all configured surcharge providers
+- **Authentication**: Required (X-API-Key header)
+- **Response**: Array of surcharge provider objects
+
+#### 3. Get Surcharge Provider by ID
+- **Endpoint**: `GET /api/v1/surcharge-providers/{providerId}`
+- **Description**: Retrieves a specific surcharge provider
+- **Authentication**: Required (X-API-Key header)
+- **Path Parameters**:
+  - `providerId`: Guid (required)
+- **Response**: Surcharge provider object
+
+#### 4. Update Surcharge Provider
+- **Endpoint**: `PUT /api/v1/surcharge-providers/{providerId}`
+- **Description**: Updates an existing surcharge provider
+- **Authentication**: Required (X-API-Key header)
+- **Path Parameters**:
+  - `providerId`: Guid (required)
+- **Request Body**: Same as Create Surcharge Provider
+- **Response**: Updated surcharge provider object
+
+#### 5. Delete Surcharge Provider
+- **Endpoint**: `DELETE /api/v1/surcharge-providers/{providerId}`
+- **Description**: Deletes a surcharge provider
+- **Authentication**: Required (X-API-Key header)
+- **Path Parameters**:
+  - `providerId`: Guid (required)
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Provider deleted successfully"
+  }
+  ```
+
+### Example: Interpayments Provider Configuration
+
+```json
+{
+    "name": "Interpayments",
+    "code": "INTERPAY",
+    "description": "Interpayments Surcharge Provider",
+    "baseUrl": "https://api.interpayments.com/v1",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            }
+        ]
+    },
+    "status": "active"
+}
+```
 
 ## Security Features
 

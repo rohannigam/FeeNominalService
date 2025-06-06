@@ -14,6 +14,12 @@ public class UpdateApiKeyRequest
     public string MerchantId { get; set; } = string.Empty;
 
     /// <summary>
+    /// The API key to update
+    /// </summary>
+    [Required]
+    public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
     /// Description of the API key
     /// </summary>
     [Required]

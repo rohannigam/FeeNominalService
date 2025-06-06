@@ -1,0 +1,269 @@
+# API Key Generation Endpoint
+
+**Endpoint:** `/api/v1/onboarding/apikey/generate`
+
+## Overview
+This endpoint is used to generate additional API keys for existing merchants. Unlike the initial API key generation endpoint, this requires authentication and allows for more customization of the API key properties.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Maximum of 5 active API keys per merchant
+- All sensitive data is encrypted at rest
+- Secrets are stored in environment-specific secure storage
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Request Body (GenerateApiKeyRequest)
+```json
+{
+    "merchantId": "guid",              // Required, internal merchant ID
+    "description": "string",           // Optional, max 500 chars
+    "rateLimit": 1000,                // Optional, range 1-10000
+    "allowedEndpoints": [             // Optional
+        "string"
+    ],
+    "purpose": "string",              // Optional, max 50 chars
+    "onboardingMetadata": {           // Required
+        "adminUserId": "string",      // Required
+        "onboardingReference": "string", // Required
+        "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
+}
+```
+
+## Response (GenerateApiKeyResponse)
+```json
+{
+    "merchantId": "guid",              // Internal merchant ID
+    "externalMerchantId": "string",    // External merchant ID
+    "merchantName": "string",          // Merchant name
+    "apiKey": "string",               // Generated API key
+    "secret": "string",               // Generated secret
+    "expiresAt": "datetime",          // Expiration timestamp
+    "rateLimit": 1000,               // Rate limit value
+    "allowedEndpoints": [            // Allowed endpoints
+        "string"
+    ],
+    "purpose": "string"              // Purpose of the API key
+}
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `MAX_KEYS_EXCEEDED`: Maximum number of active keys reached
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X POST http://localhost:5000/api/v1/onboarding/apikey/generate \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "description": "Development API Key",
+    "rateLimit": 1000,
+    "allowedEndpoints": ["/api/v1/transactions", "/api/v1/batch"],
+    "purpose": "DEVELOPMENT",
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "TEST-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+### Production
+```bash
+curl -X POST https://api.feenominal.com/api/v1/onboarding/apikey/generate \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "description": "Production API Key",
+    "rateLimit": 1000,
+    "allowedEndpoints": ["/api/v1/transactions", "/api/v1/batch"],
+    "purpose": "PRODUCTION",
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "PROD-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates request body structure
+   - Checks merchant exists and has not exceeded key limit
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Checks number of active keys (max 5)
+   - Generates new API key and secret
+   - Stores API key metadata in database
+   - Creates audit trail entry
+
+3. **Secret Management**:
+   - If first key: generates new secret
+   - If additional key: reuses existing secret
+   - Stores secret in appropriate location based on environment
+
+4. **Response Generation**:
+   - Returns GenerateApiKeyResponse with all required fields
+   - Includes generated API key and secret
+   - Includes metadata about the creation process
+
+## Local Development vs Production
+
+### Local Development
+1. **Database**:
+   - Uses local PostgreSQL database
+   - API keys and secrets stored in `api_key_secrets` table
+   - No AWS Secrets Manager integration
+
+2. **Code Path**:
+   ```csharp
+   // In ApiKeyService.cs
+   if (_environment.IsDevelopment())
+   {
+       // Store in local database
+       await _apiKeyRepository.StoreSecretLocallyAsync(apiKey, secret);
+   }
+   ```
+
+3. **Security**:
+   - Secrets stored in plain text in local database
+   - No encryption for local development
+   - Easier debugging and testing
+
+### Production
+1. **Database**:
+   - Uses production PostgreSQL database
+   - Only API key metadata stored in `api_keys` table
+   - Secrets stored in AWS Secrets Manager
+
+2. **Code Path**:
+   ```csharp
+   // In ApiKeyService.cs
+   if (!_environment.IsDevelopment())
+   {
+       // Store in AWS Secrets Manager
+       var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
+       await _secretsManager.StoreSecretAsync(secretName, secretValue);
+   }
+   ```
+
+3. **Security**:
+   - Secrets encrypted in AWS Secrets Manager
+   - KMS encryption for secrets
+   - IAM roles and policies for access control
+   - Audit logging enabled
+
+## Workflow Diagrams
+
+### API Key Generation Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Secrets
+
+    Client->>API: POST /api/v1/onboarding/apikey/generate
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Check merchant & key count
+    DB-->>API: Merchant status
+    API->>API: Generate API key
+    API->>Secrets: Get/Generate secret
+    API->>DB: Store API key metadata
+    API->>DB: Create audit trail
+    API-->>Client: Return API key & secret
+```
+
+### Secret Management Flow
+```mermaid
+graph TD
+    A[API Request] --> B{First Key?}
+    B -->|Yes| C[Generate New Secret]
+    B -->|No| D[Reuse Existing Secret]
+    C --> E[Store Secret]
+    D --> E
+    E --> F{Environment?}
+    F -->|Development| G[Local Database]
+    F -->|Production| H[AWS Secrets Manager]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Max Keys| E[400 Bad Request]
+    D -->|Invalid Merchant| F[404 Not Found]
+    D -->|Success| G[200 OK]
+    D -->|Error| H[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Always use HTTPS in production
+   - Implement rate limiting
+   - Rotate API keys regularly
+   - Monitor for suspicious activity
+   - Use strong secret generation
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Implement proper validation
+   - Handle edge cases gracefully
+
+3. **Performance**:
+   - Cache frequently accessed data
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Plan for key rotation
+   - Regular security audits 

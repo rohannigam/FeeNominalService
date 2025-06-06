@@ -1,6 +1,6 @@
   /* Important Notes on Implementation
-  - We want to use API Access key instead of JWT token for the FeeNominalService
-  - We want to swtich to using AWS Secret Manager to store the API Access Key 
+  - We want to use API Access key instead of JWT token for the FeeNominalService (Done)
+  - We want to swtich to using AWS Secret Manager to store the API Access Key  
   - We want to use the AWS SDK to get the API Access Key from the Secret Manager so research needed on how to do this
   - We want to make sure connection between DataCenter (GR2) for MerchantPortal->FeeNominalService->Interpayments is secure
   - We want to make sure connection between DataCenter (GR2) for XiPayWSServers->FeeNominalService->Interpayments is secure
@@ -15,6 +15,15 @@
   - Onboarding flow documentation.
   - Network timeouts to providers.
   - Make changes to code base to reflect all init.sql changes to 'id' fields. (Done)
+
+  - Changes to Merchant addition:
+    ok let me tell you a little about what i am thinking. So as i mentioned before, there is going to be  an on prem onboarding portal 
+    that will register its own merchant to our FeeNominalService using onboarding endpoints. In the externalId we are going to pass 
+    the merchantId field from that onboarding portal. Then there would be a generate button that will call 
+    onboarding/initialApiKeyGenerate endpoint where in we should be just passin in externalId and a merchant Name and possibly a 
+    unique merchantGUID that onboarding portal has tied to that externalId in its DB and then I think we should return a unique
+    merchantGuid from FeeNominalService along with unique ApiKey and a secret to go with it along with other existing fields we 
+    added support for already. 
   */
 
   /*With respect to supporting mulitple API Keys per single Merchant

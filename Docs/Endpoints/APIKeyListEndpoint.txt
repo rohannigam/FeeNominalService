@@ -1,0 +1,180 @@
+# List Merchant API Keys Endpoint
+
+**Endpoint:** `/api/v1/onboarding/apikey/list`
+
+## Overview
+This endpoint is used to retrieve all API keys associated with a merchant, including their status, metadata, and usage information. This is useful for monitoring and managing API key usage.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Returns only keys associated with the authenticated merchant
+- All sensitive data is encrypted at rest
+- Audit trail is maintained for access
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Query Parameters
+- `merchantId`: Required, the internal merchant ID (GUID)
+
+## Response (List<ApiKeyInfo>)
+```json
+[
+    {
+        "apiKey": "string",               // API key
+        "description": "string",          // Description
+        "rateLimit": 1000,               // Rate limit value
+        "allowedEndpoints": [            // Allowed endpoints
+            "string"
+        ],
+        "status": "string",              // Status (ACTIVE, REVOKED, EXPIRED)
+        "createdAt": "datetime",         // Creation timestamp
+        "lastRotatedAt": "datetime",     // Last rotation timestamp
+        "revokedAt": "datetime",         // Revocation timestamp if applicable
+        "expiresAt": "datetime",         // Expiration timestamp
+        "isRevoked": false,              // Revocation status
+        "isExpired": false,              // Expiration status
+        "lastUsedAt": "datetime",        // Last usage timestamp
+        "usageCount": 0                  // Total usage count
+    }
+]
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X GET "http://localhost:5000/api/v1/onboarding/apikey/list?merchantId=123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+### Production
+```bash
+curl -X GET "https://api.feenominal.com/api/v1/onboarding/apikey/list?merchantId=123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates merchant ID parameter
+   - Checks merchant exists
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Retrieves all API keys for merchant
+   - Gets usage statistics
+   - Creates audit trail entry
+
+3. **Response Generation**:
+   - Returns list of ApiKeyInfo objects
+   - Includes usage statistics
+   - Includes status information
+   - Sorts by creation date (newest first)
+
+## Workflow Diagrams
+
+### API Key List Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Audit
+
+    Client->>API: GET /api/v1/onboarding/apikey/list
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Get merchant API keys
+    DB-->>API: API keys list
+    API->>DB: Get usage statistics
+    API->>Audit: Create audit trail
+    API-->>Client: Return API keys list
+```
+
+### Data Retrieval Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validate Merchant}
+    B -->|Invalid| C[404 Not Found]
+    B -->|Valid| D[Get API Keys]
+    D --> E[Get Usage Stats]
+    E --> F[Format Response]
+    F --> G[Create Audit]
+    G --> H[Return Response]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Invalid Merchant| E[404 Not Found]
+    D -->|Success| F[200 OK]
+    D -->|Error| G[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Validate all input fields
+   - Track all access in audit trail
+   - Implement proper validation
+   - Monitor for suspicious activity
+   - Paginate results if needed
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Handle edge cases gracefully
+   - Maintain audit trail
+
+3. **Performance**:
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+   - Cache frequently accessed data
+   - Consider pagination for large datasets
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular security audits
+   - Review audit logs
+   - Clean up old records periodically 

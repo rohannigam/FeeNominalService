@@ -11,16 +11,11 @@ namespace FeeNominalService.Models.ApiKey.Requests;
 public class GenerateApiKeyRequest
 {
     /// <summary>
-    /// The external ID of the merchant to generate the API key for (e.g., 'DEV001')
+    /// The internal merchant ID (GUID) to generate the API key for
     /// </summary>
     [Required]
-    [StringLength(50)]
-    public string MerchantId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The merchant name to generate the API key for
-    /// </summary>
-    public string? MerchantName { get; set; }
+    [JsonConverter(typeof(GuidConverter))]
+    public Guid MerchantId { get; set; }
 
     /// <summary>
     /// Optional description for the API key

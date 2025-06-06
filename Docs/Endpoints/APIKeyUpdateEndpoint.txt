@@ -1,0 +1,220 @@
+# API Key Update Endpoint
+
+**Endpoint:** `/api/v1/onboarding/apikey/update`
+
+## Overview
+This endpoint is used to update the properties of an existing API key, such as rate limits, allowed endpoints, and description. It does not change the key or secret itself.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Only active keys can be updated
+- All sensitive data is encrypted at rest
+- Changes are tracked in audit trail
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Request Body (UpdateApiKeyRequest)
+```json
+{
+    "merchantId": "guid",              // Required, internal merchant ID
+    "apiKey": "string",                // Required, API key to update
+    "description": "string",           // Optional, max 500 chars
+    "rateLimit": 1000,                // Optional, range 1-10000
+    "allowedEndpoints": [             // Optional
+        "string"
+    ],
+    "onboardingMetadata": {           // Required
+        "adminUserId": "string",      // Required
+        "onboardingReference": "string", // Required
+        "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
+}
+```
+
+## Response (ApiKeyInfo)
+```json
+{
+    "apiKey": "string",               // API key
+    "description": "string",          // Updated description
+    "rateLimit": 1000,               // Updated rate limit
+    "allowedEndpoints": [            // Updated allowed endpoints
+        "string"
+    ],
+    "status": "ACTIVE",              // Status
+    "createdAt": "datetime",         // Creation timestamp
+    "lastRotatedAt": "datetime",     // Last rotation timestamp
+    "revokedAt": "datetime",         // Revocation timestamp if applicable
+    "expiresAt": "datetime",         // Expiration timestamp
+    "isRevoked": false,              // Revocation status
+    "isExpired": false               // Expiration status
+}
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `API_KEY_NOT_FOUND`: API key not found
+- `INVALID_STATUS`: Key is not in active state
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X PUT http://localhost:5000/api/v1/onboarding/apikey/update \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "apiKey": "existing-api-key",
+    "description": "Updated description",
+    "rateLimit": 2000,
+    "allowedEndpoints": ["/api/v1/transactions", "/api/v1/batch"],
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "UPDATE-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+### Production
+```bash
+curl -X PUT https://api.feenominal.com/api/v1/onboarding/apikey/update \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "apiKey": "existing-api-key",
+    "description": "Updated production key",
+    "rateLimit": 2000,
+    "allowedEndpoints": ["/api/v1/transactions", "/api/v1/batch"],
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "UPDATE-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates request body structure
+   - Checks merchant and API key exist
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Gets API key details
+   - Validates key is active
+   - Updates key properties
+   - Creates audit trail entry
+
+3. **Response Generation**:
+   - Returns updated ApiKeyInfo
+   - Includes all current properties
+   - Includes status information
+
+## Workflow Diagrams
+
+### API Key Update Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Audit
+
+    Client->>API: PUT /api/v1/onboarding/apikey/update
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Get API key details
+    DB-->>API: Key details
+    API->>API: Validate key status
+    API->>DB: Update key properties
+    API->>Audit: Create audit trail
+    API-->>Client: Return updated key info
+```
+
+### Update Validation Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validate Key}
+    B -->|Invalid| C[404 Not Found]
+    B -->|Valid| D{Check Status}
+    D -->|Not Active| E[400 Bad Request]
+    D -->|Active| F{Validate Changes}
+    F -->|Invalid| G[400 Bad Request]
+    F -->|Valid| H[Update Key]
+    H --> I[Create Audit]
+    I --> J[Return Response]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Invalid Key| E[404 Not Found]
+    D -->|Invalid Status| F[400 Bad Request]
+    D -->|Success| G[200 OK]
+    D -->|Error| H[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Validate all input fields
+   - Track all changes in audit trail
+   - Implement proper validation
+   - Monitor for suspicious activity
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Handle edge cases gracefully
+   - Maintain audit trail
+
+3. **Performance**:
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+   - Cache frequently accessed data
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular security audits
+   - Review audit logs 

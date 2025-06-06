@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using FeeNominalService.Models.ApiKey.Requests;
@@ -8,7 +9,7 @@ namespace FeeNominalService.Services
 {
     public interface IApiKeyService
     {
-        Task<GenerateApiKeyResponse> GenerateInitialApiKeyAsync(GenerateApiKeyRequest request);
+        Task<GenerateInitialApiKeyResponse> GenerateInitialApiKeyAsync(Guid merchantId);
         Task<GenerateApiKeyResponse> GenerateApiKeyAsync(GenerateApiKeyRequest request);
         Task<bool> RevokeApiKeyAsync(RevokeApiKeyRequest request);
         Task<IEnumerable<ApiKeyInfo>> GetMerchantApiKeysAsync(string merchantId);

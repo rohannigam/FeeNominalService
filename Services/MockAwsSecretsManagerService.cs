@@ -1,236 +1,236 @@
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
-using FeeNominalService.Models.Configuration;
-using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using System.Text.Json;
 using FeeNominalService.Models.ApiKey;
-using FeeNominalService.Models.Merchant;
+using FeeNominalService.Services.AWS;
+using System.Text.Json;
 
 namespace FeeNominalService.Services
 {
     public class MockAwsSecretsManagerService : IAwsSecretsManagerService
     {
         private readonly ILogger<MockAwsSecretsManagerService> _logger;
-        private readonly ApiKeyConfiguration _settings;
-        private readonly Dictionary<string, string> _mockSecrets;
         private readonly Dictionary<string, string> _secrets;
 
-        public MockAwsSecretsManagerService(
-            ILogger<MockAwsSecretsManagerService> logger,
-            IOptions<ApiKeyConfiguration> settings)
+        public MockAwsSecretsManagerService(ILogger<MockAwsSecretsManagerService> logger)
         {
             _logger = logger;
-            _settings = settings.Value;
-            _mockSecrets = new Dictionary<string, string>();
             _secrets = new Dictionary<string, string>();
-
-            // Initialize with test data
-            InitializeTestData();
         }
 
-        private void InitializeTestData()
+        public Task<string?> GetSecretAsync(string secretName)
         {
-            // Development test merchants
-            var dev001Key = "dev_test_key_001";
-            var dev002Key = "dev_test_key_002";
-            var dev003Key = "dev_test_key_003";
-
-            // Store secrets with the same path structure as production
-            _mockSecrets[$"feenominal/merchants/DEV001/apikeys/{dev001Key}"] = JsonSerializer.Serialize(new ApiKeySecret 
-            { 
-                ApiKey = dev001Key,
-                MerchantId = "DEV001",
-                Secret = "dev_test_secret_001",
-                CreatedAt = DateTime.UtcNow,
-                LastRotated = null,
-                IsRevoked = false,
-                RevokedAt = null,
-                Status = "ACTIVE"
-            });
-
-            _mockSecrets[$"feenominal/merchants/DEV002/apikeys/{dev002Key}"] = JsonSerializer.Serialize(new ApiKeySecret 
-            { 
-                ApiKey = dev002Key,
-                MerchantId = "DEV002",
-                Secret = "dev_test_secret_002",
-                CreatedAt = DateTime.UtcNow,
-                LastRotated = null,
-                IsRevoked = false,
-                RevokedAt = null,
-                Status = "ACTIVE"
-            });
-
-            _mockSecrets[$"feenominal/merchants/DEV003/apikeys/{dev003Key}"] = JsonSerializer.Serialize(new ApiKeySecret 
-            { 
-                ApiKey = dev003Key,
-                MerchantId = "DEV003",
-                Secret = "dev_test_secret_003",
-                CreatedAt = DateTime.UtcNow,
-                LastRotated = null,
-                IsRevoked = false,
-                RevokedAt = null,
-                Status = "ACTIVE"
-            });
-
-            // Production test merchants
-            var merch123Key = "test_secret_key_123";
-            var merch456Key = "test_secret_key_456";
-
-            _mockSecrets[$"feenominal/merchants/MERCH123/apikeys/{merch123Key}"] = JsonSerializer.Serialize(new ApiKeySecret 
-            { 
-                ApiKey = merch123Key,
-                MerchantId = "MERCH123",
-                Secret = "test_secret_value_123",
-                CreatedAt = DateTime.UtcNow,
-                LastRotated = null,
-                IsRevoked = false,
-                RevokedAt = null,
-                Status = "ACTIVE"
-            });
-
-            _mockSecrets[$"feenominal/merchants/MERCH456/apikeys/{merch456Key}"] = JsonSerializer.Serialize(new ApiKeySecret 
-            { 
-                ApiKey = merch456Key,
-                MerchantId = "MERCH456",
-                Secret = "test_secret_value_456",
-                CreatedAt = DateTime.UtcNow,
-                LastRotated = null,
-                IsRevoked = false,
-                RevokedAt = null,
-                Status = "ACTIVE"
-            });
-        }
-
-        public async Task<T> GetSecretAsync<T>(string secretName) where T : class
-        {
-            _logger.LogInformation("Mock: Getting secret {SecretName}", secretName);
-
-            if (_mockSecrets.TryGetValue(secretName, out var secretValue))
+            try
             {
-                try
+                if (_secrets.TryGetValue(secretName, out var secret))
                 {
-                    var result = await Task.Run(() => JsonSerializer.Deserialize<T>(secretValue));
-                    if (result == null)
-                    {
-                        _logger.LogWarning("Mock: Failed to deserialize secret {SecretName}", secretName);
-                        throw new InvalidOperationException($"Failed to deserialize secret {secretName}");
-                    }
-                    _logger.LogInformation("Mock: Successfully retrieved secret {SecretName}", secretName);
-                    return result;
+                    return Task.FromResult<string?>(secret);
                 }
-                catch (JsonException ex)
-                {
-                    _logger.LogError(ex, "Mock: Error deserializing secret {SecretName}", secretName);
-                    throw new InvalidOperationException($"Invalid secret format: {ex.Message}");
-                }
+                return Task.FromResult<string?>(null);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving secret {SecretName}", secretName);
+                return Task.FromResult<string?>(null);
+            }
+        }
 
-            _logger.LogWarning("Mock: Secret {SecretName} not found", secretName);
-            throw new KeyNotFoundException($"Secret {secretName} not found");
+        public Task<T?> GetSecretAsync<T>(string secretName) where T : class
+        {
+            try
+            {
+                if (_secrets.TryGetValue(secretName, out var secret))
+                {
+                    return Task.FromResult(JsonSerializer.Deserialize<T>(secret));
+                }
+                return Task.FromResult<T?>(null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving secret {SecretName}", secretName);
+                return Task.FromResult<T?>(null);
+            }
+        }
+
+        public Task StoreSecretAsync(string secretName, string secretValue)
+        {
+            try
+            {
+                _secrets[secretName] = secretValue;
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error storing secret {SecretName}", secretName);
+                throw;
+            }
+        }
+
+        public Task CreateSecretAsync(string secretName, Dictionary<string, string> secretValue)
+        {
+            try
+            {
+                _secrets[secretName] = JsonSerializer.Serialize(secretValue);
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating secret {SecretName}", secretName);
+                throw;
+            }
         }
 
         public Task UpdateSecretAsync<T>(string secretName, T secretValue) where T : class
         {
-            _logger.LogInformation("Mock: Updating secret {SecretName}", secretName);
-            
-            if (!_mockSecrets.ContainsKey(secretName))
-            {
-                throw new KeyNotFoundException($"Secret {secretName} not found");
-            }
-
-            _mockSecrets[secretName] = JsonSerializer.Serialize(secretValue);
-            return Task.CompletedTask;
-        }
-
-        public async Task StoreSecretAsync(string secretName, string secretValue)
-        {
-            _logger.LogInformation("Mock: Storing secret {SecretName}", secretName);
             try
             {
-                // Validate that the secret value is a valid ApiKeySecret
-                var secret = await Task.Run(() => JsonSerializer.Deserialize<ApiKeySecret>(secretValue));
-                if (secret == null)
-                {
-                    throw new InvalidOperationException("Invalid secret format");
-                }
-
-                // Store the validated secret
-                _mockSecrets[secretName] = secretValue;
-                _logger.LogInformation("Mock: Successfully stored secret {SecretName} with ApiKey {ApiKey}", secretName, secret.ApiKey);
+                _secrets[secretName] = JsonSerializer.Serialize(secretValue);
+                return Task.CompletedTask;
             }
-            catch (JsonException ex)
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "Mock: Failed to store secret {SecretName} - Invalid JSON format", secretName);
-                throw new InvalidOperationException($"Invalid secret format: {ex.Message}");
+                _logger.LogError(ex, "Error updating secret {SecretName}", secretName);
+                throw;
             }
         }
 
         public Task<IEnumerable<T>> GetAllSecretsAsync<T>() where T : class
         {
-            _logger.LogInformation("Mock: Getting all secrets");
-            var secrets = _mockSecrets.Values
-                .Select(value => JsonSerializer.Deserialize<T>(value))
-                .Where(secret => secret != null)
-                .Cast<T>()
-                .ToList();
-
-            return Task.FromResult<IEnumerable<T>>(secrets);
-        }
-
-        public Task<string> GetApiKeyAsync(string merchantId)
-        {
-            // Find the first non-revoked API key for the merchant
-            var merchantSecrets = _mockSecrets
-                .Where(kvp => kvp.Key.StartsWith($"feenominal/merchants/{merchantId}/apikeys/"))
-                .Select(kvp => JsonSerializer.Deserialize<ApiKeySecret>(kvp.Value))
-                .Where(secret => secret != null && !secret.IsRevoked)
-                .FirstOrDefault();
-
-            if (merchantSecrets == null)
+            try
             {
-                throw new KeyNotFoundException($"No active API key found for merchant {merchantId}");
+                var secrets = new List<T>();
+                foreach (var secret in _secrets.Values)
+                {
+                    var deserialized = JsonSerializer.Deserialize<T>(secret);
+                    if (deserialized != null)
+                    {
+                        secrets.Add(deserialized);
+                    }
+                }
+                return Task.FromResult<IEnumerable<T>>(secrets);
             }
-
-            return Task.FromResult(merchantSecrets.ApiKey);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all secrets");
+                throw;
+            }
         }
 
-        public async Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
+        public Task<string?> GetApiKeyAsync(string merchantId)
         {
             try
             {
-                var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
-                var secret = await GetSecretAsync<ApiKeySecret>(secretName);
-                var isValid = !string.IsNullOrEmpty(secret.ApiKey) && 
-                             secret.ApiKey == apiKey && 
-                             !secret.IsRevoked;
-                
-                _logger.LogInformation("Mock: API key validation result for {ApiKey}: {IsValid}", apiKey, isValid);
-                return isValid;
+                var secretName = $"apikey/{merchantId}/active";
+                if (_secrets.TryGetValue(secretName, out var secret))
+                {
+                    var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret);
+                    return Task.FromResult<string?>(apiKeySecret?.Secret);
+                }
+                return Task.FromResult<string?>(null);
             }
-            catch (KeyNotFoundException)
+            catch (Exception ex)
             {
-                _logger.LogWarning("Mock: API key {ApiKey} not found for merchant {MerchantId}", apiKey, merchantId);
-                return false;
+                _logger.LogError(ex, "Error retrieving API key for merchant {MerchantId}", merchantId);
+                return Task.FromResult<string?>(null);
             }
         }
 
-        public async Task RevokeApiKeyAsync(string merchantId, string apiKey)
+        public Task<IEnumerable<ApiKeyInfo>> GetApiKeysAsync(string merchantId)
         {
-            var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
-            var secret = await GetSecretAsync<ApiKeySecret>(secretName);
-            
-            if (secret.ApiKey != apiKey)
+            try
             {
-                throw new KeyNotFoundException($"API key {apiKey} not found for merchant {merchantId}");
+                var apiKeys = new List<ApiKeyInfo>();
+                foreach (var secret in _secrets)
+                {
+                    if (secret.Key.StartsWith($"apikey/{merchantId}/"))
+                    {
+                        var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret.Value);
+                        if (apiKeySecret != null)
+                        {
+                            apiKeys.Add(new ApiKeyInfo
+                            {
+                                ApiKey = apiKeySecret.ApiKey,
+                                Status = apiKeySecret.Status,
+                                CreatedAt = apiKeySecret.CreatedAt,
+                                LastRotatedAt = apiKeySecret.LastRotated,
+                                RevokedAt = apiKeySecret.RevokedAt,
+                                IsRevoked = apiKeySecret.IsRevoked,
+                                IsExpired = apiKeySecret.ExpiresAt.HasValue && apiKeySecret.ExpiresAt.Value < DateTime.UtcNow
+                            });
+                        }
+                    }
+                }
+                return Task.FromResult<IEnumerable<ApiKeyInfo>>(apiKeys);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", merchantId);
+                return Task.FromResult<IEnumerable<ApiKeyInfo>>(new List<ApiKeyInfo>());
+            }
+        }
 
-            secret.IsRevoked = true;
-            secret.RevokedAt = DateTime.UtcNow;
-            secret.Status = "REVOKED";
-            
-            await UpdateSecretAsync(secretName, secret);
+        public Task<string?> GetApiKeyByIdAsync(string merchantId, string apiKeyId)
+        {
+            try
+            {
+                var secretName = $"apikey/{merchantId}/{apiKeyId}";
+                if (_secrets.TryGetValue(secretName, out var secret))
+                {
+                    var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret);
+                    return Task.FromResult<string?>(apiKeySecret?.Secret);
+                }
+                return Task.FromResult<string?>(null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving API key {ApiKeyId} for merchant {MerchantId}", apiKeyId, merchantId);
+                return Task.FromResult<string?>(null);
+            }
+        }
+
+        public Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
+        {
+            try
+            {
+                var secretName = $"apikey/{merchantId}/active";
+                if (_secrets.TryGetValue(secretName, out var secret))
+                {
+                    var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret);
+                    return Task.FromResult(apiKeySecret?.Secret == apiKey);
+                }
+                return Task.FromResult(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating API key for merchant {MerchantId}", merchantId);
+                return Task.FromResult(false);
+            }
+        }
+
+        public Task RevokeApiKeyAsync(string merchantId, string apiKey)
+        {
+            try
+            {
+                var secretName = $"apikey/{merchantId}/{apiKey}";
+                if (_secrets.TryGetValue(secretName, out var secret))
+                {
+                    var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret);
+                    if (apiKeySecret != null)
+                    {
+                        apiKeySecret.IsRevoked = true;
+                        apiKeySecret.RevokedAt = DateTime.UtcNow;
+                        apiKeySecret.Status = "REVOKED";
+                        _secrets[secretName] = JsonSerializer.Serialize(apiKeySecret);
+                    }
+                }
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error revoking API key for merchant {MerchantId}", merchantId);
+                throw;
+            }
         }
     }
 } 

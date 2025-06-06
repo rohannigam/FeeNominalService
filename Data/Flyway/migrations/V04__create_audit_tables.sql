@@ -28,14 +28,22 @@ CREATE TABLE IF NOT EXISTS authentication_attempts (
 );
 
 -- Create merchant_audit_trail table
-CREATE TABLE IF NOT EXISTS merchant_audit_trail (
-    audit_trail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    merchant_id UUID NOT NULL REFERENCES merchants(merchant_id),
-    external_merchant_id VARCHAR(50) NOT NULL,
-    action VARCHAR(50) NOT NULL,  -- 'CREATE', 'UPDATE'
-    field_name VARCHAR(100) NOT NULL,
+CREATE TABLE fee_nominal.merchant_audit_trail (
+    merchant_audit_trail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_id UUID NOT NULL REFERENCES fee_nominal.merchant(merchant_id),
+    action VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    property_name VARCHAR(100),
     old_value TEXT,
     new_value TEXT,
-    timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(50) NOT NULL
-); 
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    CONSTRAINT fk_merchant_audit_trail_merchant FOREIGN KEY (merchant_id) REFERENCES fee_nominal.merchant(merchant_id)
+);
+
+-- Indexes
+CREATE INDEX idx_merchant_audit_trail_merchant_id ON fee_nominal.merchant_audit_trail(merchant_id);
+CREATE INDEX idx_merchant_audit_trail_created_at ON fee_nominal.merchant_audit_trail(created_at);
+CREATE INDEX idx_merchant_audit_trail_action ON fee_nominal.merchant_audit_trail(action);
+CREATE INDEX idx_merchant_audit_trail_entity_type ON fee_nominal.merchant_audit_trail(entity_type);
+CREATE INDEX idx_merchant_audit_trail_property_name ON fee_nominal.merchant_audit_trail(property_name); 

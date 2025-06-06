@@ -36,14 +36,55 @@ namespace FeeNominalService.Authentication
         {
             try
             {
-                // Skip authentication for public endpoints
-                if (Request.Path.StartsWithSegments("/api/v1/onboarding/apikey/generate") ||
-                    Request.Path.StartsWithSegments("/api/v1/ping"))
+                // For initial API key generation, only validate timestamp and nonce
+                if (Request.Path.StartsWithSegments("/api/v1/onboarding/apikey/initial-generate"))
+                {
+                    if (!Request.Headers.TryGetValue("X-Timestamp", out var initTimestamp) ||
+                        !Request.Headers.TryGetValue("X-Nonce", out var initNonce))
+                    {
+                        _logger.LogWarning("Missing required headers for initial API key generation");
+                        return AuthenticateResult.Fail("Missing required headers: X-Timestamp and X-Nonce");
+                    }
+
+                    // Read request body
+                    string initRequestBody;
+                    Request.EnableBuffering();
+                    using (var reader = new StreamReader(Request.Body, leaveOpen: true))
+                    {
+                        initRequestBody = await reader.ReadToEndAsync();
+                        Request.Body.Position = 0;
+                    }
+
+                    // Validate timestamp and nonce only
+                    var isValidInitTimestampAndNonce = _requestSigningService.ValidateTimestampAndNonce(
+                        initTimestamp.ToString(),
+                        initNonce.ToString());
+
+                    if (!isValidInitTimestampAndNonce)
+                    {
+                        _logger.LogWarning("Invalid timestamp or nonce for initial API key generation");
+                        return AuthenticateResult.Fail("Invalid timestamp or nonce");
+                    }
+
+                    // Create claims identity for initial API key generation
+                    var initClaims = new[]
+                    {
+                        new Claim("IsInitialKeyGeneration", "true")
+                    };
+
+                    var initIdentity = new ClaimsIdentity(initClaims, Scheme.Name);
+                    var initPrincipal = new ClaimsPrincipal(initIdentity);
+
+                    return AuthenticateResult.Success(new AuthenticationTicket(initPrincipal, Scheme.Name));
+                }
+
+                // Skip authentication for ping endpoint
+                if (Request.Path.StartsWithSegments("/api/v1/ping"))
                 {
                     return AuthenticateResult.NoResult();
                 }
 
-                // Get required headers
+                // For all other endpoints, require full authentication
                 if (!Request.Headers.TryGetValue("X-Merchant-ID", out var merchantId) ||
                     !Request.Headers.TryGetValue("X-API-Key", out var apiKey) ||
                     !Request.Headers.TryGetValue("X-Timestamp", out var timestamp) ||
@@ -63,7 +104,7 @@ namespace FeeNominalService.Authentication
                     Request.Body.Position = 0;
                 }
 
-                // Validate request
+                // Validate signature
                 var isValid = await _requestSigningService.ValidateRequestAsync(
                     merchantId.ToString(),
                     apiKey.ToString(),
@@ -74,27 +115,25 @@ namespace FeeNominalService.Authentication
 
                 if (!isValid)
                 {
-                    _logger.LogWarning("Invalid API key authentication for merchant: {MerchantId}", merchantId.ToString());
-                    return AuthenticateResult.Fail("Invalid API key or signature");
+                    _logger.LogWarning("Invalid request signature");
+                    return AuthenticateResult.Fail("Invalid request signature");
                 }
 
                 // Create claims identity
                 var claims = new[]
                 {
-                    new System.Security.Claims.Claim("MerchantId", merchantId.ToString()),
-                    new System.Security.Claims.Claim("ApiKey", apiKey.ToString())
+                    new Claim("MerchantId", merchantId.ToString()),
+                    new Claim("ApiKey", apiKey.ToString())
                 };
 
-                var identity = new System.Security.Claims.ClaimsIdentity(claims, Scheme.Name);
-                var principal = new System.Security.Claims.ClaimsPrincipal(identity);
-                var ticket = new AuthenticationTicket(principal, Scheme.Name);
-
-                return AuthenticateResult.Success(ticket);
+                var identity = new ClaimsIdentity(claims, Scheme.Name);
+                var principal = new ClaimsPrincipal(identity);
+                return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during API key authentication");
-                return AuthenticateResult.Fail("Authentication failed");
+                return AuthenticateResult.Fail("Error during authentication");
             }
         }
 

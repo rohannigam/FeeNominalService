@@ -1,0 +1,222 @@
+# API Key Revocation Endpoint
+
+**Endpoint:** `/api/v1/onboarding/apikey/revoke`
+
+## Overview
+This endpoint is used to revoke (deactivate) an existing API key. Once revoked, the key can no longer be used for authentication. This is typically used when a key is compromised or no longer needed.
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies based on merchant's plan
+- Revocation is permanent and cannot be undone
+- All sensitive data is encrypted at rest
+- Changes are tracked in audit trail
+
+## Request Headers (Required)
+1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+2. `X-Nonce`: Unique string for request (e.g., GUID)
+3. `X-Api-Key`: Valid API key for authentication
+4. `X-Signature`: HMAC-SHA256 signature of the request
+
+## Request Body (RevokeApiKeyRequest)
+```json
+{
+    "merchantId": "guid",              // Required, internal merchant ID
+    "apiKey": "string",                // Required, API key to revoke
+    "reason": "string",                // Required, reason for revocation
+    "onboardingMetadata": {            // Required
+        "adminUserId": "string",       // Required
+        "onboardingReference": "string", // Required
+        "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
+}
+```
+
+## Response (ApiKeyInfo)
+```json
+{
+    "apiKey": "string",               // Revoked API key
+    "description": "string",          // Description
+    "rateLimit": 1000,               // Rate limit value
+    "allowedEndpoints": [            // Allowed endpoints
+        "string"
+    ],
+    "status": "REVOKED",             // Status
+    "createdAt": "datetime",         // Creation timestamp
+    "lastRotatedAt": "datetime",     // Last rotation timestamp
+    "revokedAt": "datetime",         // Revocation timestamp
+    "expiresAt": "datetime",         // Expiration timestamp
+    "isRevoked": true,               // Revocation status
+    "isExpired": false               // Expiration status
+}
+```
+
+## Error Responses
+```json
+{
+    "error": "string",               // Error message
+    "code": "string",               // Error code
+    "details": {                    // Optional error details
+        "field": "string",          // Field with error
+        "message": "string"         // Field-specific error message
+    }
+}
+```
+
+Common error codes:
+- `INVALID_REQUEST`: Request validation failed
+- `UNAUTHORIZED`: Invalid API key or signature
+- `MERCHANT_NOT_FOUND`: Merchant does not exist
+- `API_KEY_NOT_FOUND`: API key not found
+- `ALREADY_REVOKED`: Key is already revoked
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INTERNAL_ERROR`: Server error
+
+## Testing the Endpoint
+
+### Local Development
+```bash
+curl -X POST http://localhost:5000/api/v1/onboarding/apikey/revoke \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "apiKey": "api-key-to-revoke",
+    "reason": "Security breach",
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "REVOKE-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+### Production
+```bash
+curl -X POST https://api.feenominal.com/api/v1/onboarding/apikey/revoke \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Api-Key: your-api-key" \
+  -H "X-Signature: calculated-signature" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+    "apiKey": "api-key-to-revoke",
+    "reason": "Security breach",
+    "onboardingMetadata": {
+        "adminUserId": "admin123",
+        "onboardingReference": "REVOKE-REF-001",
+        "onboardingTimestamp": "2024-03-20T10:30:00Z"
+    }
+}'
+```
+
+## Code Flow
+
+1. **Request Validation**:
+   - Validates timestamp is within 5-minute window
+   - Validates nonce hasn't been used recently
+   - Validates API key and signature
+   - Validates request body structure
+   - Checks merchant and API key exist
+
+2. **Database Operations**:
+   - Verifies merchant exists
+   - Gets API key details
+   - Validates key is not already revoked
+   - Updates key status to revoked
+   - Creates audit trail entry
+
+3. **Secret Management**:
+   - Marks secret as revoked
+   - Updates secret metadata
+   - Stores in appropriate location based on environment
+
+4. **Response Generation**:
+   - Returns updated ApiKeyInfo
+   - Includes revocation metadata
+   - Includes status information
+
+## Workflow Diagrams
+
+### API Key Revocation Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant DB
+    participant Secrets
+    participant Audit
+
+    Client->>API: POST /api/v1/onboarding/apikey/revoke
+    API->>Auth: Validate API key & signature
+    Auth-->>API: Validation result
+    API->>DB: Get API key details
+    DB-->>API: Key details
+    API->>API: Validate key status
+    API->>DB: Update key status
+    API->>Secrets: Update secret status
+    API->>Audit: Create audit trail
+    API-->>Client: Return revoked key info
+```
+
+### Revocation Validation Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validate Key}
+    B -->|Invalid| C[404 Not Found]
+    B -->|Valid| D{Check Status}
+    D -->|Already Revoked| E[400 Bad Request]
+    D -->|Active| F{Validate Reason}
+    F -->|Invalid| G[400 Bad Request]
+    F -->|Valid| H[Revoke Key]
+    H --> I[Update Secret]
+    I --> J[Create Audit]
+    J --> K[Return Response]
+```
+
+### Error Handling Flow
+```mermaid
+graph TD
+    A[Request] --> B{Validation}
+    B -->|Invalid| C[400 Bad Request]
+    B -->|Valid| D{Business Rules}
+    D -->|Invalid Key| E[404 Not Found]
+    D -->|Already Revoked| F[400 Bad Request]
+    D -->|Success| G[200 OK]
+    D -->|Error| H[500 Internal Error]
+```
+
+## Best Practices
+
+1. **Security**:
+   - Validate all input fields
+   - Track all revocations in audit trail
+   - Implement proper validation
+   - Monitor for suspicious activity
+   - Consider key rotation after revocation
+
+2. **Error Handling**:
+   - Return meaningful error messages
+   - Log all errors for debugging
+   - Handle edge cases gracefully
+   - Maintain audit trail
+
+3. **Performance**:
+   - Optimize database queries
+   - Monitor response times
+   - Implement proper indexing
+   - Cache frequently accessed data
+
+4. **Maintenance**:
+   - Keep documentation updated
+   - Monitor API usage
+   - Track error rates
+   - Regular security audits
+   - Review audit logs
+   - Clean up revoked keys periodically 

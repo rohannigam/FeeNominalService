@@ -15,7 +15,7 @@ namespace FeeNominalService.Models.Merchant
         /// </summary>
         [Key]
         [Column("merchant_status_id")]
-        public Guid Id { get; set; }
+        public int Id { get; set; }
 
         /// <summary>
         /// Status code (e.g., "ACTIVE", "INACTIVE")
@@ -60,11 +60,5 @@ namespace FeeNominalService.Models.Merchant
         [Required]
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
-        /// <summary>
-        /// Collection of merchants with this status
-        /// </summary>
-        [InverseProperty("Status")]
-        public virtual ICollection<Merchant> Merchants { get; set; } = new List<Merchant>();
     }
 } 

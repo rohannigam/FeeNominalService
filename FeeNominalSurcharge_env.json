@@ -9,21 +9,57 @@
 			"enabled": true
 		},
 		{
-			"key": "merchantId",
-			"value": "DEV001",
+			"key": "merchantName",
+			"value": "Test Merchant",
 			"type": "default",
 			"enabled": true
 		},
 		{
-			"key": "apiKey",
-			"value": "{{initialApiKey}}",
-			"type": "secret",
+			"key": "externalMerchantId",
+			"value": "EXT001",
+			"type": "default",
 			"enabled": true
 		},
 		{
-			"key": "apiSecret",
-			"value": "{{initialApiSecret}}",
-			"type": "secret",
+			"key": "externalMerchantGuid",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "apiKeyDescription",
+			"value": "Test API Key Description",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "apiKeyRateLimit",
+			"value": "1000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "apiKeyAllowedEndpoints",
+			"value": "[\"/api/v1/transactions\", \"/api/v1/batch\"]",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "apiKeyPurpose",
+			"value": "INITIAL",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "adminUserId",
+			"value": "admin123",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "onboardingReference",
+			"value": "TEST-REF-001",
+			"type": "default",
 			"enabled": true
 		},
 		{
@@ -36,42 +72,6 @@
 			"key": "initialApiSecret",
 			"value": "",
 			"type": "secret",
-			"enabled": true
-		},
-		{
-			"key": "subsequentApiKey",
-			"value": "",
-			"type": "secret",
-			"enabled": true
-		},
-		{
-			"key": "subsequentApiSecret",
-			"value": "",
-			"type": "secret",
-			"enabled": true
-		},
-		{
-			"key": "testDescription",
-			"value": "Test API Key",
-			"type": "default",
-			"enabled": true
-		},
-		{
-			"key": "testRateLimit",
-			"value": "1000",
-			"type": "default",
-			"enabled": true
-		},
-		{
-			"key": "adminUserId",
-			"value": "admin",
-			"type": "default",
-			"enabled": true
-		},
-		{
-			"key": "onboardingReference",
-			"value": "INITIAL_SETUP",
-			"type": "default",
 			"enabled": true
 		},
 		{
