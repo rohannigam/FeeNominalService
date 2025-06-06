@@ -414,3 +414,273 @@ X-Signature: calculated-signature-here
 #     "processedAt": "2025-05-20T04:52:24.803373Z"
 #   }
 # ]
+
+### Surcharge Provider Endpoints
+
+### Create Surcharge Provider
+POST {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+    "name": "Interpayments",
+    "code": "INTERPAY",
+    "description": "Interpayments Surcharge Provider",
+    "baseUrl": "https://api.interpayments.com/v1",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            }
+        ]
+    },
+    "status": "active"
+}
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments",
+#   "code": "INTERPAY",
+#   "description": "Interpayments Surcharge Provider",
+#   "baseUrl": "https://api.interpayments.com/v1",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [
+#           {
+#               "name": "client_id",
+#               "type": "string",
+#               "description": "Interpayments Client ID"
+#           },
+#           {
+#               "name": "client_secret",
+#               "type": "string",
+#               "description": "Interpayments Client Secret"
+#           },
+#           {
+#               "name": "audience",
+#               "type": "string",
+#               "description": "JWT Audience"
+#           },
+#           {
+#               "name": "issuer",
+#               "type": "string",
+#               "description": "JWT Issuer"
+#           }
+#       ]
+#   },
+#   "status": "active",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:30:00Z"
+# }
+
+### Get All Surcharge Providers
+GET {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# [
+#   {
+#     "id": "123e4567-e89b-12d3-a456-426614174000",
+#     "name": "Interpayments",
+#     "code": "INTERPAY",
+#     "description": "Interpayments Surcharge Provider",
+#     "baseUrl": "https://api.interpayments.com/v1",
+#     "authenticationType": "JWT",
+#     "credentialsSchema": {
+#         "required_fields": [
+#             {
+#                 "name": "client_id",
+#                 "type": "string",
+#                 "description": "Interpayments Client ID"
+#             },
+#             {
+#                 "name": "client_secret",
+#                 "type": "string",
+#                 "description": "Interpayments Client Secret"
+#             },
+#             {
+#                 "name": "audience",
+#                 "type": "string",
+#                 "description": "JWT Audience"
+#             },
+#             {
+#                 "name": "issuer",
+#                 "type": "string",
+#                 "description": "JWT Issuer"
+#             }
+#         ]
+#     },
+#     "status": "active",
+#     "createdAt": "2024-03-20T10:30:00Z",
+#     "updatedAt": "2024-03-20T10:30:00Z"
+#   }
+# ]
+
+### Get Surcharge Provider by ID
+GET {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments",
+#   "code": "INTERPAY",
+#   "description": "Interpayments Surcharge Provider",
+#   "baseUrl": "https://api.interpayments.com/v1",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [
+#           {
+#               "name": "client_id",
+#               "type": "string",
+#               "description": "Interpayments Client ID"
+#           },
+#           {
+#               "name": "client_secret",
+#               "type": "string",
+#               "description": "Interpayments Client Secret"
+#           },
+#           {
+#               "name": "audience",
+#               "type": "string",
+#               "description": "JWT Audience"
+#           },
+#           {
+#               "name": "issuer",
+#               "type": "string",
+#               "description": "JWT Issuer"
+#           }
+#       ]
+#   },
+#   "status": "active",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:30:00Z"
+# }
+
+### Update Surcharge Provider
+PUT {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+    "name": "Interpayments Updated",
+    "description": "Updated Interpayments Configuration",
+    "baseUrl": "https://api.interpayments.com/v2",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            },
+            {
+                "name": "token_endpoint",
+                "type": "string",
+                "description": "JWT Token Endpoint"
+            }
+        ]
+    },
+    "status": "active"
+}
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments Updated",
+#   "code": "INTERPAY",
+#   "description": "Updated Interpayments Configuration",
+#   "baseUrl": "https://api.interpayments.com/v2",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [
+#           {
+#               "name": "client_id",
+#               "type": "string",
+#               "description": "Interpayments Client ID"
+#           },
+#           {
+#               "name": "client_secret",
+#               "type": "string",
+#               "description": "Interpayments Client Secret"
+#           },
+#           {
+#               "name": "audience",
+#               "type": "string",
+#               "description": "JWT Audience"
+#           },
+#           {
+#               "name": "issuer",
+#               "type": "string",
+#               "description": "JWT Issuer"
+#           },
+#           {
+#               "name": "token_endpoint",
+#               "type": "string",
+#               "description": "JWT Token Endpoint"
+#           }
+#       ]
+#   },
+#   "status": "active",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:35:00Z"
+# }
+
+### Delete Surcharge Provider
+DELETE {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# {
+#   "success": true,
+#   "message": "Provider deleted successfully"
+# }
