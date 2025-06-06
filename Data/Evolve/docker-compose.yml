@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: feenominal-postgres-evolve
+    environment:
+      POSTGRES_DB: feenominal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  evolve:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: feenominal-evolve
+    volumes:
+      - .:/app
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      /bin/bash -c "
+        echo 'Running migrations...' &&
+        echo 'Listing migrations directory:' &&
+        ls -la migrations/dev &&
+        echo 'Running migrations...' &&
+        evolve migrate postgresql -c 'Host=postgres;Port=5432;Database=feenominal;Username=postgres;Password=postgres' -l migrations/dev &&
+        echo 'Migrations completed. Keeping container alive...' &&
+        while true; do sleep 1; done
+      "
+
+volumes:
+  postgres_data: 

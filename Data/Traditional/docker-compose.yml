@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: feenominal-postgres
+    environment:
+      POSTGRES_DB: feenominal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./Step1_Schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./Step2_Data.sql:/docker-entrypoint-initdb.d/02_data.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data: 

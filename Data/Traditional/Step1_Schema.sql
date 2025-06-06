@@ -2,11 +2,11 @@
 -- SCHEMA CREATION
 -- =============================================
 
--- Drop existing schema if it exists (for clean start)
-DROP SCHEMA IF EXISTS fee_nominal CASCADE;
+-- Create schema
+CREATE SCHEMA IF NOT EXISTS fee_nominal;
 
--- Create schema explicitly
-CREATE SCHEMA fee_nominal;
+-- Set search path
+SET search_path TO fee_nominal;
 
 -- Create merchant_statuses table
 CREATE TABLE IF NOT EXISTS fee_nominal.merchant_statuses (
@@ -18,16 +18,6 @@ CREATE TABLE IF NOT EXISTS fee_nominal.merchant_statuses (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Insert default merchant statuses
-INSERT INTO fee_nominal.merchant_statuses (merchant_status_id, code, name, description, is_active) VALUES
-    (-2, 'SUSPENDED', 'Suspended', 'Merchant account is temporarily suspended', false),
-    (-1, 'INACTIVE', 'Inactive', 'Merchant account is inactive', false),
-    (0, 'UNKNOWN', 'Unknown', 'Merchant status is unknown', false),
-    (1, 'ACTIVE', 'Active', 'Merchant account is active and operational', true),
-    (2, 'PENDING', 'Pending', 'Merchant account is pending activation', true),
-    (3, 'VERIFIED', 'Verified', 'Merchant account is verified and active', true)
-ON CONFLICT (merchant_status_id) DO NOTHING;
 
 -- Create merchants table
 CREATE TABLE IF NOT EXISTS fee_nominal.merchants (
@@ -195,24 +185,26 @@ CREATE TABLE IF NOT EXISTS fee_nominal.api_key_secrets (
     merchant_id VARCHAR(50) NOT NULL,
     secret VARCHAR(255) NOT NULL,  -- Updated to match V08 migration
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_rotated TIMESTAMP WITH TIME ZONE,
     is_revoked BOOLEAN DEFAULT FALSE,
-    revoked_at TIMESTAMP WITH TIME ZONE
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
 );
 
 -- Create merchant_audit_trail table
 CREATE TABLE IF NOT EXISTS fee_nominal.merchant_audit_trail (
-    merchant_audit_trail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    audit_trail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     merchant_id UUID NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
     external_merchant_id VARCHAR(50) NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    old_values JSONB,
-    new_values JSONB,
-    performed_by VARCHAR(50) NOT NULL,
-    performed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    additional_info JSONB
+    action VARCHAR(50) NOT NULL,  -- 'CREATE', 'UPDATE'
+    field_name VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    changed_by VARCHAR(50) NOT NULL,
+    changed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reason TEXT
 );
 
 -- =============================================
@@ -255,12 +247,12 @@ CREATE INDEX IF NOT EXISTS idx_api_key_secrets_api_key ON fee_nominal.api_key_se
 CREATE INDEX IF NOT EXISTS idx_api_key_secrets_merchant_id ON fee_nominal.api_key_secrets(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_merchant_id ON fee_nominal.merchant_audit_trail(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_external_merchant_id ON fee_nominal.merchant_audit_trail(external_merchant_id);
-CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_timestamp ON fee_nominal.merchant_audit_trail(timestamp);
+CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_changed_at ON fee_nominal.merchant_audit_trail(changed_at);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_action ON fee_nominal.merchant_audit_trail(action);
 CREATE INDEX IF NOT EXISTS idx_merchants_external_merchant_guid ON fee_nominal.merchants(external_merchant_guid);
 
 -- =============================================
--- FUNCTIONS AND TRIGGERS
+-- STORED PROCEDURES AND TRIGGERS
 -- =============================================
 
 -- Function to update updated_at timestamp
@@ -270,9 +262,9 @@ BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ language 'plpgsql';
 
--- Create triggers
+-- Create triggers for updated_at
 CREATE TRIGGER update_merchants_updated_at
     BEFORE UPDATE ON fee_nominal.merchants
     FOR EACH ROW
@@ -303,243 +295,8 @@ CREATE TRIGGER update_batch_transactions_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.update_updated_at_column();
 
--- =============================================
--- TEST DATA
--- =============================================
-
--- Note: The following section contains test data for development purposes only.
--- DO NOT run these inserts in production environments.
-
--- Insert merchant statuses
-INSERT INTO fee_nominal.merchant_statuses (code, name, description) VALUES
-    ('ACTIVE', 'Active', 'Merchant is active and can process transactions'),
-    ('INACTIVE', 'Inactive', 'Merchant is inactive and cannot process transactions'),
-    ('SUSPENDED', 'Suspended', 'Merchant is temporarily suspended'),
-    ('PENDING', 'Pending', 'Merchant is pending approval'),
-    ('REJECTED', 'Rejected', 'Merchant application was rejected'),
-    ('TERMINATED', 'Terminated', 'Merchant account has been terminated')
-ON CONFLICT (code) DO NOTHING;
-
--- Insert test merchant (with explicit status_id)
-WITH active_status AS (
-    SELECT merchant_status_id FROM fee_nominal.merchant_statuses WHERE code = 'ACTIVE' LIMIT 1
-)
-INSERT INTO fee_nominal.merchants (external_merchant_id, name, status_id, created_by)
-SELECT 
-    'DEV001',
-    'Development Merchant',
-    merchant_status_id,
-    'admin'
-FROM active_status
-ON CONFLICT (external_merchant_id) DO NOTHING;
-
--- Insert test surcharge provider
-INSERT INTO fee_nominal.surcharge_providers (name, code, description, base_url, authentication_type, credentials_schema, status) VALUES
-('InterPayments', 'INTERPAY', 
- 'InterPayments Surcharge Service Provider TEST',
- 'https://api-test.interpayments.com',
- 'API_KEY',
- '{
-   "required_fields": [
-     {
-       "name": "api_token",
-       "type": "string",
-       "description": "API Token for authentication",
-       "format": "jwt"
-     },
-     {
-       "name": "merchant_id",
-       "type": "string",
-       "description": "Merchant ID in InterPayments system",
-       "format": "alphanumeric"
-     }
-   ]
- }',
- 'ACTIVE')
-ON CONFLICT (code) DO NOTHING;
-
--- Insert test provider configurations
-WITH merchant AS (
-    SELECT merchant_id FROM fee_nominal.merchants WHERE external_merchant_id = 'DEV001' LIMIT 1
-),
-provider AS (
-    SELECT surcharge_provider_id FROM fee_nominal.surcharge_providers WHERE code = 'INTERPAY' LIMIT 1
-)
-INSERT INTO fee_nominal.surcharge_provider_configs (
-    provider_id,
-    merchant_id,
-    config_name,
-    api_version,
-    credentials,
-    is_active,
-    metadata,
-    created_by,
-    updated_by
-)
-SELECT 
-    surcharge_provider_id,
-    merchant_id,
-    'Primary',
-    'v1',
-    '{
-        "api_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJwYXltZXRyaWMtdGVzdCIsImlkIjoiNmoyY3hjZ21qNGd5NnQyMWo2bnRobmw2byIsImRhdGEiOlsicGF5bWV0cmljLXRlc3QiXSwiZSI6InRlc3QifQ.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs",
-        "merchant_id": "IP123456"
-    }',
-    true,
-    '{
-        "rate_limit": 1000,
-        "timeout": 30,
-        "retry_attempts": 3,
-        "webhook_url": "https://merchant.com/webhooks/interpayments"
-    }',
-    'admin',
-    'admin'
-FROM merchant m, provider p
-ON CONFLICT (provider_id, merchant_id, config_name) DO NOTHING;
-
--- Insert backup configuration
-WITH merchant AS (
-    SELECT merchant_id FROM fee_nominal.merchants WHERE external_merchant_id = 'DEV001' LIMIT 1
-),
-provider AS (
-    SELECT surcharge_provider_id FROM fee_nominal.surcharge_providers WHERE code = 'INTERPAY' LIMIT 1
-)
-INSERT INTO fee_nominal.surcharge_provider_configs (
-    provider_id,
-    merchant_id,
-    config_name,
-    api_version,
-    credentials,
-    is_active,
-    metadata,
-    created_by,
-    updated_by
-)
-SELECT 
-    surcharge_provider_id,
-    merchant_id,
-    'Backup',
-    'v1',
-    '{
-        "api_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJpbnRlcnBheS1iYWNrdXAiLCJpZCI6IjZqMmN4Y2dtajRneTZ0MjFqNm50aG9sbjZvIiwiZGF0YSI6WyJpbnRlcnBheS1iYWNrdXAiXSwiZSI6ImJhY2t1cCJ9.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs",
-        "merchant_id": "IP123456"
-    }',
-    true,
-    '{
-        "rate_limit": 1000,
-        "timeout": 30,
-        "retry_attempts": 3,
-        "webhook_url": "https://merchant.com/webhooks/interpayments/backup"
-    }',
-    'admin',
-    'admin'
-FROM merchant m, provider p
-ON CONFLICT (provider_id, merchant_id, config_name) DO NOTHING;
-
--- Insert test configuration history
-WITH config AS (
-    SELECT surcharge_provider_config_id FROM fee_nominal.surcharge_provider_configs 
-    WHERE config_name = 'Primary' 
-    AND merchant_id IN (SELECT merchant_id FROM fee_nominal.merchants WHERE external_merchant_id = 'DEV001')
-    LIMIT 1
-)
-INSERT INTO fee_nominal.surcharge_provider_config_history (
-    config_id,
-    action,
-    previous_values,
-    new_values,
-    changed_by,
-    reason
-)
-SELECT 
-    surcharge_provider_config_id,
-    'CREATED',
-    NULL,
-    '{
-        "api_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJpbnRlcnBheS1wcmltYXJ5IiwiaWQiOiI2ajJjeGNnbWo0Z3k2dDIxajZudGhvbG42byIsImRhdGEiOlsiaW50ZXJwYXktcHJpbWFyeSJdLCJlIjoicHJpbWFyeSJ9.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs",
-        "merchant_id": "IP123456",
-        "config_name": "Primary",
-        "api_version": "v1",
-        "is_active": true
-    }',
-    'admin',
-    'Initial configuration creation'
-FROM config c
-ON CONFLICT DO NOTHING;
-
--- Insert test API key
-INSERT INTO fee_nominal.api_keys (
-    merchant_id,
-    key,
-    name,
-    description,
-    rate_limit,
-    allowed_endpoints,
-    status,
-    expiration_days,
-    expires_at,
-    created_by,
-    purpose
-)
-SELECT 
-    merchant_id,
-    'test_api_key',
-    'Test API Key',
-    'Test API Key',
-    1000,
-    ARRAY['/api/v1/surchargefee/calculate', '/api/v1/surchargefee/calculate-batch', '/api/v1/refunds/process'],
-    'ACTIVE',
-    30,
-    CURRENT_TIMESTAMP + INTERVAL '30 days',
-    'admin',
-    'GENERAL'
-FROM fee_nominal.merchants
-WHERE external_merchant_id = 'DEV001'
-ON CONFLICT (key) DO NOTHING;
-
--- Add test data for transactions
-WITH merchant AS (
-    SELECT merchant_id FROM fee_nominal.merchants WHERE external_merchant_id = 'DEV001' LIMIT 1
-),
-provider AS (
-    SELECT surcharge_provider_id FROM fee_nominal.surcharge_providers WHERE code = 'INTERPAY' LIMIT 1
-),
-provider_config AS (
-    SELECT surcharge_provider_config_id FROM fee_nominal.surcharge_provider_configs 
-    WHERE config_name = 'Primary' 
-    AND merchant_id IN (SELECT merchant_id FROM fee_nominal.merchants WHERE external_merchant_id = 'DEV001')
-    LIMIT 1
-)
-INSERT INTO fee_nominal.transactions (
-    merchant_id,
-    surcharge_provider_id,
-    surcharge_provider_config_id,
-    amount,
-    currency,
-    surcharge_amount,
-    total_amount,
-    status,
-    external_reference,
-    external_source,
-    external_transaction_id
-)
-SELECT 
-    merchant_id,
-    surcharge_provider_id,
-    surcharge_provider_config_id,
-    100.00,
-    'USD',
-    2.50,
-    102.50,
-    'COMPLETED',
-    'REF123456',
-    'SOAP_API',
-    'SOAP-TXN-001'
-FROM merchant m, provider p, provider_config pc
-ON CONFLICT DO NOTHING;
-
--- Insert test API key secret
-INSERT INTO fee_nominal.api_key_secrets (id, api_key, merchant_id, secret, status)
-VALUES 
-    ('33333333-3333-3333-3333-333333333333', 'test-api-key', 'DEV001', 'test-secret', 'ACTIVE')
-ON CONFLICT (api_key) DO NOTHING; 
+-- Add trigger for api_key_secrets updated_at
+CREATE TRIGGER update_api_key_secrets_updated_at
+    BEFORE UPDATE ON fee_nominal.api_key_secrets
+    FOR EACH ROW
+    EXECUTE FUNCTION fee_nominal.update_updated_at_column(); 

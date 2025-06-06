@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using FeeNominalService.Models.Merchant;
 using FeeNominalService.Models.ApiKey;
+using FeeNominalService.Services;
 
 namespace FeeNominalService.Data
 {
@@ -19,12 +20,12 @@ namespace FeeNominalService.Data
                 // Add merchant statuses
                 var statuses = new[]
                 {
-                    new MerchantStatus { Code = "ACTIVE", Name = "Active", Description = "Merchant is active and can process transactions" },
-                    new MerchantStatus { Code = "INACTIVE", Name = "Inactive", Description = "Merchant is inactive and cannot process transactions" },
-                    new MerchantStatus { Code = "SUSPENDED", Name = "Suspended", Description = "Merchant is temporarily suspended" },
-                    new MerchantStatus { Code = "PENDING", Name = "Pending", Description = "Merchant is pending approval" },
-                    new MerchantStatus { Code = "REJECTED", Name = "Rejected", Description = "Merchant application was rejected" },
-                    new MerchantStatus { Code = "TERMINATED", Name = "Terminated", Description = "Merchant account has been terminated" }
+                    new MerchantStatus { Id = MerchantStatusIds.Suspended, Code = "SUSPENDED", Name = "Suspended", Description = "Merchant is temporarily suspended", IsActive = false },
+                    new MerchantStatus { Id = MerchantStatusIds.Inactive, Code = "INACTIVE", Name = "Inactive", Description = "Merchant is inactive and cannot process transactions", IsActive = false },
+                    new MerchantStatus { Id = MerchantStatusIds.Unknown, Code = "UNKNOWN", Name = "Unknown", Description = "Merchant status is unknown", IsActive = false },
+                    new MerchantStatus { Id = MerchantStatusIds.Active, Code = "ACTIVE", Name = "Active", Description = "Merchant is active and can process transactions", IsActive = true },
+                    new MerchantStatus { Id = MerchantStatusIds.Pending, Code = "PENDING", Name = "Pending", Description = "Merchant is pending activation", IsActive = true },
+                    new MerchantStatus { Id = MerchantStatusIds.Verified, Code = "VERIFIED", Name = "Verified", Description = "Merchant is verified and active", IsActive = true }
                 };
 
                 await context.MerchantStatuses.AddRangeAsync(statuses);
@@ -36,7 +37,7 @@ namespace FeeNominalService.Data
                 {
                     var merchant = new Merchant
                     {
-                        ExternalId = "DEV001",
+                        ExternalMerchantId = "DEV001",
                         Name = "Development Merchant",
                         StatusId = activeStatus.Id,
                         CreatedBy = "admin"
@@ -48,7 +49,7 @@ namespace FeeNominalService.Data
                     // Add test API key
                     var apiKey = new ApiKey
                     {
-                        MerchantId = merchant.Id,
+                        MerchantId = merchant.MerchantId,
                         Key = "test_api_key",
                         Description = "Test API Key",
                         RateLimit = 1000,

@@ -1,0 +1,136 @@
+pipeline {
+    agent any
+
+    environment {
+        // Database Configuration
+        DB_PORT = '5432'
+        DB_NAME = 'fee_nominal'
+        DB_SCHEMA = 'fee_nominal'
+        EVOLVE_CLI_VERSION = '3.0.0'
+        
+        // Environment-specific hosts
+        DEV_DB_HOST = 'dev-db.feenominal.local'
+        STAGING_DB_HOST = 'staging-db.feenominal.local'
+        PROD_DB_HOST = 'prod-db.feenominal.local'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                powershell '''
+                    dotnet tool install --global Evolve.Cli --version ${EVOLVE_CLI_VERSION}
+                    dotnet restore
+                '''
+            }
+        }
+
+        stage('Build') {
+            steps {
+                powershell '''
+                    dotnet build --configuration Release
+                '''
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                powershell '''
+                    dotnet test --configuration Release --no-build
+                '''
+            }
+        }
+
+        stage('Development Migration') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dev-db-credentials',
+                    usernameVariable: 'DB_USER',
+                    passwordVariable: 'DB_PASSWORD'
+                )]) {
+                    powershell '''
+                        $logFile = "migration-dev-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+                        evolve repair -c "Host=${DEV_DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" 2>&1 | Tee-Object -FilePath $logFile
+                        Write-Host "Migration log saved to $logFile"
+                    '''
+                }
+            }
+        }
+
+        stage('Staging Migration') {
+            when {
+                branch 'staging'
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'staging-db-credentials',
+                    usernameVariable: 'DB_USER',
+                    passwordVariable: 'DB_PASSWORD'
+                )]) {
+                    powershell '''
+                        $logFile = "migration-staging-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+                        evolve repair -c "Host=${STAGING_DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" 2>&1 | Tee-Object -FilePath $logFile
+                        Write-Host "Migration log saved to $logFile"
+                    '''
+                }
+            }
+        }
+
+        stage('Production Migration') {
+            when {
+                branch 'main'
+            }
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    input message: 'Approve Production Migration?'
+                }
+                withCredentials([usernamePassword(
+                    credentialsId: 'prod-db-credentials',
+                    usernameVariable: 'DB_USER',
+                    passwordVariable: 'DB_PASSWORD'
+                )]) {
+                    powershell '''
+                        $logFile = "migration-prod-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+                        evolve repair -c "Host=${PROD_DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" 2>&1 | Tee-Object -FilePath $logFile
+                        Write-Host "Migration log saved to $logFile"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            archiveArtifacts artifacts: 'migration-*.log', allowEmptyArchive: true
+        }
+        failure {
+            script {
+                def previousVersion = sh(script: 'evolve info -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" | grep "Current version" | cut -d" " -f3', returnStdout: true).trim()
+                
+                withCredentials([usernamePassword(
+                    credentialsId: 'db-credentials',
+                    usernameVariable: 'DB_USER',
+                    passwordVariable: 'DB_PASSWORD'
+                )]) {
+                    powershell '''
+                        $logFile = "rollback-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+                        evolve repair -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" -v ${previousVersion} 2>&1 | Tee-Object -FilePath $logFile
+                        Write-Host "Rollback log saved to $logFile"
+                    '''
+                }
+            }
+            archiveArtifacts artifacts: 'rollback-*.log', allowEmptyArchive: true
+        }
+        always {
+            cleanWs()
+        }
+    }
+} 

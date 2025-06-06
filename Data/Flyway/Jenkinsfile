@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+
+    environment {
+        FLYWAY_VERSION = '9.22.3'
+        FLYWAY_HOME = "${WORKSPACE}/flyway-${FLYWAY_VERSION}"
+    }
+
+    stages {
+        stage('Setup') {
+            steps {
+                // Download Flyway
+                sh """
+                    if [ ! -d "${FLYWAY_HOME}" ]; then
+                        wget https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz
+                        tar -xzf flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz
+                        rm flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz
+                    fi
+                """
+            }
+        }
+
+        stage('Validate') {
+            steps {
+                dir('FeeNominalService/Data/Flyway') {
+                    sh """
+                        ${FLYWAY_HOME}/flyway validate \
+                            -configFiles=flyway.conf
+                    """
+                }
+            }
+        }
+
+        stage('Migrate') {
+            steps {
+                dir('FeeNominalService/Data/Flyway') {
+                    sh """
+                        ${FLYWAY_HOME}/flyway migrate \
+                            -configFiles=flyway.conf
+                    """
+                }
+            }
+        }
+
+        stage('Info') {
+            steps {
+                dir('FeeNominalService/Data/Flyway') {
+                    sh """
+                        ${FLYWAY_HOME}/flyway info \
+                            -configFiles=flyway.conf
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Cleanup
+            sh "rm -rf ${FLYWAY_HOME}"
+        }
+        success {
+            echo 'Database migration completed successfully'
+        }
+        failure {
+            echo 'Database migration failed'
+        }
+    }
+} 

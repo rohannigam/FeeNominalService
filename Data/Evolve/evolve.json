@@ -1,0 +1,23 @@
+{
+  "CommandTimeout": 30,
+  "ConnectionTimeout": 30,
+  "Command": "migrate",
+  "Locations": [
+    "migrations/dev",
+    "migrations/prod"
+  ],
+  "MetadataTableName": "evolve_changelog",
+  "Placeholders": {
+    "schema": "fee_nominal"
+  },
+  "OutOfOrder": false,
+  "IsEraseDisabled": false,
+  "Encoding": "UTF-8",
+  "Schemas": [
+    "fee_nominal"
+  ],
+  "StartVersion": "0",
+  "TargetVersion": "latest",
+  "VersionFilter": "V*__*.sql",
+  "VersionSortOrder": "Ascending"
+} 

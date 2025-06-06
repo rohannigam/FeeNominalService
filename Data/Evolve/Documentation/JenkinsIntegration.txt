@@ -1,0 +1,285 @@
+# Integrating Evolve with Jenkins CI/CD
+
+## Overview
+
+This document outlines how to integrate Evolve database migrations into your Jenkins CI/CD pipeline for the FeeNominalService project.
+
+## Prerequisites
+
+1. Jenkins server with necessary plugins:
+   - Pipeline
+   - Git
+   - PowerShell (for Windows environments)
+   - Credentials Binding
+
+2. Required tools on Jenkins server:
+   - .NET SDK
+   - PowerShell
+   - PostgreSQL client tools
+
+## Pipeline Structure
+
+### 1. Environment Variables
+
+```groovy
+environment {
+    DB_HOST = 'localhost'
+    DB_PORT = '5432'
+    DB_NAME = 'fee_nominal'
+    DB_SCHEMA = 'fee_nominal'
+    EVOLVE_CLI_VERSION = '3.0.0'
+}
+```
+
+### 2. Pipeline Stages
+
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install Evolve CLI') {
+            steps {
+                powershell '''
+                    dotnet tool install --global Evolve.Cli --version ${EVOLVE_CLI_VERSION}
+                '''
+            }
+        }
+        
+        stage('Database Migration') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'db-credentials',
+                    usernameVariable: 'DB_USER',
+                    passwordVariable: 'DB_PASSWORD'
+                )]) {
+                    powershell '''
+                        evolve repair -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
+```
+
+## Environment-Specific Configurations
+
+### Development Environment
+
+```groovy
+stage('Development Migration') {
+    when {
+        branch 'develop'
+    }
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'dev-db-credentials',
+            usernameVariable: 'DB_USER',
+            passwordVariable: 'DB_PASSWORD'
+        )]) {
+            powershell '''
+                evolve repair -c "Host=${DEV_DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}"
+            '''
+        }
+    }
+}
+```
+
+### Staging Environment
+
+```groovy
+stage('Staging Migration') {
+    when {
+        branch 'staging'
+    }
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'staging-db-credentials',
+            usernameVariable: 'DB_USER',
+            passwordVariable: 'DB_PASSWORD'
+        )]) {
+            powershell '''
+                evolve repair -c "Host=${STAGING_DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}"
+            '''
+        }
+    }
+}
+```
+
+### Production Environment
+
+```groovy
+stage('Production Migration') {
+    when {
+        branch 'main'
+    }
+    steps {
+        timeout(time: 1, unit: 'HOURS') {
+            input message: 'Approve Production Migration?'
+        }
+        withCredentials([usernamePassword(
+            credentialsId: 'prod-db-credentials',
+            usernameVariable: 'DB_USER',
+            passwordVariable: 'DB_PASSWORD'
+        )]) {
+            powershell '''
+                evolve repair -c "Host=${PROD_DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}"
+            '''
+        }
+    }
+}
+```
+
+## Best Practices
+
+1. **Security**
+   - Store database credentials in Jenkins credentials store
+   - Use environment-specific credentials
+   - Never hardcode sensitive information
+   - Use least-privilege database users
+
+2. **Error Handling**
+   ```groovy
+   stage('Database Migration') {
+       steps {
+           script {
+               try {
+                   withCredentials([usernamePassword(
+                       credentialsId: 'db-credentials',
+                       usernameVariable: 'DB_USER',
+                       passwordVariable: 'DB_PASSWORD'
+                   )]) {
+                       powershell '''
+                           evolve repair -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}"
+                       '''
+                   }
+               } catch (Exception e) {
+                   currentBuild.result = 'FAILURE'
+                   error "Database migration failed: ${e.message}"
+               }
+           }
+       }
+   }
+   ```
+
+3. **Rollback Strategy**
+   ```groovy
+   stage('Rollback') {
+       when {
+           expression { currentBuild.result == 'FAILURE' }
+       }
+       steps {
+           withCredentials([usernamePassword(
+               credentialsId: 'db-credentials',
+               usernameVariable: 'DB_USER',
+               passwordVariable: 'DB_PASSWORD'
+           )]) {
+               powershell '''
+                   evolve repair -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" -v ${PREVIOUS_VERSION}
+               '''
+           }
+       }
+   }
+   ```
+
+4. **Monitoring and Logging**
+   ```groovy
+   stage('Database Migration') {
+       steps {
+           withCredentials([usernamePassword(
+               credentialsId: 'db-credentials',
+               usernameVariable: 'DB_USER',
+               passwordVariable: 'DB_PASSWORD'
+           )]) {
+               powershell '''
+                   $logFile = "migration-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+                   evolve repair -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" 2>&1 | Tee-Object -FilePath $logFile
+                   Write-Host "Migration log saved to $logFile"
+               '''
+           }
+       }
+   }
+   ```
+
+## Integration with Other Tools
+
+1. **SonarQube Integration**
+   ```groovy
+   stage('Code Quality') {
+       steps {
+           withSonarQubeEnv('SonarQube') {
+               sh 'dotnet sonarscanner begin /k:"FeeNominalService"'
+               sh 'dotnet build'
+               sh 'dotnet sonarscanner end'
+           }
+       }
+   }
+   ```
+
+2. **Artifact Storage**
+   ```groovy
+   stage('Archive Migration Logs') {
+       steps {
+           archiveArtifacts artifacts: 'migration-*.log', allowEmptyArchive: true
+       }
+   }
+   ```
+
+## Troubleshooting
+
+1. **Common Issues**
+   - Connection failures
+   - Permission issues
+   - Version conflicts
+   - Migration conflicts
+
+2. **Debugging Steps**
+   ```groovy
+   stage('Debug Migration') {
+       steps {
+           powershell '''
+               $env:EVOLVE_DEBUG = "true"
+               evolve repair -c "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SearchPath=${DB_SCHEMA}" --verbose
+           '''
+       }
+   }
+   ```
+
+## Maintenance
+
+1. **Regular Tasks**
+   - Update Evolve CLI version
+   - Review and clean up old migration logs
+   - Monitor database performance
+   - Update credentials
+
+2. **Version Control**
+   - Keep migration files in version control
+   - Use semantic versioning for migrations
+   - Document breaking changes
+   - Maintain changelog
+
+## Additional Resources
+
+1. **Documentation**
+   - [Evolve Documentation](https://evolve-db.netlify.app/)
+   - [Jenkins Pipeline Syntax](https://www.jenkins.io/doc/book/pipeline/syntax/)
+   - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+
+2. **Support**
+   - Jenkins support channels
+   - Evolve GitHub issues
+   - Database team contact information 

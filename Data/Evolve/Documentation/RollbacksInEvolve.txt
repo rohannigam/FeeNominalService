@@ -1,0 +1,293 @@
+# Rollbacks in Evolve
+
+## Basic Rollback Structure
+
+In Evolve, rollback scripts are part of each migration file itself. Each migration file contains both "Up Migration" and "Down Migration" sections. For example:
+
+```sql
+-- Up Migration
+CREATE TABLE example (...);
+
+-- Down Migration
+DROP TABLE IF EXISTS example;
+```
+
+## Key Points About Evolve's Rollback Approach
+
+1. **No Separate Rollback Files**
+   - Unlike Flyway, Evolve doesn't use separate rollback files
+   - Down migrations are included in the same file as up migrations
+   - This keeps related changes together and easier to maintain
+
+2. **Down Migration Section**
+   - Each migration file has a clear separation between up and down migrations
+   - Typically marked with comments for clarity
+   - Down migrations should be written to properly undo the up migration changes
+
+3. **Execution Order**
+   When rolling back, Evolve will:
+   - Read the migration files in reverse order
+   - Execute the "Down Migration" section of each file
+   - Stop when it reaches the target version
+   - Update the changelog to reflect the rollback
+
+4. **Changelog Table**
+   - Evolve uses the `evolve_changelog` table to track applied migrations
+   - Tracks which migrations have been applied and in what order
+   - Used to determine which down migrations to execute during rollback
+
+## Complex Rollback Scenarios for PostgreSQL
+
+1. **Data Preservation Rollbacks**
+   - Scenario: Rolling back a schema change while preserving existing data
+   - Challenge: Direct DROP/CREATE would lose data
+   - Solution: 
+     ```sql
+     -- Down Migration
+     CREATE TABLE temp_table AS SELECT * FROM new_table;
+     DROP TABLE new_table;
+     ALTER TABLE old_table RENAME TO new_table;
+     INSERT INTO new_table SELECT * FROM temp_table;
+     DROP TABLE temp_table;
+     ```
+
+2. **Column Type Changes**
+   - Scenario: Rolling back a column type change (e.g., VARCHAR to TEXT)
+   - Challenge: Data might not be compatible with old type
+   - Solution:
+     ```sql
+     -- Down Migration
+     ALTER TABLE table_name 
+     ALTER COLUMN column_name TYPE varchar(100) 
+     USING column_name::varchar(100);
+     ```
+
+3. **Partitioned Tables**
+   - Scenario: Rolling back from partitioned to non-partitioned table
+   - Challenge: Need to merge data from multiple partitions
+   - Solution:
+     ```sql
+     -- Down Migration
+     CREATE TABLE new_table (LIKE partitioned_table);
+     INSERT INTO new_table 
+     SELECT * FROM partitioned_table_part1
+     UNION ALL
+     SELECT * FROM partitioned_table_part2;
+     DROP TABLE partitioned_table CASCADE;
+     ALTER TABLE new_table RENAME TO original_table;
+     ```
+
+4. **Materialized Views**
+   - Scenario: Rolling back materialized view changes
+   - Challenge: Need to handle dependencies and refresh data
+   - Solution:
+     ```sql
+     -- Down Migration
+     DROP MATERIALIZED VIEW IF EXISTS new_view;
+     CREATE MATERIALIZED VIEW old_view AS
+     SELECT * FROM base_table;
+     REFRESH MATERIALIZED VIEW old_view;
+     ```
+
+5. **Foreign Key Constraints**
+   - Scenario: Rolling back complex foreign key relationships
+   - Challenge: Need to handle dependent records
+   - Solution:
+     ```sql
+     -- Down Migration
+     ALTER TABLE child_table 
+     DROP CONSTRAINT fk_constraint;
+     ALTER TABLE child_table 
+     ADD CONSTRAINT fk_constraint 
+     FOREIGN KEY (column) 
+     REFERENCES parent_table(column) 
+     ON DELETE CASCADE;
+     ```
+
+6. **Index Changes**
+   - Scenario: Rolling back from partial to full index
+   - Challenge: Need to rebuild index without blocking
+   - Solution:
+     ```sql
+     -- Down Migration
+     CREATE INDEX CONCURRENTLY new_index 
+     ON table_name (column);
+     DROP INDEX CONCURRENTLY old_index;
+     ALTER INDEX new_index RENAME TO old_index;
+     ```
+
+7. **Extension Changes**
+   - Scenario: Rolling back PostgreSQL extension updates
+   - Challenge: Need to handle extension-specific objects
+   - Solution:
+     ```sql
+     -- Down Migration
+     ALTER EXTENSION extension_name UPDATE TO 'old_version';
+     DROP EXTENSION IF EXISTS new_extension;
+     CREATE EXTENSION old_extension;
+     ```
+
+8. **Enum Type Changes**
+   - Scenario: Rolling back enum type modifications
+   - Challenge: Need to handle existing enum values
+   - Solution:
+     ```sql
+     -- Down Migration
+     ALTER TABLE table_name 
+     ALTER COLUMN enum_column TYPE text;
+     DROP TYPE new_enum_type;
+     CREATE TYPE old_enum_type AS ENUM ('value1', 'value2');
+     ALTER TABLE table_name 
+     ALTER COLUMN enum_column TYPE old_enum_type 
+     USING enum_column::text::old_enum_type;
+     ```
+
+9. **JSON/JSONB Schema Changes**
+   - Scenario: Rolling back JSON schema modifications
+   - Challenge: Need to handle nested JSON structures
+   - Solution:
+     ```sql
+     -- Down Migration
+     ALTER TABLE table_name 
+     ALTER COLUMN json_column TYPE jsonb 
+     USING jsonb_set(
+       json_column::jsonb,
+       '{old_path}',
+       json_column->'new_path'
+     );
+     ```
+
+10. **Temporal Tables**
+    - Scenario: Rolling back temporal table changes
+    - Challenge: Need to handle history tables
+    - Solution:
+     ```sql
+     -- Down Migration
+     ALTER TABLE temporal_table 
+     DROP SYSTEM VERSIONING;
+     DROP TABLE history_table;
+     CREATE TABLE history_table (LIKE temporal_table);
+     ALTER TABLE temporal_table 
+     ADD SYSTEM VERSIONING 
+     HISTORY TABLE history_table;
+     ```
+
+11. **Full Text Search Changes**
+    - Scenario: Rolling back text search configuration changes
+    - Challenge: Need to handle existing search indexes
+    - Solution:
+     ```sql
+     -- Down Migration
+     DROP TEXT SEARCH CONFIGURATION new_config;
+     CREATE TEXT SEARCH CONFIGURATION old_config (COPY = simple);
+     ALTER TEXT SEARCH CONFIGURATION old_config 
+     ADD MAPPING FOR word WITH simple;
+     ```
+
+12. **Replication Changes**
+    - Scenario: Rolling back replication setup changes
+    - Challenge: Need to handle ongoing replication
+    - Solution:
+     ```sql
+     -- Down Migration
+     SELECT pg_drop_replication_slot('new_slot');
+     SELECT pg_create_physical_replication_slot('old_slot');
+     ALTER SYSTEM SET wal_level = 'replica';
+     SELECT pg_reload_conf();
+     ```
+
+13. **Role and Permission Changes**
+    - Scenario: Rolling back role permission changes
+    - Challenge: Need to handle existing grants
+    - Solution:
+     ```sql
+     -- Down Migration
+     REVOKE ALL ON ALL TABLES IN SCHEMA public FROM new_role;
+     GRANT SELECT ON ALL TABLES IN SCHEMA public TO old_role;
+     ```
+
+14. **Schema Inheritance**
+    - Scenario: Rolling back table inheritance changes
+    - Challenge: Need to handle data in child tables
+    - Solution:
+     ```sql
+     -- Down Migration
+     CREATE TABLE temp_table (LIKE child_table);
+     INSERT INTO temp_table SELECT * FROM child_table;
+     DROP TABLE child_table;
+     CREATE TABLE child_table () INHERITS (parent_table);
+     INSERT INTO child_table SELECT * FROM temp_table;
+     DROP TABLE temp_table;
+     ```
+
+15. **Custom Types and Domains**
+    - Scenario: Rolling back custom type changes
+    - Challenge: Need to handle existing type usage
+    - Solution:
+     ```sql
+     -- Down Migration
+     ALTER TABLE table_name 
+     ALTER COLUMN custom_type_column TYPE text;
+     DROP TYPE new_custom_type;
+     CREATE TYPE old_custom_type AS (field1 text, field2 integer);
+     ALTER TABLE table_name 
+     ALTER COLUMN custom_type_column TYPE old_custom_type 
+     USING (custom_type_column::text)::old_custom_type;
+     ```
+
+## Best Practices for Rollbacks
+
+1. **Testing**
+   - Test rollbacks with realistic data volumes
+   - Test with both empty and populated databases
+   - Test with various data scenarios
+
+2. **Performance**
+   - Consider the performance impact of rollbacks
+   - Use CONCURRENTLY for index operations when possible
+   - Consider using temporary tables for large data operations
+
+3. **Transaction Management**
+   - Use transactions to ensure atomicity
+   - Handle transaction boundaries properly
+   - Consider using savepoints for complex rollbacks
+
+4. **Documentation**
+   - Document any special rollback procedures
+   - Include comments explaining complex rollback logic
+   - Document any prerequisites or dependencies
+
+5. **Backup Strategy**
+   - Always have a backup before performing rollbacks
+   - Test backup restoration procedures
+   - Consider point-in-time recovery options
+
+6. **Data Integrity**
+   - Ensure data consistency after rollbacks
+   - Verify foreign key relationships
+   - Check for orphaned records
+
+7. **Error Handling**
+   - Include proper error handling in rollback scripts
+   - Log rollback operations
+   - Have a plan for failed rollbacks
+
+## Using the Rollback Script
+
+The project includes a PowerShell script (`rollback.ps1`) to help with rollbacks:
+
+```powershell
+.\rollback.ps1 -Environment dev -Version 5
+```
+
+This will:
+1. Look at the changelog to see which migrations are applied
+2. Find migrations with versions higher than 5
+3. Execute their down migrations in reverse order
+4. Update the changelog to reflect the rollback
+
+Remember to:
+- Always test rollbacks in development first
+- Take a database backup before rolling back in production
+- Verify the rollback was successful
+- Check application functionality after rollback 

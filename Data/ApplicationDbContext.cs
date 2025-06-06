@@ -29,10 +29,15 @@ namespace FeeNominalService.Data
         public DbSet<SurchargeProvider> SurchargeProviders { get; set; } = null!;
         public DbSet<SurchargeProviderConfig> SurchargeProviderConfigs { get; set; } = null!;
         public DbSet<SurchargeProviderConfigHistory> SurchargeProviderConfigHistory { get; set; } = null!;
+        public DbSet<ApiKeySecret> ApiKeySecrets { get; set; }
+        public DbSet<MerchantAuditTrail> MerchantAuditTrail { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Set schema for all entities
+            modelBuilder.HasDefaultSchema("fee_nominal");
 
             // Configure table names to match SQL schema
             modelBuilder.Entity<MerchantStatus>().ToTable("merchant_statuses");
@@ -46,34 +51,98 @@ namespace FeeNominalService.Data
             modelBuilder.Entity<SurchargeProvider>().ToTable("surcharge_providers");
             modelBuilder.Entity<SurchargeProviderConfig>().ToTable("surcharge_provider_configs");
             modelBuilder.Entity<SurchargeProviderConfigHistory>().ToTable("surcharge_provider_config_history");
+            modelBuilder.Entity<ApiKeySecret>().ToTable("api_key_secrets");
+            modelBuilder.Entity<MerchantAuditTrail>().ToTable("merchant_audit_trail");
+
+            // Configure MerchantAuditTrail
+            modelBuilder.Entity<MerchantAuditTrail>(entity =>
+            {
+                entity.HasKey(e => e.AuditTrailId);
+                entity.Property(e => e.AuditTrailId).HasColumnName("audit_trail_id");
+                entity.Property(e => e.MerchantId).HasColumnName("merchant_id").IsRequired();
+                entity.Property(e => e.ExternalMerchantId).HasColumnName("external_merchant_id").IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Action).HasColumnName("action").IsRequired().HasMaxLength(50);
+                entity.Property(e => e.FieldName).HasColumnName("field_name").IsRequired().HasMaxLength(100);
+                entity.Property(e => e.OldValue).HasColumnName("old_value");
+                entity.Property(e => e.NewValue).HasColumnName("new_value");
+                entity.Property(e => e.Timestamp).HasColumnName("timestamp").IsRequired();
+                entity.Property(e => e.UpdatedBy).HasColumnName("updated_by").IsRequired().HasMaxLength(50);
+
+                entity.HasOne(e => e.Merchant)
+                    .WithMany()
+                    .HasForeignKey(e => e.MerchantId)
+                    .HasPrincipalKey(e => e.MerchantId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             // Configure MerchantStatus
             modelBuilder.Entity<MerchantStatus>(entity =>
             {
+                entity.ToTable("merchant_statuses", _schema);
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).HasColumnName("merchant_status_id");
-                entity.Property(e => e.Code).IsRequired().HasMaxLength(20);
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.Description).HasMaxLength(255);
-                entity.Property(e => e.CreatedAt).IsRequired().HasColumnName("created_at");
-                entity.Property(e => e.UpdatedAt).IsRequired().HasColumnName("updated_at");
+                entity.Property(e => e.Id)
+                    .HasColumnName("merchant_status_id")
+                    .ValueGeneratedNever(); // Since we're using predefined integer values
+                entity.Property(e => e.Code)
+                    .IsRequired()
+                    .HasMaxLength(20);
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                entity.Property(e => e.Description)
+                    .HasMaxLength(255);
+                entity.Property(e => e.IsActive)
+                    .IsRequired()
+                    .HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired()
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt)
+                    .IsRequired()
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.HasIndex(e => e.Code).IsUnique();
             });
 
             // Configure Merchant
             modelBuilder.Entity<Merchant>(entity =>
             {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).HasColumnName("merchant_id");
-                entity.Property(e => e.ExternalId).IsRequired().HasMaxLength(50).HasColumnName("external_id");
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
-                entity.Property(e => e.CreatedAt).IsRequired().HasColumnName("created_at");
-                entity.Property(e => e.UpdatedAt).IsRequired().HasColumnName("updated_at");
-                entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(50).HasColumnName("created_by");
-                entity.Property(e => e.StatusId).HasColumnName("status_id").IsRequired();
-                entity.HasIndex(e => e.ExternalId).IsUnique();
+                entity.ToTable("merchants", _schema);
+                entity.HasKey(e => e.MerchantId);
+                entity.Property(e => e.MerchantId)
+                    .HasColumnName("merchant_id")
+                    .HasColumnType("uuid")
+                    .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(e => e.ExternalMerchantId)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnName("external_merchant_id");
+                entity.Property(e => e.ExternalMerchantGuid)
+                    .HasColumnName("external_merchant_guid")
+                    .HasColumnType("uuid");
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(255);
+                entity.Property(e => e.StatusId)
+                    .HasColumnName("status_id")
+                    .IsRequired();
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired()
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt)
+                    .IsRequired()
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.CreatedBy)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnName("created_by");
+                entity.HasIndex(e => e.ExternalMerchantId).IsUnique();
+                entity.HasIndex(e => e.ExternalMerchantGuid).IsUnique();
                 entity.HasOne(e => e.Status)
-                    .WithMany(e => e.Merchants)
+                    .WithMany()
                     .HasForeignKey(e => e.StatusId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
@@ -100,6 +169,11 @@ namespace FeeNominalService.Data
                 entity.Property(e => e.LastRotatedAt).HasColumnName("last_rotated_at");
                 entity.Property(e => e.RevokedAt).HasColumnName("revoked_at");
                 entity.Property(e => e.ExpirationDays).HasColumnName("expiration_days");
+                entity.HasIndex(e => e.Key).IsUnique();
+                entity.HasOne(e => e.Merchant)
+                    .WithMany(e => e.ApiKeys)
+                    .HasForeignKey(e => e.MerchantId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Configure ApiKeyUsage
@@ -288,6 +362,27 @@ namespace FeeNominalService.Data
                     .WithMany()
                     .HasForeignKey(e => e.ConfigId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure ApiKeySecret
+            modelBuilder.Entity<ApiKeySecret>(entity =>
+            {
+                entity.ToTable("api_key_secrets");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.ApiKey).HasColumnName("api_key").IsRequired();
+                entity.Property(e => e.MerchantId).HasColumnName("merchant_id").IsRequired();
+                entity.Property(e => e.Secret).HasColumnName("secret").IsRequired();
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+                entity.Property(e => e.LastRotated).HasColumnName("last_rotated");
+                entity.Property(e => e.IsRevoked).HasColumnName("is_revoked");
+                entity.Property(e => e.RevokedAt).HasColumnName("revoked_at");
+                entity.Property(e => e.Status).HasColumnName("status");
+                entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+
+                entity.HasIndex(e => e.ApiKey).IsUnique();
+                entity.HasIndex(e => e.MerchantId);
             });
         }
     }
