@@ -48,16 +48,11 @@ CREATE TRIGGER update_transactions_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.update_updated_at_column();
 
-CREATE TRIGGER update_batch_transactions_updated_at
-    BEFORE UPDATE ON fee_nominal.batch_transactions
-    FOR EACH ROW
-    EXECUTE FUNCTION fee_nominal.update_updated_at_column();
-
 -- Function to log transaction history
-CREATE OR REPLACE FUNCTION log_transaction_history()
+CREATE OR REPLACE FUNCTION fee_nominal.log_transaction_history()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO transaction_history (
+    INSERT INTO fee_nominal.transaction_history (
         transaction_id,
         status_id,
         surcharge_amount,
@@ -76,61 +71,44 @@ $$ language 'plpgsql';
 
 -- Create trigger for transaction history
 CREATE TRIGGER log_transaction_history
-    AFTER INSERT OR UPDATE ON transactions
+    AFTER INSERT OR UPDATE ON fee_nominal.transactions
     FOR EACH ROW
-    EXECUTE FUNCTION log_transaction_history();
+    EXECUTE FUNCTION fee_nominal.log_transaction_history();
 
 -- Function to log audit details
-CREATE OR REPLACE FUNCTION log_audit_details()
+CREATE OR REPLACE FUNCTION fee_nominal.log_audit_details()
 RETURNS TRIGGER AS $$
 DECLARE
     v_audit_log_id INTEGER;
-    v_merchant_id INTEGER;
-    v_api_key_id INTEGER;
     v_entity_id INTEGER;
 BEGIN
-    -- Get merchant_id if it exists
-    BEGIN
-        v_merchant_id := NEW.merchant_id;
-    EXCEPTION WHEN undefined_column THEN
-        v_merchant_id := NULL;
-    END;
-
-    -- Get api_key_id if it exists
-    BEGIN
-        v_api_key_id := NEW.api_key_id;
-    EXCEPTION WHEN undefined_column THEN
-        v_api_key_id := NULL;
-    END;
-
-    -- Get id if it exists
-    BEGIN
-        v_entity_id := NEW.id;
-    EXCEPTION WHEN undefined_column THEN
-        v_entity_id := NULL;
-    END;
+    -- Get entity_id based on the table
+    CASE TG_TABLE_NAME
+        WHEN 'merchants' THEN
+            v_entity_id := NEW.merchant_id;
+        WHEN 'api_keys' THEN
+            v_entity_id := NEW.api_key_id;
+        WHEN 'transactions' THEN
+            v_entity_id := NEW.transaction_id;
+        ELSE
+            v_entity_id := NULL;
+    END CASE;
 
     -- Insert into audit_logs
-    INSERT INTO audit_logs (
-        merchant_id,
-        api_key_id,
-        action,
+    INSERT INTO fee_nominal.audit_logs (
         entity_type,
         entity_id,
-        old_values,
-        new_values
+        action,
+        user_id
     ) VALUES (
-        v_merchant_id,
-        v_api_key_id,
-        TG_OP,
         TG_TABLE_NAME,
         v_entity_id,
-        CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE NULL END,
-        CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE row_to_json(NEW) END
+        TG_OP,
+        NULL
     ) RETURNING audit_log_id INTO v_audit_log_id;
 
     -- Insert into audit_log_details
-    INSERT INTO audit_log_details (
+    INSERT INTO fee_nominal.audit_log_details (
         audit_log_id,
         field_name,
         old_value,
@@ -152,19 +130,19 @@ $$ language 'plpgsql';
 
 -- Create triggers for audit logging
 CREATE TRIGGER audit_merchants
-    AFTER INSERT OR UPDATE OR DELETE ON merchants
+    AFTER INSERT OR UPDATE OR DELETE ON fee_nominal.merchants
     FOR EACH ROW
-    EXECUTE FUNCTION log_audit_details();
+    EXECUTE FUNCTION fee_nominal.log_audit_details();
 
 CREATE TRIGGER audit_api_keys
-    AFTER INSERT OR UPDATE OR DELETE ON api_keys
+    AFTER INSERT OR UPDATE OR DELETE ON fee_nominal.api_keys
     FOR EACH ROW
-    EXECUTE FUNCTION log_audit_details();
+    EXECUTE FUNCTION fee_nominal.log_audit_details();
 
 CREATE TRIGGER audit_transactions
-    AFTER INSERT OR UPDATE OR DELETE ON transactions
+    AFTER INSERT OR UPDATE OR DELETE ON fee_nominal.transactions
     FOR EACH ROW
-    EXECUTE FUNCTION log_audit_details();
+    EXECUTE FUNCTION fee_nominal.log_audit_details();
 
 -- Create log_audit_event function
 CREATE OR REPLACE FUNCTION fee_nominal.log_audit_event(
@@ -191,7 +169,10 @@ BEGIN
     RETURN v_audit_log_id;
 END;
 $$ LANGUAGE plpgsql;
-RAISE NOTICE 'Created log_audit_event function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created log_audit_event function';
+END $$;
 
 -- Create log_audit_detail function
 CREATE OR REPLACE FUNCTION fee_nominal.log_audit_detail(
@@ -214,7 +195,10 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql;
-RAISE NOTICE 'Created log_audit_detail function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created log_audit_detail function';
+END $$;
 
 -- Create get_audit_logs function
 CREATE OR REPLACE FUNCTION fee_nominal.get_audit_logs(
@@ -247,10 +231,13 @@ BEGIN
     AND al.entity_id = p_entity_id
     AND (p_start_date IS NULL OR al.created_at >= p_start_date)
     AND (p_end_date IS NULL OR al.created_at <= p_end_date)
-    ORDER BY al.created_at DESC, ald.detail_id;
+    ORDER BY al.created_at DESC;
 END;
 $$ LANGUAGE plpgsql;
-RAISE NOTICE 'Created get_audit_logs function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created get_audit_logs function';
+END $$;
 
 -- Verify functions
 DO $$ 

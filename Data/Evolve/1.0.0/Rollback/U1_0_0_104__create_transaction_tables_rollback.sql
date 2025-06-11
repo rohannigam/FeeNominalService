@@ -1,5 +1,5 @@
 /*
-Rollback: V1_0_0_104__create_transaction_tables_rollback.sql
+Rollback: U1_0_0_104__create_transaction_tables_rollback.sql
 Description: Drops all transaction tables created for transaction management
 Dependencies: None
 Changes:
@@ -10,20 +10,29 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_104__create_transaction_tables...';
+    RAISE NOTICE 'Starting running U1_0_0_104__create_transaction_tables_rollback.sql which is a rollback of V1_0_0_4__create_transaction_tables...';
 END $$;
 
 -- Drop transaction_audit_logs table first (due to foreign key dependency)
 DROP TABLE IF EXISTS fee_nominal.transaction_audit_logs;
-RAISE NOTICE 'Dropped transaction_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped transaction_audit_logs table';
+END $$;
 
 -- Drop transactions table
 DROP TABLE IF EXISTS fee_nominal.transactions;
-RAISE NOTICE 'Dropped transactions table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped transactions table';
+END $$;
 
 -- Drop transaction_statuses table
 DROP TABLE IF EXISTS fee_nominal.transaction_statuses;
-RAISE NOTICE 'Dropped transaction_statuses table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped transaction_statuses table';
+END $$;
 
 -- Verify rollback
 DO $$
@@ -48,5 +57,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_104__create_transaction_tables successfully';
+    RAISE NOTICE 'Completed running U1_0_0_104__create_transaction_tables_rollback.sql which is a rollback of V1_0_0_4__create_transaction_tables successfully';
 END $$; 

@@ -1,57 +1,72 @@
 /*
-Migration: V1_0_0_7__fix_audit_function.sql
-Description: Fixes the audit logging function to use correct table structure
-Dependencies: 
-- V1_0_0_1__create_schema.sql (requires fee_nominal schema)
-- V1_0_0_5__create_audit_tables.sql (requires audit_logs table)
-- V1_0_0_6__create_functions.sql (requires log_audit_details function)
+Rollback: U1_0_0_107__fix_audit_function_rollback.sql
+Description: Rolls back the audit function fix
+Dependencies: None
 Changes:
-- Updates log_audit_details function to use correct audit_logs table structure
+- Restores the original log_audit_details function
+- Restores the original audit triggers
 */
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting V1_0_0_7__fix_audit_function migration...';
+    RAISE NOTICE 'Starting running U1_0_0_107__fix_audit_function_rollback.sql which is a rollback of V1_0_0_7__fix_audit_function...';
 END $$;
 
--- Drop existing triggers that use the old function
+-- Drop the fixed function's triggers
 DROP TRIGGER IF EXISTS audit_merchants ON fee_nominal.merchants;
 DROP TRIGGER IF EXISTS audit_api_keys ON fee_nominal.api_keys;
 DROP TRIGGER IF EXISTS audit_transactions ON fee_nominal.transactions;
 
--- Drop the old function
+-- Drop the fixed function
 DROP FUNCTION IF EXISTS fee_nominal.log_audit_details();
 
--- Create the fixed function
+-- Restore the original function
 CREATE OR REPLACE FUNCTION fee_nominal.log_audit_details()
 RETURNS TRIGGER AS $$
 DECLARE
     v_audit_log_id INTEGER;
+    v_merchant_id INTEGER;
+    v_api_key_id INTEGER;
     v_entity_id INTEGER;
 BEGIN
-    -- Get entity_id based on the table
-    CASE TG_TABLE_NAME
-        WHEN 'merchants' THEN
-            v_entity_id := NEW.merchant_id;
-        WHEN 'api_keys' THEN
-            v_entity_id := NEW.api_key_id;
-        WHEN 'transactions' THEN
-            v_entity_id := NEW.transaction_id;
-        ELSE
-            v_entity_id := NULL;
-    END CASE;
+    -- Get merchant_id if it exists
+    BEGIN
+        v_merchant_id := NEW.merchant_id;
+    EXCEPTION WHEN undefined_column THEN
+        v_merchant_id := NULL;
+    END;
+
+    -- Get api_key_id if it exists
+    BEGIN
+        v_api_key_id := NEW.api_key_id;
+    EXCEPTION WHEN undefined_column THEN
+        v_api_key_id := NULL;
+    END;
+
+    -- Get id if it exists
+    BEGIN
+        v_entity_id := NEW.id;
+    EXCEPTION WHEN undefined_column THEN
+        v_entity_id := NULL;
+    END;
 
     -- Insert into audit_logs
     INSERT INTO fee_nominal.audit_logs (
+        merchant_id,
+        api_key_id,
+        action,
         entity_type,
         entity_id,
-        action,
-        user_id
+        old_values,
+        new_values
     ) VALUES (
+        v_merchant_id,
+        v_api_key_id,
+        TG_OP,
         TG_TABLE_NAME,
         v_entity_id,
-        TG_OP,
-        NULL
+        CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE NULL END,
+        CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE row_to_json(NEW) END
     ) RETURNING audit_log_id INTO v_audit_log_id;
 
     -- Insert into audit_log_details
@@ -75,7 +90,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Recreate the triggers with the fixed function
+-- Restore the original triggers
 CREATE TRIGGER audit_merchants
     AFTER INSERT OR UPDATE OR DELETE ON fee_nominal.merchants
     FOR EACH ROW
@@ -91,7 +106,7 @@ CREATE TRIGGER audit_transactions
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.log_audit_details();
 
--- Verify the function was created
+-- Verify the function was restored
 DO $$ 
 BEGIN
     IF NOT EXISTS (
@@ -100,12 +115,12 @@ BEGIN
         WHERE proname = 'log_audit_details' 
         AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'fee_nominal')
     ) THEN
-        RAISE EXCEPTION 'Function log_audit_details was not created successfully';
+        RAISE EXCEPTION 'Function log_audit_details was not restored successfully';
     END IF;
-    RAISE NOTICE 'Verified log_audit_details function creation';
+    RAISE NOTICE 'Verified log_audit_details function restoration';
 END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed V1_0_0_7__fix_audit_function migration successfully';
-END $$;
+    RAISE NOTICE 'Completed running U1_0_0_107__fix_audit_function_rollback.sql which is a rollback of V1_0_0_7__fix_audit_function successfully';
+END $$; 

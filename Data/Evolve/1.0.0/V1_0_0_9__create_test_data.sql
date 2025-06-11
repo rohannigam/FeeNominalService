@@ -16,75 +16,118 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_9__create_test_data migration...';
 END $$;
 
+-- Temporarily disable audit triggers
+ALTER TABLE fee_nominal.merchants DISABLE TRIGGER audit_merchants;
+ALTER TABLE fee_nominal.api_keys DISABLE TRIGGER audit_api_keys;
+ALTER TABLE fee_nominal.transactions DISABLE TRIGGER audit_transactions;
+
+DO $$
+BEGIN
+    RAISE NOTICE 'Disabled audit triggers for test data insertion';
+END $$;
+
 -- Insert test merchant statuses
-INSERT INTO fee_nominal.merchant_statuses (status_id, status_name, description)
+INSERT INTO fee_nominal.merchant_statuses (code, name, description)
 VALUES 
-    (1, 'Active', 'Merchant is active and can process transactions'),
-    (2, 'Inactive', 'Merchant is inactive and cannot process transactions'),
-    (3, 'Suspended', 'Merchant is temporarily suspended')
-ON CONFLICT (status_id) DO NOTHING;
-RAISE NOTICE 'Inserted test merchant statuses';
+    ('TEST_ACTIVE', 'Test Active', 'Test merchant is active and can process transactions'),
+    ('TEST_INACTIVE', 'Test Inactive', 'Test merchant is inactive and cannot process transactions'),
+    ('TEST_SUSPENDED', 'Test Suspended', 'Test merchant is temporarily suspended')
+ON CONFLICT (code) DO NOTHING;
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted test merchant statuses';
+END $$;
 
 -- Insert test merchants
-INSERT INTO fee_nominal.merchants (merchant_id, merchant_name, status_id)
+INSERT INTO fee_nominal.merchants (merchant_name, merchant_code, merchant_status_id, description)
 VALUES 
-    (1, 'Test Merchant 1', 1),
-    (2, 'Test Merchant 2', 1),
-    (3, 'Test Merchant 3', 2)
-ON CONFLICT (merchant_id) DO NOTHING;
-RAISE NOTICE 'Inserted test merchants';
+    ('Test Merchant 1', 'TEST_MERCHANT_1', (SELECT merchant_status_id FROM fee_nominal.merchant_statuses WHERE code = 'TEST_ACTIVE'), 'Test merchant 1 for development'),
+    ('Test Merchant 2', 'TEST_MERCHANT_2', (SELECT merchant_status_id FROM fee_nominal.merchant_statuses WHERE code = 'TEST_ACTIVE'), 'Test merchant 2 for development'),
+    ('Test Merchant 3', 'TEST_MERCHANT_3', (SELECT merchant_status_id FROM fee_nominal.merchant_statuses WHERE code = 'TEST_INACTIVE'), 'Test merchant 3 for development')
+ON CONFLICT (merchant_code) DO NOTHING;
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted test merchants';
+END $$;
 
 -- Insert test surcharge providers
-INSERT INTO fee_nominal.surcharge_providers (provider_id, code, name, description)
+INSERT INTO fee_nominal.surcharge_providers (code, name, base_url, credentials_schema)
 VALUES 
-    (1, 'PROVIDER1', 'Test Provider 1', 'Test provider for development'),
-    (2, 'PROVIDER2', 'Test Provider 2', 'Another test provider')
-ON CONFLICT (provider_id) DO NOTHING;
-RAISE NOTICE 'Inserted test surcharge providers';
+    ('TEST_PROVIDER1', 'Test Provider 1', 'https://test-provider1.example.com', '{"api_key": "string", "secret": "string"}'),
+    ('TEST_PROVIDER2', 'Test Provider 2', 'https://test-provider2.example.com', '{"api_key": "string", "secret": "string"}')
+ON CONFLICT (code) DO NOTHING;
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted test surcharge providers';
+END $$;
 
 -- Insert test provider configurations
 INSERT INTO fee_nominal.surcharge_provider_configs (
     merchant_id, 
     surcharge_provider_id, 
     is_active, 
-    config_data
+    credentials
 )
 VALUES 
-    (1, 1, true, '{"fee": 0.02, "min_amount": 10.00}'),
-    (1, 2, true, '{"fee": 0.015, "min_amount": 5.00}'),
-    (2, 1, true, '{"fee": 0.025, "min_amount": 15.00}')
-ON CONFLICT (merchant_id, surcharge_provider_id) DO NOTHING;
-RAISE NOTICE 'Inserted test provider configurations';
+    ((SELECT merchant_id FROM fee_nominal.merchants WHERE merchant_code = 'TEST_MERCHANT_1'), 
+     (SELECT surcharge_provider_id FROM fee_nominal.surcharge_providers WHERE code = 'TEST_PROVIDER1'), 
+     true, 
+     '{"api_key": "test_key_1", "secret": "test_secret_1"}'),
+    ((SELECT merchant_id FROM fee_nominal.merchants WHERE merchant_code = 'TEST_MERCHANT_1'), 
+     (SELECT surcharge_provider_id FROM fee_nominal.surcharge_providers WHERE code = 'TEST_PROVIDER2'), 
+     true, 
+     '{"api_key": "test_key_2", "secret": "test_secret_2"}'),
+    ((SELECT merchant_id FROM fee_nominal.merchants WHERE merchant_code = 'TEST_MERCHANT_2'), 
+     (SELECT surcharge_provider_id FROM fee_nominal.surcharge_providers WHERE code = 'TEST_PROVIDER1'), 
+     true, 
+     '{"api_key": "test_key_3", "secret": "test_secret_3"}')
+ON CONFLICT (surcharge_provider_id, merchant_id) DO NOTHING;
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted test provider configurations';
+END $$;
 
 -- Insert test API keys
 INSERT INTO fee_nominal.api_keys (
-    api_key_id,
     merchant_id,
-    key_name,
-    status_id,
-    expires_at
+    name,
+    is_active
 )
 VALUES 
-    (1, 1, 'Test Key 1', 1, CURRENT_TIMESTAMP + INTERVAL '1 year'),
-    (2, 1, 'Test Key 2', 1, CURRENT_TIMESTAMP + INTERVAL '1 year'),
-    (3, 2, 'Test Key 3', 1, CURRENT_TIMESTAMP + INTERVAL '1 year')
-ON CONFLICT (api_key_id) DO NOTHING;
-RAISE NOTICE 'Inserted test API keys';
+    ((SELECT merchant_id FROM fee_nominal.merchants WHERE merchant_code = 'TEST_MERCHANT_1'), 'Test Key 1', true),
+    ((SELECT merchant_id FROM fee_nominal.merchants WHERE merchant_code = 'TEST_MERCHANT_1'), 'Test Key 2', true),
+    ((SELECT merchant_id FROM fee_nominal.merchants WHERE merchant_code = 'TEST_MERCHANT_2'), 'Test Key 3', true)
+ON CONFLICT (merchant_id, name) DO NOTHING;
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted test API keys';
+END $$;
 
 -- Insert test API key secrets
 INSERT INTO fee_nominal.api_key_secrets (
     api_key_id,
     secret_key,
-    is_active,
-    created_at,
-    expires_at
+    is_active
 )
 VALUES 
-    (1, 'test_secret_1', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 year'),
-    (2, 'test_secret_2', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 year'),
-    (3, 'test_secret_3', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 year')
+    ((SELECT api_key_id FROM fee_nominal.api_keys WHERE name = 'Test Key 1'), 'test_secret_1', true),
+    ((SELECT api_key_id FROM fee_nominal.api_keys WHERE name = 'Test Key 2'), 'test_secret_2', true),
+    ((SELECT api_key_id FROM fee_nominal.api_keys WHERE name = 'Test Key 3'), 'test_secret_3', true)
 ON CONFLICT (api_key_id) DO NOTHING;
-RAISE NOTICE 'Inserted test API key secrets';
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted test API key secrets';
+END $$;
+
+-- Re-enable audit triggers
+ALTER TABLE fee_nominal.merchants ENABLE TRIGGER audit_merchants;
+ALTER TABLE fee_nominal.api_keys ENABLE TRIGGER audit_api_keys;
+ALTER TABLE fee_nominal.transactions ENABLE TRIGGER audit_transactions;
+
+DO $$
+BEGIN
+    RAISE NOTICE 'Re-enabled audit triggers';
+END $$;
 
 -- Verify test data
 DO $$ 
@@ -93,9 +136,9 @@ DECLARE
     v_api_key_count INTEGER;
     v_provider_count INTEGER;
 BEGIN
-    SELECT COUNT(*) INTO v_merchant_count FROM fee_nominal.merchants;
-    SELECT COUNT(*) INTO v_api_key_count FROM fee_nominal.api_keys;
-    SELECT COUNT(*) INTO v_provider_count FROM fee_nominal.surcharge_providers;
+    SELECT COUNT(*) INTO v_merchant_count FROM fee_nominal.merchants WHERE merchant_code LIKE 'TEST_%';
+    SELECT COUNT(*) INTO v_api_key_count FROM fee_nominal.api_keys WHERE name LIKE 'Test Key%';
+    SELECT COUNT(*) INTO v_provider_count FROM fee_nominal.surcharge_providers WHERE code LIKE 'TEST_%';
     
     IF v_merchant_count < 3 THEN
         RAISE EXCEPTION 'Not all test merchants were created. Expected 3, found %', v_merchant_count;

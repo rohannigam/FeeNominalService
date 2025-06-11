@@ -1,0 +1,14 @@
+{
+  "Database": {
+    "Type": "PostgreSQL",
+    "ConnectionString": "Server=localhost;Port=5432;Database=feenominal;User Id=postgres;Password=postgres;"
+  },
+  "Locations": [
+    "1.0.0"
+  ],
+  "CommandTimeout": 30,
+  "PlaceholderReplacement": true,
+  "Placeholders": {
+    "schema": "fee_nominal"
+  }
+} 

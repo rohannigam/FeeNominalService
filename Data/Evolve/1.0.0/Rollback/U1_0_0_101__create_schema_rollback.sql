@@ -1,5 +1,5 @@
 /*
-Rollback: V1_0_0_101__create_schema_rollback.sql
+Rollback: U1_0_0_101__create_schema_rollback.sql
 Description: Drops the fee_nominal schema and all its objects
 Dependencies: None
 Changes:
@@ -8,12 +8,15 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_101__create_schema...';
+    RAISE NOTICE 'Starting running U1_0_0_101__create_schema_rollback.sql which is a rollback of V1_0_0_1__create_schema...';
 END $$;
 
 -- Drop the fee_nominal schema and all its objects
 DROP SCHEMA IF EXISTS fee_nominal CASCADE;
-RAISE NOTICE 'Dropped fee_nominal schema and all contained objects';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped fee_nominal schema and all contained objects';
+END $$;
 
 -- Verify rollback
 DO $$
@@ -28,5 +31,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_101__create_schema successfully';
+    RAISE NOTICE 'Completed running U1_0_0_101__create_schema_rollback.sql which is a rollback of V1_0_0_1__create_schema successfully';
 END $$; 

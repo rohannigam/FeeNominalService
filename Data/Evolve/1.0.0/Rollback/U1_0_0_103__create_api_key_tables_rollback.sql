@@ -1,8 +1,9 @@
 /*
-Rollback: V1_0_0_103__create_api_key_tables_rollback.sql
+Rollback: U1_0_0_103__create_api_key_tables_rollback.sql
 Description: Drops all API key tables created for API key management
 Dependencies: None
 Changes:
+- Drops api_key_statuses table
 - Drops api_keys table
 - Drops api_key_secrets table
 - Drops api_key_audit_logs table
@@ -10,24 +11,45 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_103__create_api_key_tables...';
+    RAISE NOTICE 'Starting running U1_0_0_103__create_api_key_tables_rollback.sql which is a rollback of V1_0_0_3__create_api_key_tables...';
 END $$;
 
 -- Drop api_key_audit_logs table first (due to foreign key dependency)
 DROP TABLE IF EXISTS fee_nominal.api_key_audit_logs;
-RAISE NOTICE 'Dropped api_key_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped api_key_audit_logs table';
+END $$;
 
 -- Drop api_key_secrets table
 DROP TABLE IF EXISTS fee_nominal.api_key_secrets;
-RAISE NOTICE 'Dropped api_key_secrets table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped api_key_secrets table';
+END $$;
 
 -- Drop api_keys table
 DROP TABLE IF EXISTS fee_nominal.api_keys;
-RAISE NOTICE 'Dropped api_keys table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped api_keys table';
+END $$;
+
+-- Drop api_key_statuses table
+DROP TABLE IF EXISTS fee_nominal.api_key_statuses;
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped api_key_statuses table';
+END $$;
 
 -- Verify rollback
 DO $$
 BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'api_key_statuses'
+    ) THEN
+        RAISE EXCEPTION 'api_key_statuses table was not removed successfully';
+    END IF;
     IF EXISTS (
         SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'api_keys'
     ) THEN
@@ -48,5 +70,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_103__create_api_key_tables successfully';
+    RAISE NOTICE 'Completed running U1_0_0_103__create_api_key_tables_rollback.sql which is a rollback of V1_0_0_3__create_api_key_tables successfully';
 END $$; 

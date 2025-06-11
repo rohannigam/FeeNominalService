@@ -1,5 +1,5 @@
 /*
-Rollback: V1_0_0_110__alter_api_key_secrets_rollback.sql
+Rollback: U1_0_0_110__alter_api_key_secrets_rollback.sql
 Description: Removes updated_at and expires_at columns from api_key_secrets table
 Dependencies: None
 Changes:
@@ -10,25 +10,37 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_110__alter_api_key_secrets...';
+    RAISE NOTICE 'Starting running U1_0_0_110__alter_api_key_secrets_rollback.sql which is a rollback of V1_0_0_10__alter_api_key_secrets...';
 END $$;
 
 -- Drop trigger first
 DROP TRIGGER IF EXISTS update_api_key_secrets_updated_at ON fee_nominal.api_key_secrets;
-RAISE NOTICE 'Dropped update_api_key_secrets_updated_at trigger';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped update_api_key_secrets_updated_at trigger';
+END $$;
 
 -- Drop function
 DROP FUNCTION IF EXISTS fee_nominal.update_updated_at_column();
-RAISE NOTICE 'Dropped update_updated_at_column function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped update_updated_at_column function';
+END $$;
 
 -- Remove columns
 ALTER TABLE fee_nominal.api_key_secrets 
 DROP COLUMN IF EXISTS updated_at;
-RAISE NOTICE 'Dropped updated_at column from api_key_secrets table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped updated_at column from api_key_secrets table';
+END $$;
 
 ALTER TABLE fee_nominal.api_key_secrets 
 DROP COLUMN IF EXISTS expires_at;
-RAISE NOTICE 'Dropped expires_at column from api_key_secrets table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped expires_at column from api_key_secrets table';
+END $$;
 
 -- Verify rollback
 DO $$ 
@@ -66,5 +78,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_110__alter_api_key_secrets successfully';
+    RAISE NOTICE 'Completed running U1_0_0_110__alter_api_key_secrets_rollback.sql which is a rollback of V1_0_0_10__alter_api_key_secrets successfully';
 END $$; 

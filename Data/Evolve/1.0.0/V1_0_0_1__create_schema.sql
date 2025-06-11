@@ -14,15 +14,24 @@ END $$;
 
 -- Drop existing schema and its dependencies
 DROP SCHEMA IF EXISTS fee_nominal CASCADE;
-RAISE NOTICE 'Dropped existing fee_nominal schema if it existed';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped existing fee_nominal schema if it existed';
+END $$;
 
 -- Create schema
 CREATE SCHEMA IF NOT EXISTS fee_nominal;
-RAISE NOTICE 'Created fee_nominal schema';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created fee_nominal schema';
+END $$;
 
 -- Set search path
 SET search_path TO fee_nominal;
-RAISE NOTICE 'Set search path to fee_nominal';
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
 
 -- Create function for updating updated_at column
 CREATE OR REPLACE FUNCTION fee_nominal.update_updated_at_column()
@@ -32,7 +41,10 @@ BEGIN
     RETURN NEW;
 END;
 $$ language 'plpgsql';
-RAISE NOTICE 'Created update_updated_at_column function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created update_updated_at_column function';
+END $$;
 
 DO $$
 BEGIN

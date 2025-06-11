@@ -1,5 +1,5 @@
 /*
-Rollback: V1_0_0_106__create_functions_rollback.sql
+Rollback: U1_0_0_106__create_functions_rollback.sql
 Description: Drops all functions created for audit logging and retrieval
 Dependencies: None
 Changes:
@@ -11,33 +11,35 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_106__create_functions...';
+    RAISE NOTICE 'Starting rollback of U1_0_0_106__create_functions...';
 END $$;
 
 -- Drop triggers first
-DROP TRIGGER IF EXISTS audit_transactions ON transactions;
-DROP TRIGGER IF EXISTS audit_api_keys ON api_keys;
-DROP TRIGGER IF EXISTS audit_merchants ON merchants;
-DROP TRIGGER IF EXISTS log_transaction_history ON transactions;
-DROP TRIGGER IF EXISTS update_batch_transactions_updated_at ON fee_nominal.batch_transactions;
+DROP TRIGGER IF EXISTS audit_transactions ON fee_nominal.transactions;
+DROP TRIGGER IF EXISTS audit_api_keys ON fee_nominal.api_keys;
+DROP TRIGGER IF EXISTS audit_merchants ON fee_nominal.merchants;
+DROP TRIGGER IF EXISTS log_transaction_history ON fee_nominal.transactions;
 DROP TRIGGER IF EXISTS update_transactions_updated_at ON fee_nominal.transactions;
-DROP TRIGGER IF EXISTS update_transaction_statuses_updated_at ON transaction_statuses;
-DROP TRIGGER IF EXISTS update_api_key_secrets_updated_at ON api_key_secrets;
 DROP TRIGGER IF EXISTS update_api_keys_updated_at ON fee_nominal.api_keys;
 DROP TRIGGER IF EXISTS update_surcharge_provider_configs_updated_at ON fee_nominal.surcharge_provider_configs;
 DROP TRIGGER IF EXISTS update_surcharge_providers_updated_at ON fee_nominal.surcharge_providers;
 DROP TRIGGER IF EXISTS update_merchants_updated_at ON fee_nominal.merchants;
-DROP TRIGGER IF EXISTS update_merchant_statuses_updated_at ON merchant_statuses;
-RAISE NOTICE 'Dropped all triggers';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped all triggers';
+END $$;
 
 -- Drop functions
-DROP FUNCTION IF EXISTS fee_nominal.log_audit_event(TEXT, INTEGER, TEXT, TEXT);
-DROP FUNCTION IF EXISTS fee_nominal.log_audit_detail(INTEGER, TEXT, TEXT, TEXT);
-DROP FUNCTION IF EXISTS fee_nominal.get_audit_logs(INTEGER);
+DROP FUNCTION IF EXISTS fee_nominal.log_audit_event(VARCHAR(50), INTEGER, VARCHAR(50), VARCHAR(100));
+DROP FUNCTION IF EXISTS fee_nominal.log_audit_detail(INTEGER, VARCHAR(100), TEXT, TEXT);
+DROP FUNCTION IF EXISTS fee_nominal.get_audit_logs(VARCHAR(50), INTEGER, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE);
 DROP FUNCTION IF EXISTS fee_nominal.update_updated_at_column();
-DROP FUNCTION IF EXISTS log_transaction_history();
-DROP FUNCTION IF EXISTS log_audit_details();
-RAISE NOTICE 'Dropped all functions';
+DROP FUNCTION IF EXISTS fee_nominal.log_transaction_history();
+DROP FUNCTION IF EXISTS fee_nominal.log_audit_details();
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped all functions';
+END $$;
 
 -- Verify rollback
 DO $$
@@ -77,5 +79,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_106__create_functions successfully';
+    RAISE NOTICE 'Completed rollback of U1_0_0_106__create_functions successfully';
 END $$; 

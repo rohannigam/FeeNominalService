@@ -1,5 +1,5 @@
 /*
-Rollback: V1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql
+Rollback: U1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql
 Description: Removes user tracking from merchant audit logs
 Dependencies: None
 Changes:
@@ -9,21 +9,30 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_111__add_updated_by_to_merchant_audit_trail...';
+    RAISE NOTICE 'Starting running U1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql which is a rollback of V1_0_0_11__add_updated_by_to_merchant_audit_trail...';
 END $$;
 
 -- Drop trigger first
 DROP TRIGGER IF EXISTS update_merchant_audit_updated_by ON fee_nominal.merchant_audit_logs;
-RAISE NOTICE 'Dropped update_merchant_audit_updated_by trigger';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped update_merchant_audit_updated_by trigger';
+END $$;
 
 -- Drop function
 DROP FUNCTION IF EXISTS fee_nominal.update_merchant_audit_updated_by();
-RAISE NOTICE 'Dropped update_merchant_audit_updated_by function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped update_merchant_audit_updated_by function';
+END $$;
 
 -- Remove column
 ALTER TABLE fee_nominal.merchant_audit_logs 
 DROP COLUMN IF EXISTS updated_by;
-RAISE NOTICE 'Dropped updated_by column from merchant_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped updated_by column from merchant_audit_logs table';
+END $$;
 
 -- Verify rollback
 DO $$ 
@@ -51,5 +60,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_111__add_updated_by_to_merchant_audit_trail successfully';
+    RAISE NOTICE 'Completed running U1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql which is a rollback of V1_0_0_11__add_updated_by_to_merchant_audit_trail successfully';
 END $$; 

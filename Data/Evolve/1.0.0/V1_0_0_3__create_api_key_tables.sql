@@ -22,9 +22,13 @@ CREATE TABLE IF NOT EXISTS fee_nominal.api_keys (
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(merchant_id, name)
 );
-RAISE NOTICE 'Created api_keys table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created api_keys table';
+END $$;
 
 -- Verify api_keys table
 DO $$ 
@@ -41,9 +45,13 @@ CREATE TABLE IF NOT EXISTS fee_nominal.api_key_secrets (
     secret_key VARCHAR(255) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(api_key_id)
 );
-RAISE NOTICE 'Created api_key_secrets table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created api_key_secrets table';
+END $$;
 
 -- Verify api_key_secrets table
 DO $$ 
@@ -62,7 +70,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.api_key_audit_logs (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100)
 );
-RAISE NOTICE 'Created api_key_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created api_key_audit_logs table';
+END $$;
 
 -- Verify api_key_audit_logs table
 DO $$ 

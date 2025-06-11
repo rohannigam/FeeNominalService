@@ -1,5 +1,5 @@
 /*
-Rollback: V1_0_0_102__create_merchant_tables_rollback.sql
+Rollback: U1_0_0_102__create_merchant_tables_rollback.sql
 Description: Drops all merchant tables created for merchant management
 Dependencies: None
 Changes:
@@ -13,32 +13,50 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback of V1_0_0_102__create_merchant_tables...';
+    RAISE NOTICE 'Starting running U1_0_0_102__create_merchant_tables_rollback.sql which is a rollback of V1_0_0_2__create_merchant_tables...';
 END $$;
 
 -- Drop merchant_audit_logs table first (due to foreign key dependency)
 DROP TABLE IF EXISTS fee_nominal.merchant_audit_logs;
-RAISE NOTICE 'Dropped merchant_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped merchant_audit_logs table';
+END $$;
 
 -- Drop surcharge_provider_config_history table
 DROP TABLE IF EXISTS fee_nominal.surcharge_provider_config_history;
-RAISE NOTICE 'Dropped surcharge_provider_config_history table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped surcharge_provider_config_history table';
+END $$;
 
 -- Drop surcharge_provider_configs table
 DROP TABLE IF EXISTS fee_nominal.surcharge_provider_configs;
-RAISE NOTICE 'Dropped surcharge_provider_configs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped surcharge_provider_configs table';
+END $$;
 
 -- Drop surcharge_providers table
 DROP TABLE IF EXISTS fee_nominal.surcharge_providers;
-RAISE NOTICE 'Dropped surcharge_providers table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped surcharge_providers table';
+END $$;
 
 -- Drop merchants table
 DROP TABLE IF EXISTS fee_nominal.merchants;
-RAISE NOTICE 'Dropped merchants table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped merchants table';
+END $$;
 
 -- Drop merchant_statuses table
 DROP TABLE IF EXISTS fee_nominal.merchant_statuses;
-RAISE NOTICE 'Dropped merchant_statuses table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Dropped merchant_statuses table';
+END $$;
 
 -- Verify rollback
 DO $$
@@ -78,5 +96,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback of V1_0_0_102__create_merchant_tables successfully';
+    RAISE NOTICE 'Completed running U1_0_0_102__create_merchant_tables_rollback.sql which is a rollback of V1_0_0_2__create_merchant_tables successfully';
 END $$; 

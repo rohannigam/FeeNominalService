@@ -7,8 +7,8 @@ This directory contains the database migration scripts for version 1.0.0 of the 
 ```
 1.0.0/
 ├── Rollback/                    # Rollback scripts for each migration
-│   ├── V1_0_0_101__create_schema_rollback.sql
-│   ├── V1_0_0_102__create_merchant_tables_rollback.sql
+│   ├── U1_0_0_101__create_schema_rollback.sql
+│   ├── U1_0_0_102__create_merchant_tables_rollback.sql
 │   └── ...
 └── README.md                    # This file
 ```

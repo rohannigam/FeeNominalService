@@ -27,7 +27,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.merchant_statuses (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created merchant_statuses table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created merchant_statuses table';
+END $$;
 
 -- Verify merchant_statuses table
 DO $$ 
@@ -49,7 +52,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.merchants (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created merchants table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created merchants table';
+END $$;
 
 -- Verify merchants table
 DO $$ 
@@ -70,7 +76,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.surcharge_providers (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created surcharge_providers table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created surcharge_providers table';
+END $$;
 
 -- Verify surcharge_providers table
 DO $$ 
@@ -92,7 +101,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.surcharge_provider_configs (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(surcharge_provider_id, merchant_id)
 );
-RAISE NOTICE 'Created surcharge_provider_configs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created surcharge_provider_configs table';
+END $$;
 
 -- Verify surcharge_provider_configs table
 DO $$ 
@@ -112,7 +124,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.surcharge_provider_config_history (
     new_value JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created surcharge_provider_config_history table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created surcharge_provider_config_history table';
+END $$;
 
 -- Verify surcharge_provider_config_history table
 DO $$ 
@@ -132,7 +147,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.merchant_audit_logs (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100)
 );
-RAISE NOTICE 'Created merchant_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created merchant_audit_logs table';
+END $$;
 
 -- Verify merchant_audit_logs table
 DO $$ 
@@ -150,7 +168,10 @@ INSERT INTO fee_nominal.merchant_statuses (code, name, description) VALUES
     ('SUSPENDED', 'Suspended', 'Merchant is temporarily suspended'),
     ('TERMINATED', 'Terminated', 'Merchant account has been terminated')
 ON CONFLICT (code) DO NOTHING;
-RAISE NOTICE 'Inserted default merchant statuses';
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted default merchant statuses';
+END $$;
 
 -- Verify data insertion
 DO $$ 

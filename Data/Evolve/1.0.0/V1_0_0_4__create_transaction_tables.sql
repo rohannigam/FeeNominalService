@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.transaction_statuses (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created transaction_statuses table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created transaction_statuses table';
+END $$;
 
 -- Verify transaction_statuses table
 DO $$ 
@@ -48,7 +51,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.transactions (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created transactions table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created transactions table';
+END $$;
 
 -- Verify transactions table
 DO $$ 
@@ -67,7 +73,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.transaction_audit_logs (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100)
 );
-RAISE NOTICE 'Created transaction_audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created transaction_audit_logs table';
+END $$;
 
 -- Verify transaction_audit_logs table
 DO $$ 
@@ -86,7 +95,10 @@ INSERT INTO fee_nominal.transaction_statuses (code, name, description) VALUES
     ('FAILED', 'Failed', 'Transaction has failed'),
     ('CANCELLED', 'Cancelled', 'Transaction has been cancelled')
 ON CONFLICT (code) DO NOTHING;
-RAISE NOTICE 'Inserted default transaction statuses';
+DO $$
+BEGIN
+    RAISE NOTICE 'Inserted default transaction statuses';
+END $$;
 
 -- Verify data insertion
 DO $$ 

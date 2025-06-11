@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.audit_logs (
     user_id VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created audit_logs table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created audit_logs table';
+END $$;
 
 -- Verify audit_logs table
 DO $$ 
@@ -43,7 +46,10 @@ CREATE TABLE IF NOT EXISTS fee_nominal.audit_log_details (
     new_value TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-RAISE NOTICE 'Created audit_log_details table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created audit_log_details table';
+END $$;
 
 -- Verify audit_log_details table
 DO $$ 
@@ -52,11 +58,6 @@ BEGIN
         RAISE EXCEPTION 'Table audit_log_details was not created successfully';
     END IF;
     RAISE NOTICE 'Verified audit_log_details table creation';
-END $$;
-
-DO $$
-BEGIN
-    RAISE NOTICE 'Completed V1_0_0_5__create_audit_tables migration successfully';
 END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.merchant_audit_trail (
@@ -72,8 +73,6 @@ CREATE TABLE IF NOT EXISTS fee_nominal.merchant_audit_trail (
 );
 
 -- Create indexes
-CREATE INDEX IF NOT EXISTS idx_audit_logs_merchant_id ON fee_nominal.audit_logs(merchant_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_api_key_id ON fee_nominal.audit_logs(api_key_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type_entity_id ON fee_nominal.audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON fee_nominal.audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_details_audit_log_id ON fee_nominal.audit_log_details(audit_log_id);
@@ -82,3 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_created_at ON fee_nominal.me
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_action ON fee_nominal.merchant_audit_trail(action);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_entity_type ON fee_nominal.merchant_audit_trail(entity_type);
 CREATE INDEX IF NOT EXISTS idx_merchant_audit_trail_property_name ON fee_nominal.merchant_audit_trail(property_name);
+
+DO $$
+BEGIN
+    RAISE NOTICE 'Completed V1_0_0_5__create_audit_tables migration successfully';
+END $$;

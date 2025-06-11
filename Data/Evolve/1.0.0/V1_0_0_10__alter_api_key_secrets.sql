@@ -18,12 +18,18 @@ END $$;
 -- Add updated_at column
 ALTER TABLE fee_nominal.api_key_secrets 
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-RAISE NOTICE 'Added updated_at column to api_key_secrets table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Added updated_at column to api_key_secrets table';
+END $$;
 
 -- Add expires_at column
 ALTER TABLE fee_nominal.api_key_secrets 
 ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '1 year');
-RAISE NOTICE 'Added expires_at column to api_key_secrets table';
+DO $$
+BEGIN
+    RAISE NOTICE 'Added expires_at column to api_key_secrets table';
+END $$;
 
 -- Update existing records
 UPDATE fee_nominal.api_key_secrets 
@@ -31,7 +37,10 @@ SET
     updated_at = CURRENT_TIMESTAMP,
     expires_at = CURRENT_TIMESTAMP + INTERVAL '1 year'
 WHERE updated_at IS NULL OR expires_at IS NULL;
-RAISE NOTICE 'Updated existing records with default values';
+DO $$
+BEGIN
+    RAISE NOTICE 'Updated existing records with default values';
+END $$;
 
 -- Create trigger for updated_at
 CREATE OR REPLACE FUNCTION fee_nominal.update_updated_at_column()
@@ -41,14 +50,20 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-RAISE NOTICE 'Created update_updated_at_column function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created update_updated_at_column function';
+END $$;
 
 DROP TRIGGER IF EXISTS update_api_key_secrets_updated_at ON fee_nominal.api_key_secrets;
 CREATE TRIGGER update_api_key_secrets_updated_at
     BEFORE UPDATE ON fee_nominal.api_key_secrets
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.update_updated_at_column();
-RAISE NOTICE 'Created update_api_key_secrets_updated_at trigger';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created update_api_key_secrets_updated_at trigger';
+END $$;
 
 -- Verify changes
 DO $$ 

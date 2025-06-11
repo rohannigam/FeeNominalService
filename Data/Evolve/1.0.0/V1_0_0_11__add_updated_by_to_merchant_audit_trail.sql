@@ -35,7 +35,10 @@ END $$;
 UPDATE fee_nominal.merchant_audit_trail 
 SET updated_by = 'system'
 WHERE updated_by IS NULL;
-RAISE NOTICE 'Updated existing records with default value';
+DO $$
+BEGIN
+    RAISE NOTICE 'Updated existing records with default value';
+END $$;
 
 -- Create trigger for updated_by
 CREATE OR REPLACE FUNCTION fee_nominal.update_merchant_audit_updated_by()
@@ -45,14 +48,20 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-RAISE NOTICE 'Created update_merchant_audit_updated_by function';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created update_merchant_audit_updated_by function';
+END $$;
 
 DROP TRIGGER IF EXISTS update_merchant_audit_updated_by ON fee_nominal.merchant_audit_trail;
 CREATE TRIGGER update_merchant_audit_updated_by
     BEFORE INSERT OR UPDATE ON fee_nominal.merchant_audit_trail
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.update_merchant_audit_updated_by();
-RAISE NOTICE 'Created update_merchant_audit_updated_by trigger';
+DO $$
+BEGIN
+    RAISE NOTICE 'Created update_merchant_audit_updated_by trigger';
+END $$;
 
 -- Verify changes
 DO $$ 
