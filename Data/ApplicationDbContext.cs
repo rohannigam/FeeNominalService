@@ -29,6 +29,7 @@ namespace FeeNominalService.Data
         public DbSet<SurchargeProvider> SurchargeProviders { get; set; } = null!;
         public DbSet<SurchargeProviderConfig> SurchargeProviderConfigs { get; set; } = null!;
         public DbSet<SurchargeProviderConfigHistory> SurchargeProviderConfigHistory { get; set; } = null!;
+        public DbSet<SurchargeProviderStatus> SurchargeProviderStatuses { get; set; } = null!;
         public DbSet<ApiKeySecret> ApiKeySecrets { get; set; }
         public DbSet<MerchantAuditTrail> MerchantAuditTrail { get; set; } = null!;
 
@@ -71,7 +72,7 @@ namespace FeeNominalService.Data
                 entity.Property(e => e.MerchantId).HasColumnName("merchant_id").IsRequired();
                 entity.Property(e => e.Action).HasColumnName("action").IsRequired().HasMaxLength(50);
                 entity.Property(e => e.EntityType).HasColumnName("entity_type").IsRequired().HasMaxLength(50);
-                entity.Property(e => e.PropertyName).HasColumnName("property_name").HasMaxLength(100);
+                entity.Property(e => e.PropertyName).HasColumnName("property_name").HasMaxLength(255);
                 entity.Property(e => e.OldValue).HasColumnName("old_value");
                 entity.Property(e => e.NewValue).HasColumnName("new_value");
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
@@ -88,8 +89,8 @@ namespace FeeNominalService.Data
             modelBuilder.Entity<MerchantStatus>(entity =>
             {
                 entity.ToTable("merchant_statuses", _schema);
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id)
+                entity.HasKey(e => e.MerchantStatusId);
+                entity.Property(e => e.MerchantStatusId)
                     .HasColumnName("merchant_status_id")
                     .ValueGeneratedNever(); // Since we're using predefined integer values
                 entity.Property(e => e.Code)
@@ -100,9 +101,6 @@ namespace FeeNominalService.Data
                     .HasMaxLength(50);
                 entity.Property(e => e.Description)
                     .HasMaxLength(255);
-                entity.Property(e => e.IsActive)
-                    .IsRequired()
-                    .HasDefaultValue(true);
                 entity.Property(e => e.CreatedAt)
                     .IsRequired()
                     .HasColumnName("created_at")
@@ -151,8 +149,9 @@ namespace FeeNominalService.Data
                 entity.HasIndex(e => e.ExternalMerchantId).IsUnique();
                 entity.HasIndex(e => e.ExternalMerchantGuid).IsUnique();
                 entity.HasOne(e => e.Status)
-                    .WithMany()
+                    .WithMany(e => e.Merchants)
                     .HasForeignKey(e => e.StatusId)
+                    .HasPrincipalKey(e => e.MerchantStatusId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -276,26 +275,81 @@ namespace FeeNominalService.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Configure SurchargeProviderStatus
+            modelBuilder.Entity<SurchargeProviderStatus>(entity =>
+            {
+                entity.ToTable("surcharge_provider_statuses", _schema);
+                entity.HasKey(e => e.StatusId);
+                entity.Property(e => e.StatusId)
+                    .HasColumnName("status_id")
+                    .ValueGeneratedNever(); // Since we're using predefined integer values
+                entity.Property(e => e.Code)
+                    .IsRequired()
+                    .HasMaxLength(20);
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                entity.Property(e => e.Description)
+                    .HasMaxLength(255);
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired()
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt)
+                    .IsRequired()
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasIndex(e => e.Code).IsUnique();
+            });
+
             // Configure SurchargeProvider
             modelBuilder.Entity<SurchargeProvider>(entity =>
             {
+                entity.ToTable("surcharge_providers", _schema);
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).HasColumnName("surcharge_provider_id");
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Code).IsRequired().HasMaxLength(20);
-                entity.Property(e => e.Description).HasMaxLength(255);
-                entity.Property(e => e.BaseUrl).IsRequired().HasMaxLength(255);
-                entity.Property(e => e.AuthenticationType).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.CredentialsSchema)
+                entity.Property(e => e.Id)
+                    .HasColumnName("surcharge_provider_id")
+                    .HasColumnType("uuid")
+                    .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(e => e.Name)
                     .IsRequired()
-                    .HasColumnType("jsonb")
-                    .HasConversion(
-                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())!
-                    );
-                entity.Property(e => e.Status).IsRequired().HasMaxLength(20);
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UpdatedAt).IsRequired();
+                    .HasMaxLength(100);
+                entity.Property(e => e.Code)
+                    .IsRequired()
+                    .HasMaxLength(20);
+                entity.Property(e => e.Description);
+                entity.Property(e => e.BaseUrl)
+                    .IsRequired()
+                    .HasMaxLength(255);
+                entity.Property(e => e.AuthenticationType)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                entity.Property(e => e.CredentialsSchema)
+                    .IsRequired();
+                entity.Property(e => e.StatusId)
+                    .IsRequired();
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired()
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt)
+                    .IsRequired()
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.CreatedBy)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnName("created_by");
+                entity.Property(e => e.UpdatedBy)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnName("updated_by");
+
+                entity.HasOne(e => e.Status)
+                    .WithMany(e => e.Providers)
+                    .HasForeignKey(e => e.StatusId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasIndex(e => e.Code).IsUnique();
             });
 
@@ -314,7 +368,7 @@ namespace FeeNominalService.Data
                         v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                         v => JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())!
                     );
-                entity.Property(e => e.IsActive).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.IsPrimary).IsRequired();
                 entity.Property(e => e.RateLimit);
                 entity.Property(e => e.RateLimitPeriod);

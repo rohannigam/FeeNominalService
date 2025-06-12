@@ -95,11 +95,14 @@ namespace FeeNominalService.Services
                 provider.CreatedAt = DateTime.UtcNow;
                 provider.UpdatedAt = DateTime.UtcNow;
 
-                // Set default status if not provided
-                if (string.IsNullOrEmpty(provider.Status))
+                // Get the status ID from the code
+                var status = await _repository.GetStatusByCodeAsync("ACTIVE");
+                if (status == null)
                 {
-                    provider.Status = "active";
+                    throw new InvalidOperationException("ACTIVE status not found in the database");
                 }
+                provider.StatusId = status.StatusId;
+                provider.Status = status;
 
                 return await _repository.AddAsync(provider);
             }
@@ -284,6 +287,20 @@ namespace FeeNominalService.Services
             catch (Exception ex)
             {
                 throw new InvalidOperationException($"Error generating schema for provider type {providerType}", ex);
+            }
+        }
+
+        public async Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code)
+        {
+            try
+            {
+                _logger.LogInformation("Getting status by code {StatusCode}", code);
+                return await _repository.GetStatusByCodeAsync(code);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting status by code {StatusCode}", code);
+                throw;
             }
         }
     }

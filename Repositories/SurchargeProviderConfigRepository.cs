@@ -46,8 +46,7 @@ namespace FeeNominalService.Repositories
                     .FirstOrDefaultAsync(c => 
                         c.MerchantId == merchantId && 
                         c.ProviderId == providerId && 
-                        c.IsPrimary && 
-                        c.IsActive);
+                        c.IsPrimary);
             }
             catch (Exception ex)
             {
@@ -98,7 +97,7 @@ namespace FeeNominalService.Repositories
             {
                 return await _context.SurchargeProviderConfigs
                     .Include(c => c.Provider)
-                    .Where(c => c.MerchantId == merchantId && c.IsActive)
+                    .Where(c => c.MerchantId == merchantId)
                     .OrderBy(c => c.ConfigName)
                     .ToListAsync();
             }

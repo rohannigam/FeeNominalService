@@ -1,5 +1,5 @@
 /*
-Rollback: U1_0_0_108__create_indexes_rollback.sql
+Rollback: U1_0_0_107__create_indexes_rollback.sql
 Description: Removes all indexes created for performance optimization
 Dependencies: None
 Changes:
@@ -12,7 +12,7 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting running U1_0_0_108__create_indexes_rollback.sql which is a rollback of V1_0_0_8__create_indexes...';
+    RAISE NOTICE 'Starting running U1_0_0_107__create_indexes_rollback.sql which is a rollback of V1_0_0_7__create_indexes...';
 END $$;
 
 -- Drop indexes on merchant table
@@ -40,7 +40,9 @@ END $$;
 DROP INDEX IF EXISTS fee_nominal.idx_api_keys_merchant;
 DROP INDEX IF EXISTS fee_nominal.idx_api_keys_created_at;
 DROP INDEX IF EXISTS fee_nominal.idx_api_keys_is_active;
-DROP INDEX IF EXISTS fee_nominal.idx_api_key_secrets_is_active;
+DROP INDEX IF EXISTS fee_nominal.idx_api_key_secrets_merchant;
+DROP INDEX IF EXISTS fee_nominal.idx_api_key_secrets_status;
+DROP INDEX IF EXISTS fee_nominal.idx_api_key_secrets_is_revoked;
 DROP INDEX IF EXISTS fee_nominal.idx_api_key_secrets_created_at;
 DO $$
 BEGIN
@@ -83,5 +85,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed running U1_0_0_108__create_indexes_rollback.sql which is a rollback of V1_0_0_8__create_indexes successfully';
+    RAISE NOTICE 'Completed running U1_0_0_107__create_indexes_rollback.sql which is a rollback of V1_0_0_7__create_indexes successfully';
 END $$; 

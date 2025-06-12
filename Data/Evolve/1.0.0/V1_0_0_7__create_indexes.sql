@@ -1,5 +1,5 @@
 /*
-Migration: V1_0_0_8__create_indexes.sql
+Migration: V1_0_0_7__create_indexes.sql
 Description: Creates performance-optimizing indexes on key tables
 Dependencies: 
 - V1_0_0_1__create_schema.sql (requires fee_nominal schema)
@@ -15,13 +15,13 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting V1_0_0_8__create_indexes migration...';
+    RAISE NOTICE 'Starting V1_0_0_7__create_indexes migration...';
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_merchants_status ON fee_nominal.merchants(merchant_status_id);
+CREATE INDEX IF NOT EXISTS idx_merchants_status ON fee_nominal.merchants(status_id);
 DO $$
 BEGIN
-    RAISE NOTICE 'Created index on merchants.merchant_status_id';
+    RAISE NOTICE 'Created index on merchants.status_id';
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_merchants_created_at ON fee_nominal.merchants(created_at);
@@ -66,10 +66,10 @@ BEGIN
     RAISE NOTICE 'Created index on surcharge_provider_config_history.surcharge_provider_config_id';
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_surcharge_provider_config_history_created_at ON fee_nominal.surcharge_provider_config_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_surcharge_provider_config_history_changed_at ON fee_nominal.surcharge_provider_config_history(changed_at);
 DO $$
 BEGIN
-    RAISE NOTICE 'Created index on surcharge_provider_config_history.created_at';
+    RAISE NOTICE 'Created index on surcharge_provider_config_history.changed_at';
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_merchant ON fee_nominal.api_keys(merchant_id);
@@ -90,10 +90,22 @@ BEGIN
     RAISE NOTICE 'Created index on api_keys.is_active';
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_api_key_secrets_is_active ON fee_nominal.api_key_secrets(is_active);
+CREATE INDEX IF NOT EXISTS idx_api_key_secrets_merchant ON fee_nominal.api_key_secrets(merchant_id);
 DO $$
 BEGIN
-    RAISE NOTICE 'Created index on api_key_secrets.is_active';
+    RAISE NOTICE 'Created index on api_key_secrets.merchant_id';
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_api_key_secrets_status ON fee_nominal.api_key_secrets(status);
+DO $$
+BEGIN
+    RAISE NOTICE 'Created index on api_key_secrets.status';
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_api_key_secrets_is_revoked ON fee_nominal.api_key_secrets(is_revoked);
+DO $$
+BEGIN
+    RAISE NOTICE 'Created index on api_key_secrets.is_revoked';
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_api_key_secrets_created_at ON fee_nominal.api_key_secrets(created_at);
@@ -112,12 +124,6 @@ CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON fee_nominal.transactio
 DO $$
 BEGIN
     RAISE NOTICE 'Created index on transactions.created_at';
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_audit_trail_merchant ON fee_nominal.merchant_audit_trail(merchant_id);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on merchant_audit_trail.merchant_id';
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at_entity_type ON fee_nominal.audit_logs(created_at, entity_type);
@@ -149,5 +155,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed V1_0_0_8__create_indexes migration successfully';
+    RAISE NOTICE 'Completed V1_0_0_7__create_indexes migration successfully';
 END $$;

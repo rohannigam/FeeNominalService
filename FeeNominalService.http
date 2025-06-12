@@ -7,15 +7,17 @@
 # The signature is calculated using the following components:
 # 1. Timestamp: Current UTC time in ISO 8601 format
 # 2. Nonce: A unique random string for each request
-# 3. Request Body: The JSON body of the request
-# 4. Secret: The API key secret (not the API key itself)
+# 3. MerchantId: Your merchant ID
+# 4. ApiKey: Your API key
+# 5. Secret: The API key secret (not the API key itself)
 #
 # Signature Calculation:
-# 1. Concatenate: timestamp + nonce + requestBody
+# 1. Concatenate: timestamp|nonce|merchantId|apiKey (using pipe separator)
 # 2. Create HMAC-SHA256 hash using the secret key
 # 3. Base64 encode the hash
 #
 # Required Headers:
+# X-Merchant-ID: Your merchant ID
 # X-API-Key: Your API key
 # X-Timestamp: Current UTC time in ISO 8601 format
 # X-Nonce: Unique random string

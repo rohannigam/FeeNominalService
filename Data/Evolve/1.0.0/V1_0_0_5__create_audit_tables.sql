@@ -17,11 +17,11 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.audit_logs (
-    audit_log_id SERIAL PRIMARY KEY,
+    audit_log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(50) NOT NULL,
-    entity_id INTEGER NOT NULL,
+    entity_id UUID NOT NULL,
     action VARCHAR(50) NOT NULL,
-    user_id VARCHAR(100),
+    user_id VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 DO $$
@@ -39,9 +39,9 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.audit_log_details (
-    detail_id SERIAL PRIMARY KEY,
-    audit_log_id INTEGER NOT NULL REFERENCES fee_nominal.audit_logs(audit_log_id),
-    field_name VARCHAR(100) NOT NULL,
+    detail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    audit_log_id UUID NOT NULL REFERENCES fee_nominal.audit_logs(audit_log_id),
+    field_name VARCHAR(255) NOT NULL,
     old_value TEXT,
     new_value TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -61,11 +61,11 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.merchant_audit_trail (
-    merchant_audit_trail_id SERIAL PRIMARY KEY,
-    merchant_id INTEGER REFERENCES fee_nominal.merchants(merchant_id),
+    merchant_audit_trail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_id UUID REFERENCES fee_nominal.merchants(merchant_id),
     action VARCHAR(50) NOT NULL,
     entity_type VARCHAR(50) NOT NULL,
-    property_name VARCHAR(100),
+    property_name VARCHAR(255),
     old_value TEXT,
     new_value TEXT,
     updated_by VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',

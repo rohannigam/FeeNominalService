@@ -43,16 +43,28 @@ namespace FeeNominalService.Models.SurchargeProvider
         public required JsonDocument CredentialsSchema { get; set; }
 
         [Required]
-        [Column("status")]
-        [MaxLength(20)]
-        public required string Status { get; set; }
+        [Column("status_id")]
+        public int StatusId { get; set; }
+
+        [ForeignKey("StatusId")]
+        public virtual SurchargeProviderStatus Status { get; set; } = null!;
 
         [Required]
         [Column("created_at")]
-        public DateTime CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         [Required]
         [Column("updated_at")]
-        public DateTime UpdatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        [Required]
+        [Column("created_by")]
+        [MaxLength(50)]
+        public required string CreatedBy { get; set; }
+
+        [Required]
+        [Column("updated_by")]
+        [MaxLength(50)]
+        public required string UpdatedBy { get; set; }
     }
 } 

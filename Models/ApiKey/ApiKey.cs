@@ -49,7 +49,7 @@ namespace FeeNominalService.Models.ApiKey
         /// Name or description of the API key
         /// </summary>
         [Required]
-        [StringLength(100)]
+        [StringLength(255)]
         [Column("name")]
         public string Name { get; set; } = string.Empty;
 

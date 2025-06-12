@@ -15,50 +15,44 @@ namespace FeeNominalService.Models.Merchant
         /// </summary>
         [Key]
         [Column("merchant_status_id")]
-        public int Id { get; set; }
+        public int MerchantStatusId { get; set; }
 
         /// <summary>
         /// Status code (e.g., "ACTIVE", "INACTIVE")
         /// </summary>
         [Required]
-        [StringLength(20)]
         [Column("code")]
-        public string Code { get; set; } = string.Empty;
+        [StringLength(50)]
+        public required string Code { get; set; }
 
         /// <summary>
         /// Display name of the status
         /// </summary>
         [Required]
-        [StringLength(50)]
         [Column("name")]
-        public string Name { get; set; } = string.Empty;
+        [StringLength(100)]
+        public required string Name { get; set; }
 
         /// <summary>
         /// Description of the status
         /// </summary>
-        [StringLength(255)]
         [Column("description")]
+        [StringLength(500)]
         public string? Description { get; set; }
-
-        /// <summary>
-        /// Whether this status is active
-        /// </summary>
-        [Required]
-        [Column("is_active")]
-        public bool IsActive { get; set; } = true;
 
         /// <summary>
         /// When the status was created
         /// </summary>
-        [Required]
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         /// <summary>
         /// When the status was last updated
         /// </summary>
-        [Required]
         [Column("updated_at")]
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
+
+        // Navigation properties
+        public virtual ICollection<Merchant> Merchants { get; set; } = new List<Merchant>();
     }
 } 

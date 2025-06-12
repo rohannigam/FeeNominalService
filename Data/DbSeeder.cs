@@ -20,12 +20,12 @@ namespace FeeNominalService.Data
                 // Add merchant statuses
                 var statuses = new[]
                 {
-                    new MerchantStatus { Id = MerchantStatusIds.Suspended, Code = "SUSPENDED", Name = "Suspended", Description = "Merchant is temporarily suspended", IsActive = false },
-                    new MerchantStatus { Id = MerchantStatusIds.Inactive, Code = "INACTIVE", Name = "Inactive", Description = "Merchant is inactive and cannot process transactions", IsActive = false },
-                    new MerchantStatus { Id = MerchantStatusIds.Unknown, Code = "UNKNOWN", Name = "Unknown", Description = "Merchant status is unknown", IsActive = false },
-                    new MerchantStatus { Id = MerchantStatusIds.Active, Code = "ACTIVE", Name = "Active", Description = "Merchant is active and can process transactions", IsActive = true },
-                    new MerchantStatus { Id = MerchantStatusIds.Pending, Code = "PENDING", Name = "Pending", Description = "Merchant is pending activation", IsActive = true },
-                    new MerchantStatus { Id = MerchantStatusIds.Verified, Code = "VERIFIED", Name = "Verified", Description = "Merchant is verified and active", IsActive = true }
+                    new MerchantStatus { MerchantStatusId = MerchantStatusIds.Suspended, Code = "SUSPENDED", Name = "Suspended", Description = "Merchant is temporarily suspended" },
+                    new MerchantStatus { MerchantStatusId = MerchantStatusIds.Inactive, Code = "INACTIVE", Name = "Inactive", Description = "Merchant is inactive and cannot process transactions" },
+                    new MerchantStatus { MerchantStatusId = MerchantStatusIds.Unknown, Code = "UNKNOWN", Name = "Unknown", Description = "Merchant status is unknown" },
+                    new MerchantStatus { MerchantStatusId = MerchantStatusIds.Active, Code = "ACTIVE", Name = "Active", Description = "Merchant is active and can process transactions" },
+                    new MerchantStatus { MerchantStatusId = MerchantStatusIds.Pending, Code = "PENDING", Name = "Pending", Description = "Merchant is pending activation" },
+                    new MerchantStatus { MerchantStatusId = MerchantStatusIds.Verified, Code = "VERIFIED", Name = "Verified", Description = "Merchant is verified and active" }
                 };
 
                 await context.MerchantStatuses.AddRangeAsync(statuses);
@@ -39,7 +39,7 @@ namespace FeeNominalService.Data
                     {
                         ExternalMerchantId = "DEV001",
                         Name = "Development Merchant",
-                        StatusId = activeStatus.Id,
+                        StatusId = activeStatus.MerchantStatusId,
                         CreatedBy = "admin"
                     };
 

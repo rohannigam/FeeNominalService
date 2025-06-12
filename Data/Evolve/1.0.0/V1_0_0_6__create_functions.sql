@@ -79,8 +79,8 @@ CREATE TRIGGER log_transaction_history
 CREATE OR REPLACE FUNCTION fee_nominal.log_audit_details()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_audit_log_id INTEGER;
-    v_entity_id INTEGER;
+    v_audit_log_id UUID;
+    v_entity_id UUID;
 BEGIN
     -- Get entity_id based on the table
     CASE TG_TABLE_NAME
@@ -108,6 +108,12 @@ BEGIN
     ) RETURNING audit_log_id INTO v_audit_log_id;
 
     -- Insert into audit_log_details
+    WITH old_data AS (
+        SELECT key, value FROM jsonb_each_text(row_to_json(OLD)::jsonb)
+    ),
+    new_data AS (
+        SELECT key, value FROM jsonb_each_text(row_to_json(NEW)::jsonb)
+    )
     INSERT INTO fee_nominal.audit_log_details (
         audit_log_id,
         field_name,
@@ -116,13 +122,12 @@ BEGIN
     )
     SELECT
         v_audit_log_id,
-        key,
-        old_value::text,
-        new_value::text
-    FROM jsonb_each_text(row_to_json(OLD)::jsonb) old_vals
-    FULL OUTER JOIN jsonb_each_text(row_to_json(NEW)::jsonb) new_vals
-    USING (key)
-    WHERE old_value IS DISTINCT FROM new_value;
+        COALESCE(old_data.key, new_data.key),
+        old_data.value,
+        new_data.value
+    FROM old_data
+    FULL OUTER JOIN new_data USING (key)
+    WHERE old_data.value IS DISTINCT FROM new_data.value;
 
     RETURN NEW;
 END;
@@ -147,12 +152,12 @@ CREATE TRIGGER audit_transactions
 -- Create log_audit_event function
 CREATE OR REPLACE FUNCTION fee_nominal.log_audit_event(
     p_entity_type VARCHAR(50),
-    p_entity_id INTEGER,
+    p_entity_id UUID,
     p_action VARCHAR(50),
     p_user_id VARCHAR(100) DEFAULT NULL
-) RETURNS INTEGER AS $$
+) RETURNS UUID AS $$
 DECLARE
-    v_audit_log_id INTEGER;
+    v_audit_log_id UUID;
 BEGIN
     INSERT INTO fee_nominal.audit_logs (
         entity_type,
@@ -176,7 +181,7 @@ END $$;
 
 -- Create log_audit_detail function
 CREATE OR REPLACE FUNCTION fee_nominal.log_audit_detail(
-    p_audit_log_id INTEGER,
+    p_audit_log_id UUID,
     p_field_name VARCHAR(100),
     p_old_value TEXT DEFAULT NULL,
     p_new_value TEXT DEFAULT NULL
@@ -203,11 +208,11 @@ END $$;
 -- Create get_audit_logs function
 CREATE OR REPLACE FUNCTION fee_nominal.get_audit_logs(
     p_entity_type VARCHAR(50),
-    p_entity_id INTEGER,
+    p_entity_id UUID,
     p_start_date TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     p_end_date TIMESTAMP WITH TIME ZONE DEFAULT NULL
 ) RETURNS TABLE (
-    audit_log_id INTEGER,
+    audit_log_id UUID,
     action VARCHAR(50),
     user_id VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE,
@@ -239,9 +244,10 @@ BEGIN
     RAISE NOTICE 'Created get_audit_logs function';
 END $$;
 
--- Verify functions
+-- Verify functions and column types
 DO $$ 
 BEGIN
+    -- Verify functions exist
     IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'log_audit_event' AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'fee_nominal')) THEN
         RAISE EXCEPTION 'Function log_audit_event was not created successfully';
     END IF;
@@ -252,6 +258,54 @@ BEGIN
         RAISE EXCEPTION 'Function get_audit_logs was not created successfully';
     END IF;
     RAISE NOTICE 'Verified all functions were created successfully';
+
+    -- Verify audit_logs table columns
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_schema = 'fee_nominal' 
+        AND table_name = 'audit_logs' 
+        AND column_name = 'audit_log_id' 
+        AND data_type = 'uuid'
+    ) THEN
+        RAISE EXCEPTION 'audit_logs.audit_log_id is not UUID type';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_schema = 'fee_nominal' 
+        AND table_name = 'audit_logs' 
+        AND column_name = 'entity_id' 
+        AND data_type = 'uuid'
+    ) THEN
+        RAISE EXCEPTION 'audit_logs.entity_id is not UUID type';
+    END IF;
+
+    -- Verify audit_log_details table columns
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_schema = 'fee_nominal' 
+        AND table_name = 'audit_log_details' 
+        AND column_name = 'detail_id' 
+        AND data_type = 'uuid'
+    ) THEN
+        RAISE EXCEPTION 'audit_log_details.detail_id is not UUID type';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_schema = 'fee_nominal' 
+        AND table_name = 'audit_log_details' 
+        AND column_name = 'audit_log_id' 
+        AND data_type = 'uuid'
+    ) THEN
+        RAISE EXCEPTION 'audit_log_details.audit_log_id is not UUID type';
+    END IF;
+
+    RAISE NOTICE 'Verified all column types successfully';
 END $$;
 
 DO $$

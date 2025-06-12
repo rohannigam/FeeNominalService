@@ -36,7 +36,7 @@ public class Merchant
     /// Name of the merchant
     /// </summary>
     [Required]
-    [StringLength(100)]
+    [StringLength(255)]
     [Column("name")]
     public string Name { get; set; } = string.Empty;
 

@@ -44,11 +44,18 @@ namespace FeeNominalService.Swagger
             // Add security definitions
             options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
             {
-                Description = "API Key Authentication",
-                Name = "X-Merchant-ID",
+                Description = @"API Key Authentication with Request Signing.
+                Required Headers:
+                - X-Merchant-ID: Your merchant ID
+                - X-API-Key: Your API key
+                - X-Timestamp: Current UTC time in ISO 8601 format
+                - X-Nonce: Unique random string
+                - X-Signature: HMAC signature (timestamp|nonce|merchantId|apiKey)",
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
                 In = ParameterLocation.Header,
-                Type = SecuritySchemeType.ApiKey,
-                Scheme = "ApiKey"
+                Name = "Authorization"
             });
 
             options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -62,7 +69,14 @@ namespace FeeNominalService.Swagger
                             Id = "ApiKey"
                         }
                     },
-                    Array.Empty<string>()
+                    new[]
+                    {
+                        "X-Merchant-ID",
+                        "X-API-Key",
+                        "X-Timestamp",
+                        "X-Nonce",
+                        "X-Signature"
+                    }
                 }
             });
 

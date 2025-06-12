@@ -16,5 +16,6 @@ namespace FeeNominalService.Repositories
         Task<bool> DeleteAsync(Guid id);
         Task<bool> ExistsAsync(Guid id);
         Task<bool> ExistsByCodeAsync(string code);
+        Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code);
     }
 } 

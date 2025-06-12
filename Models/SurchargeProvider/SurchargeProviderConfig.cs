@@ -33,9 +33,12 @@ namespace FeeNominalService.Models.SurchargeProvider
         [Column("credentials")]
         public required JsonDocument Credentials { get; set; } = JsonDocument.Parse("{}");
 
+        /// <summary>
+        /// Whether this configuration is currently active
+        /// </summary>
         [Required]
         [Column("is_active")]
-        public bool IsActive { get; set; }
+        public bool IsActive { get; set; } = true;
 
         [Required]
         [Column("is_primary")]

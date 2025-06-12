@@ -15,14 +15,29 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_3__create_api_key_tables migration...';
 END $$;
 
+-- Add extension if not exists
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE IF NOT EXISTS fee_nominal.api_keys (
-    api_key_id SERIAL PRIMARY KEY,
-    merchant_id INTEGER NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
-    name VARCHAR(100) NOT NULL,
+    api_key_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    merchant_id UUID NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
+    name VARCHAR(255) NOT NULL,
+    key VARCHAR(255),
+    status VARCHAR(50) NOT NULL DEFAULT 'Active',
+    expires_at TIMESTAMP WITH TIME ZONE,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    allowed_endpoints TEXT[],
+    created_by VARCHAR(50),
+    expiration_days INTEGER,
+    last_rotated_at TIMESTAMP WITH TIME ZONE,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    onboarding_reference VARCHAR(50),
+    purpose VARCHAR(255),
+    rate_limit INTEGER,
+    revoked_at TIMESTAMP WITH TIME ZONE,
     UNIQUE(merchant_id, name)
 );
 DO $$
@@ -40,13 +55,18 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.api_key_secrets (
-    api_key_secret_id SERIAL PRIMARY KEY,
-    api_key_id INTEGER NOT NULL REFERENCES fee_nominal.api_keys(api_key_id),
-    secret_key VARCHAR(255) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT true,
+    id SERIAL PRIMARY KEY,
+    api_key VARCHAR(255) NOT NULL,
+    secret VARCHAR(255) NOT NULL,
+    merchant_id UUID NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'Active',
+    is_revoked BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(api_key_id)
+    expires_at TIMESTAMP WITH TIME ZONE,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    last_rotated TIMESTAMP WITH TIME ZONE,
+    UNIQUE(api_key)
 );
 DO $$
 BEGIN
@@ -64,11 +84,11 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.api_key_audit_logs (
     audit_log_id SERIAL PRIMARY KEY,
-    api_key_id INTEGER NOT NULL REFERENCES fee_nominal.api_keys(api_key_id),
+    api_key_id UUID NOT NULL REFERENCES fee_nominal.api_keys(api_key_id),
     action VARCHAR(50) NOT NULL,
     details JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(100)
+    created_by VARCHAR(255)
 );
 DO $$
 BEGIN

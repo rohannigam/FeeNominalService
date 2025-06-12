@@ -14,28 +14,21 @@ using System.Collections.Concurrent;
 
 namespace FeeNominalService.Services
 {
-    public interface IRequestSigningService
-    {
-        Task<bool> ValidateRequestAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature);
-        Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody);
-        bool ValidateTimestampAndNonce(string timestamp, string nonce);
-    }
-
-    public class RequestSigningService : IRequestSigningService
+    public class RequestSigningServiceDebug : IRequestSigningService
     {
         private readonly IApiKeyRepository _apiKeyRepository;
         private readonly IMerchantRepository _merchantRepository;
         private readonly IAwsSecretsManagerService _secretsManager;
-        private readonly ILogger<RequestSigningService> _logger;
+        private readonly ILogger<RequestSigningServiceDebug> _logger;
         private readonly ApiKeyConfiguration _apiKeyConfig;
         private readonly ConcurrentDictionary<string, DateTime> _usedNonces;
         private readonly HashSet<string> _recentNonces;
 
-        public RequestSigningService(
+        public RequestSigningServiceDebug(
             IApiKeyRepository apiKeyRepository,
             IMerchantRepository merchantRepository,
             IAwsSecretsManagerService secretsManager,
-            ILogger<RequestSigningService> logger,
+            ILogger<RequestSigningServiceDebug> logger,
             IOptions<ApiKeyConfiguration> apiKeyConfig)
         {
             _apiKeyRepository = apiKeyRepository;
@@ -47,84 +40,11 @@ namespace FeeNominalService.Services
             _recentNonces = new HashSet<string>();
         }
 
-        public bool ValidateTimestampAndNonce(string timestamp, string nonce)
-        {
-            try
-            {
-                // Parse the timestamp and ensure it's in UTC
-                if (!DateTime.TryParse(timestamp, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime requestTime))
-                {
-                    _logger.LogWarning("Invalid timestamp format: {Timestamp}", timestamp);
-                    return false;
-                }
-
-                // Ensure requestTime is in UTC
-                if (requestTime.Kind != DateTimeKind.Utc)
-                {
-                    requestTime = DateTime.SpecifyKind(requestTime, DateTimeKind.Utc);
-                }
-
-                var currentTime = DateTime.UtcNow;
-                var timeDiff = Math.Abs((currentTime - requestTime).TotalMinutes);
-
-                // Log detailed time information for debugging
-                _logger.LogInformation(
-                    "Time validation details - Request time (UTC): {RequestTime}, Current time (UTC): {CurrentTime}, Time difference (minutes): {TimeDiff}",
-                    requestTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                    currentTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                    timeDiff);
-
-                // Check if the timestamp is within the allowed window
-                if (timeDiff > _apiKeyConfig.RequestTimeWindowMinutes)
-                {
-                    _logger.LogWarning(
-                        "Request timestamp is outside the allowed window. Request time (UTC): {RequestTime}, Current time (UTC): {CurrentTime}, Time difference (minutes): {TimeDiff}",
-                        requestTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                        currentTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                        timeDiff);
-                    return false;
-                }
-
-                // Check if the nonce has been used recently
-                if (_recentNonces.Contains(nonce))
-                {
-                    _logger.LogWarning("Nonce has been used recently: {Nonce}", nonce);
-                    return false;
-                }
-
-                // Add the nonce to the recent nonces set
-                _recentNonces.Add(nonce);
-
-                // Clean up old nonces
-                CleanupOldNonces();
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating timestamp and nonce");
-                return false;
-            }
-        }
-
-        private void CleanupOldNonces()
-        {
-            var currentTime = DateTime.UtcNow;
-            var oldNonces = _usedNonces.Where(kvp => currentTime - kvp.Value > TimeSpan.FromMinutes(_apiKeyConfig.RequestTimeWindowMinutes))
-                                     .Select(kvp => kvp.Key)
-                                     .ToList();
-
-            foreach (var nonce in oldNonces)
-            {
-                _usedNonces.TryRemove(nonce, out _);
-            }
-        }
-
         public async Task<bool> ValidateRequestAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature)
         {
             try
             {
-                _logger.LogDebug(
+                _logger.LogInformation(
                     "Starting request validation - MerchantId: {MerchantId}, ApiKey: {ApiKey}, Timestamp: {Timestamp}, Nonce: {Nonce}",
                     merchantId, apiKey, timestamp, nonce);
 
@@ -137,11 +57,11 @@ namespace FeeNominalService.Services
                     try
                     {
                         merchant = await _merchantRepository.GetByIdAsync(merchantGuid);
-                        _logger.LogDebug("Found merchant by internal ID: {MerchantId}", merchantGuid);
+                        _logger.LogInformation("Found merchant by internal ID: {MerchantId}", merchantGuid);
                     }
                     catch (KeyNotFoundException)
                     {
-                        _logger.LogDebug("Merchant not found by internal ID, trying external ID");
+                        _logger.LogInformation("Merchant not found by internal ID, trying external ID");
                         // Ignore and try external ID
                     }
                 }
@@ -150,7 +70,7 @@ namespace FeeNominalService.Services
                 if (merchant == null)
                 {
                     merchant = await _merchantRepository.GetByExternalIdAsync(merchantId);
-                    _logger.LogDebug("Found merchant by external ID: {MerchantId}", merchantId);
+                    _logger.LogInformation("Found merchant by external ID: {MerchantId}", merchantId);
                 }
 
                 if (merchant == null)
@@ -166,18 +86,18 @@ namespace FeeNominalService.Services
                     _logger.LogWarning("Invalid or inactive API key: {ApiKey}", apiKey);
                     return false;
                 }
-                _logger.LogDebug("Found valid API key: {ApiKey}", apiKey);
+                _logger.LogInformation("Found valid API key: {ApiKey}", apiKey);
 
                 // 3. Get secret from AWS Secrets Manager
                 var secretName = $"feenominal/merchants/{merchant.MerchantId:D}/apikeys/{apiKey}";
-                _logger.LogDebug("Retrieving secret from AWS: {SecretName}", secretName);
+                _logger.LogInformation("Retrieving secret from AWS: {SecretName}", secretName);
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null || secretData.IsRevoked)
                 {
                     _logger.LogWarning("Secret not found or revoked for API key: {ApiKey}", apiKey);
                     return false;
                 }
-                _logger.LogDebug("Successfully retrieved secret from AWS");
+                _logger.LogInformation("Successfully retrieved secret from AWS");
 
                 // 4. Validate timestamp
                 if (!DateTime.TryParse(timestamp, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var requestTime))
@@ -193,7 +113,7 @@ namespace FeeNominalService.Services
                 }
 
                 var timeDiff = Math.Abs((DateTime.UtcNow - requestTime).TotalMinutes);
-                _logger.LogDebug(
+                _logger.LogInformation(
                     "Time validation - Request time: {RequestTime}, Current time: {CurrentTime}, Difference: {TimeDiff} minutes",
                     requestTime.ToString("yyyy-MM-dd HH:mm:ss"),
                     DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -206,10 +126,10 @@ namespace FeeNominalService.Services
                 }
 
                 // 5. Validate signature
-                _logger.LogDebug("Generating expected signature...");
+                _logger.LogInformation("Generating expected signature...");
                 var expectedSignature = await GenerateSignatureAsync(merchant.MerchantId.ToString("D"), apiKey, timestamp, nonce, requestBody);
                 
-                _logger.LogDebug(
+                _logger.LogInformation(
                     "Signature validation details:\n" +
                     "MerchantId: {MerchantId}\n" +
                     "ApiKey: {ApiKey}\n" +
@@ -241,42 +161,114 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogDebug(
+                _logger.LogInformation(
                     "Starting signature generation - MerchantId: {MerchantId}, ApiKey: {ApiKey}, Timestamp: {Timestamp}, Nonce: {Nonce}",
                     merchantId, apiKey, timestamp, nonce);
 
                 // 1. Get secret from AWS Secrets Manager
                 var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
-                _logger.LogDebug("Retrieving secret from AWS: {SecretName}", secretName);
+                _logger.LogInformation("Retrieving secret from AWS: {SecretName}", secretName);
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null)
                 {
                     _logger.LogError("Secret not found for API key: {ApiKey}", apiKey);
                     throw new KeyNotFoundException($"Secret not found for API key: {apiKey}");
                 }
-                _logger.LogDebug("Successfully retrieved secret from AWS");
+                _logger.LogInformation("Successfully retrieved secret from AWS");
 
-                // 2. Generate signature using only specific fields
-                var data = $"{timestamp}|{nonce}|{merchantId}|{apiKey}";
-                _logger.LogDebug("Data to sign: {Data}", data);
-                
-                // Log masked secret for debugging
-                var maskedSecret = secretData.Secret.Length > 8 
-                    ? $"{secretData.Secret.Substring(0, 4)}...{secretData.Secret.Substring(secretData.Secret.Length - 4)}"
-                    : "****";
-                _logger.LogDebug("Using secret (masked): {MaskedSecret}", maskedSecret);
+                // 2. Generate signature
+                var data = $"{timestamp}{nonce}{requestBody}";
+                _logger.LogInformation("Data to sign: {Data}", data);
                 
                 using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretData.Secret));
                 var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
                 var signature = Convert.ToBase64String(hash);
                 
-                _logger.LogDebug("Generated signature: {Signature}", signature);
+                _logger.LogInformation("Generated signature: {Signature}", signature);
                 return signature;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating signature");
                 throw;
+            }
+        }
+
+        public bool ValidateTimestampAndNonce(string timestamp, string nonce)
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "Validating timestamp and nonce - Timestamp: {Timestamp}, Nonce: {Nonce}",
+                    timestamp, nonce);
+
+                // Parse the timestamp and ensure it's in UTC
+                if (!DateTime.TryParse(timestamp, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime requestTime))
+                {
+                    _logger.LogWarning("Invalid timestamp format: {Timestamp}", timestamp);
+                    return false;
+                }
+
+                // Ensure requestTime is in UTC
+                if (requestTime.Kind != DateTimeKind.Utc)
+                {
+                    requestTime = DateTime.SpecifyKind(requestTime, DateTimeKind.Utc);
+                }
+
+                var currentTime = DateTime.UtcNow;
+                var timeDiff = Math.Abs((currentTime - requestTime).TotalMinutes);
+
+                _logger.LogInformation(
+                    "Time validation details - Request time (UTC): {RequestTime}, Current time (UTC): {CurrentTime}, Time difference (minutes): {TimeDiff}",
+                    requestTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                    currentTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                    timeDiff);
+
+                // Check if the timestamp is within the allowed window
+                if (timeDiff > _apiKeyConfig.RequestTimeWindowMinutes)
+                {
+                    _logger.LogWarning(
+                        "Request timestamp is outside the allowed window. Request time (UTC): {RequestTime}, Current time (UTC): {CurrentTime}, Time difference (minutes): {TimeDiff}",
+                        requestTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        currentTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        timeDiff);
+                    return false;
+                }
+
+                // Check if the nonce has been used recently
+                if (_recentNonces.Contains(nonce))
+                {
+                    _logger.LogWarning("Nonce has been used recently: {Nonce}", nonce);
+                    return false;
+                }
+
+                // Add the nonce to the recent nonces set
+                _recentNonces.Add(nonce);
+                _logger.LogInformation("Added nonce to recent nonces: {Nonce}", nonce);
+
+                // Clean up old nonces
+                CleanupOldNonces();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating timestamp and nonce");
+                return false;
+            }
+        }
+
+        private void CleanupOldNonces()
+        {
+            var currentTime = DateTime.UtcNow;
+            var oldNonces = _usedNonces.Where(kvp => currentTime - kvp.Value > TimeSpan.FromMinutes(_apiKeyConfig.RequestTimeWindowMinutes))
+                                     .Select(kvp => kvp.Key)
+                                     .ToList();
+
+            foreach (var nonce in oldNonces)
+            {
+                _usedNonces.TryRemove(nonce, out _);
+                _logger.LogInformation("Removed old nonce: {Nonce}", nonce);
             }
         }
     }

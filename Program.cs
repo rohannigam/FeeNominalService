@@ -25,6 +25,7 @@ using System.Reflection;
 using FeeNominalService.Repositories;
 using FeeNominalService.Middleware;
 using FeeNominalService.Services.AWS;
+using Microsoft.AspNetCore.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,6 +92,7 @@ else
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IMerchantRepository, MerchantRepository>();
 builder.Services.AddScoped<IMerchantAuditTrailRepository, MerchantAuditTrailRepository>();
+builder.Services.AddScoped<ISurchargeProviderRepository, SurchargeProviderRepository>();
 
 // Register services
 builder.Services.AddScoped<IMerchantService, MerchantService>();
@@ -99,6 +101,7 @@ builder.Services.AddScoped<IRequestSigningService, RequestSigningService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ISurchargeFeeService, SurchargeFeeService>();
+builder.Services.AddScoped<ISurchargeProviderService, SurchargeProviderService>();
 builder.Services.AddScoped<IRefundService, RefundService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 builder.Services.AddScoped<IApiKeyGenerator, ApiKeyGenerator>();
@@ -109,12 +112,25 @@ builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = "ApiKey";
     options.DefaultChallengeScheme = "ApiKey";
+    options.DefaultForbidScheme = "ApiKey";
 })
 .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>("ApiKey", null);
 
 // Add authorization
 builder.Services.AddAuthorization(options =>
 {
+    // Policy for initial API key generation - only requires timestamp and nonce
+    options.AddPolicy("InitialKeyGeneration", policy =>
+        policy.RequireAssertion(context =>
+        {
+            var user = context.User;
+            if (user == null) return false;
+
+            // For initial key generation, we only need the IsInitialKeyGeneration claim
+            return user.HasClaim(c => c.Type == "IsInitialKeyGeneration" && c.Value == "true");
+        }));
+
+    // Policy for API key access - requires MerchantId and allowed endpoints
     options.AddPolicy("ApiKeyAccess", policy =>
         policy.RequireAssertion(context =>
         {
@@ -123,6 +139,13 @@ builder.Services.AddAuthorization(options =>
             {
                 Log.Warning("Authorization failed: HttpContext is null");
                 return false;
+            }
+
+            // Skip authorization for ping endpoint
+            if (httpContext.Request.Path.StartsWithSegments("/api/v1/ping"))
+            {
+                Log.Debug("Skipping authorization for ping endpoint");
+                return true;
             }
 
             var user = context.User;
@@ -136,14 +159,6 @@ builder.Services.AddAuthorization(options =>
             if (string.IsNullOrEmpty(merchantId))
             {
                 Log.Warning("Authorization failed: No MerchantId claim found");
-                return false;
-            }
-
-            // Check if the user has the Admin role
-            var isAdmin = user.IsInRole("Admin");
-            if (!isAdmin)
-            {
-                Log.Warning("Authorization failed: User does not have Admin role");
                 return false;
             }
 
@@ -192,6 +207,39 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Add middleware to handle ping endpoint before authentication
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api/v1/ping"))
+    {
+        context.Response.StatusCode = 200;
+        await context.Response.WriteAsync("pong");
+        return;
+    }
+    await next();
+});
+
+// Add authentication middleware
+app.UseAuthentication();
+
+// Add authorization middleware
+app.UseAuthorization();
+
+// Add global exception handler
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "An unhandled exception occurred");
+        context.Response.StatusCode = 500;
+        await context.Response.WriteAsJsonAsync(new { error = "An internal server error occurred" });
+    }
+});
+
 // Seed the database in development mode
 if (app.Environment.IsDevelopment())
 {
@@ -232,11 +280,6 @@ app.UseCors("AllowAll");
 
 // Add request/response logging middleware
 app.UseMiddleware<RequestResponseLoggingMiddleware>();
-
-Log.Information("Adding authentication middleware");
-app.UseAuthentication();
-Log.Information("Adding authorization middleware");
-app.UseAuthorization();
 
 app.MapControllers();
 

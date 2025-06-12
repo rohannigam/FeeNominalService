@@ -2,10 +2,10 @@ namespace FeeNominalService.Models.ApiKey
 {
     public class ApiKeySecret
     {
-        public Guid Id { get; set; }
+        public int Id { get; set; }
         public string ApiKey { get; set; } = string.Empty;
         public string Secret { get; set; } = string.Empty;
-        public string MerchantId { get; set; } = string.Empty;
+        public Guid MerchantId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public DateTime? LastRotated { get; set; }

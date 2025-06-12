@@ -61,12 +61,12 @@ The service implements several design patterns to ensure maintainability, scalab
    - Purpose: Manages component dependencies
    - Implementation:
      ```csharp
-     public class ApiKeyService
+     public class ExampleApiKeyService
      {
          private readonly IAwsSecretsManagerService _secretsManager;
          private readonly IApiKeyRepository _apiKeyRepository;
          private readonly IMerchantRepository _merchantRepository;
-         private readonly ILogger<ApiKeyService> _logger;
+         private readonly ILogger<ExampleApiKeyService> _logger;
          private readonly ApiKeyConfiguration _settings;
      }
      ```
@@ -253,7 +253,7 @@ The service implements a sophisticated interaction between multiple design patte
    - **Repository + Unit of Work Pattern**
      ```csharp
      // ApiKeyService coordinates between patterns
-     public class ApiKeyService
+     public class ExampleApiKeyService
      {
          private readonly IApiKeyRepository _apiKeyRepository;
          private readonly ApplicationDbContext _context;
@@ -276,7 +276,7 @@ The service implements a sophisticated interaction between multiple design patte
    - **Factory + Singleton Pattern**
      ```csharp
      // Factory pattern for creating API keys
-     public class ApiKeyService
+     public class ExampleApiKeyService
      {
          private string GenerateSecureRandomString(int length)
          {
@@ -1316,7 +1316,10 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
      - X-Timestamp: Current UTC timestamp
      - X-Nonce: Unique request identifier
      - X-Signature: HMAC signature
-   - Signature validation in `RequestSigningService`
+   - Signature calculation:
+     - Data format: `timestamp|nonce|merchantId|apiKey`
+     - HMAC-SHA256 with secret key
+     - Base64 encoded result
    - Timestamp validation to prevent replay attacks
    - Nonce tracking to prevent request duplication
 
@@ -1503,3 +1506,50 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
    - Follow security guidelines
    - Implement proper error handling
    - Maintain audit logs
+
+# Request Signing
+The service implements a secure request signing mechanism for all API requests (except initial API key generation). The signature is calculated using the following components:
+
+1. **Timestamp**: Current UTC time in ISO 8601 format
+2. **Nonce**: A unique random string for each request
+3. **MerchantId**: Your merchant ID
+4. **ApiKey**: Your API key
+5. **Secret**: The API key secret (not the API key itself)
+
+## Signature Calculation
+1. Concatenate the following fields using pipe separator: `timestamp|nonce|merchantId|apiKey`
+2. Create HMAC-SHA256 hash using the secret key
+3. Base64 encode the hash
+
+## Required Headers
+- `X-Merchant-ID`: Your merchant ID
+- `X-API-Key`: Your API key
+- `X-Timestamp`: Current UTC time in ISO 8601 format
+- `X-Nonce`: Unique random string
+- `X-Signature`: The calculated signature
+
+## Example
+```javascript
+// Generate timestamp and nonce
+const timestamp = new Date().toISOString();
+const nonce = Math.random().toString(36).substring(2, 15);
+
+// Create data string to sign
+const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;
+
+// Generate HMAC-SHA256 signature
+const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);
+
+// Set headers
+headers.add('X-Merchant-ID', merchantId);
+headers.add('X-API-Key', apiKey);
+headers.add('X-Timestamp', timestamp);
+headers.add('X-Nonce', nonce);
+headers.add('X-Signature', signature);
+```
+
+## Security Features
+1. **Timestamp Validation**: Requests must be within a configurable time window
+2. **Nonce Tracking**: Prevents request replay attacks
+3. **HMAC-SHA256**: Strong cryptographic signing
+4. **Base64 Encoding**: Standard encoding for signature transmission

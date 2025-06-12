@@ -18,5 +18,6 @@ namespace FeeNominalService.Services
         Task<bool> ExistsAsync(Guid id);
         Task<bool> ExistsByCodeAsync(string code);
         Task<bool> ValidateCredentialsSchemaAsync(Guid providerId, JsonDocument credentials);
+        Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code);
     }
 } 

@@ -1,5 +1,5 @@
 /*
-Rollback: U1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql
+Rollback: U1_0_0_110__add_updated_by_to_merchant_audit_trail_rollback.sql
 Description: Removes user tracking from merchant audit logs
 Dependencies: None
 Changes:
@@ -9,7 +9,7 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting running U1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql which is a rollback of V1_0_0_11__add_updated_by_to_merchant_audit_trail...';
+    RAISE NOTICE 'Starting running U1_0_0_110__add_updated_by_to_merchant_audit_trail_rollback.sql which is a rollback of V1_0_0_10__add_updated_by_to_merchant_audit_trail...';
 END $$;
 
 -- Drop trigger first
@@ -60,5 +60,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed running U1_0_0_111__add_updated_by_to_merchant_audit_trail_rollback.sql which is a rollback of V1_0_0_11__add_updated_by_to_merchant_audit_trail successfully';
+    RAISE NOTICE 'Completed running U1_0_0_110__add_updated_by_to_merchant_audit_trail_rollback.sql which is a rollback of V1_0_0_10__add_updated_by_to_merchant_audit_trail successfully';
 END $$; 

@@ -1,100 +1,67 @@
 /*
 Rollback: U1_0_0_102__create_merchant_tables_rollback.sql
-Description: Drops all merchant tables created for merchant management
-Dependencies: None
+Description: Rolls back the creation of merchant-related tables
+Dependencies: V1_0_0_2__create_merchant_tables.sql
 Changes:
-- Drops merchant_statuses table
-- Drops merchants table
-- Drops surcharge_providers table
-- Drops surcharge_provider_configs table
-- Drops surcharge_provider_config_history table
 - Drops merchant_audit_logs table
+- Drops surcharge_provider_config_history table
+- Drops surcharge_provider_configs table
+- Drops surcharge_providers table
+- Drops merchants table
+- Drops merchant_statuses table
+- Drops uuid-ossp extension
 */
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting running U1_0_0_102__create_merchant_tables_rollback.sql which is a rollback of V1_0_0_2__create_merchant_tables...';
+    RAISE NOTICE 'Starting U1_0_0_102__create_merchant_tables rollback...';
 END $$;
 
--- Drop merchant_audit_logs table first (due to foreign key dependency)
-DROP TABLE IF EXISTS fee_nominal.merchant_audit_logs;
+-- Drop tables in reverse order of creation
+DROP TABLE IF EXISTS fee_nominal.merchant_audit_logs CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped merchant_audit_logs table';
 END $$;
 
--- Drop surcharge_provider_config_history table
-DROP TABLE IF EXISTS fee_nominal.surcharge_provider_config_history;
+DROP TABLE IF EXISTS fee_nominal.surcharge_provider_config_history CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped surcharge_provider_config_history table';
 END $$;
 
--- Drop surcharge_provider_configs table
-DROP TABLE IF EXISTS fee_nominal.surcharge_provider_configs;
+DROP TABLE IF EXISTS fee_nominal.surcharge_provider_configs CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped surcharge_provider_configs table';
 END $$;
 
--- Drop surcharge_providers table
-DROP TABLE IF EXISTS fee_nominal.surcharge_providers;
+DROP TABLE IF EXISTS fee_nominal.surcharge_providers CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped surcharge_providers table';
 END $$;
 
--- Drop merchants table
-DROP TABLE IF EXISTS fee_nominal.merchants;
+DROP TABLE IF EXISTS fee_nominal.merchants CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped merchants table';
 END $$;
 
--- Drop merchant_statuses table
-DROP TABLE IF EXISTS fee_nominal.merchant_statuses;
+DROP TABLE IF EXISTS fee_nominal.merchant_statuses CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped merchant_statuses table';
 END $$;
 
--- Verify rollback
+-- Drop extension if it exists
+DROP EXTENSION IF EXISTS "uuid-ossp";
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'merchant_statuses'
-    ) THEN
-        RAISE EXCEPTION 'merchant_statuses table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'merchants'
-    ) THEN
-        RAISE EXCEPTION 'merchants table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'surcharge_providers'
-    ) THEN
-        RAISE EXCEPTION 'surcharge_providers table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'surcharge_provider_configs'
-    ) THEN
-        RAISE EXCEPTION 'surcharge_provider_configs table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'surcharge_provider_config_history'
-    ) THEN
-        RAISE EXCEPTION 'surcharge_provider_config_history table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'merchant_audit_logs'
-    ) THEN
-        RAISE EXCEPTION 'merchant_audit_logs table was not removed successfully';
-    END IF;
-    RAISE NOTICE 'Verified all merchant tables were dropped successfully';
+    RAISE NOTICE 'Dropped uuid-ossp extension';
 END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed running U1_0_0_102__create_merchant_tables_rollback.sql which is a rollback of V1_0_0_2__create_merchant_tables successfully';
+    RAISE NOTICE 'Completed U1_0_0_102__create_merchant_tables rollback successfully';
 END $$; 

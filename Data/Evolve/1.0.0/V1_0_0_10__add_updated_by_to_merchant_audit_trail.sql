@@ -1,5 +1,5 @@
 /*
-Migration: V1_0_0_11__add_updated_by_to_merchant_audit_trail.sql
+Migration: V1_0_0_10__add_updated_by_to_merchant_audit_trail.sql
 Description: Adds user tracking to merchant audit trail
 Dependencies: 
 - V1_0_0_1__create_schema.sql (requires fee_nominal schema)
@@ -12,7 +12,7 @@ Changes:
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting V1_0_0_11__add_updated_by_to_merchant_audit_trail migration...';
+    RAISE NOTICE 'Starting V1_0_0_10__add_updated_by_to_merchant_audit_trail migration...';
 END $$;
 
 -- Add updated_by column if it doesn't exist
@@ -89,5 +89,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed V1_0_0_11__add_updated_by_to_merchant_audit_trail migration successfully';
+    RAISE NOTICE 'Completed V1_0_0_10__add_updated_by_to_merchant_audit_trail migration successfully';
 END $$;

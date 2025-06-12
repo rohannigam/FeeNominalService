@@ -30,9 +30,9 @@ BEGIN
 END $$;
 
 -- Drop functions
-DROP FUNCTION IF EXISTS fee_nominal.log_audit_event(VARCHAR(50), INTEGER, VARCHAR(50), VARCHAR(100));
-DROP FUNCTION IF EXISTS fee_nominal.log_audit_detail(INTEGER, VARCHAR(100), TEXT, TEXT);
-DROP FUNCTION IF EXISTS fee_nominal.get_audit_logs(VARCHAR(50), INTEGER, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE);
+DROP FUNCTION IF EXISTS fee_nominal.log_audit_event(VARCHAR(50), UUID, VARCHAR(50), VARCHAR(100));
+DROP FUNCTION IF EXISTS fee_nominal.log_audit_detail(UUID, VARCHAR(100), TEXT, TEXT);
+DROP FUNCTION IF EXISTS fee_nominal.get_audit_logs(VARCHAR(50), UUID, TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE);
 DROP FUNCTION IF EXISTS fee_nominal.update_updated_at_column();
 DROP FUNCTION IF EXISTS fee_nominal.log_transaction_history();
 DROP FUNCTION IF EXISTS fee_nominal.log_audit_details();

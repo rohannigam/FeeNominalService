@@ -19,7 +19,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS fee_nominal.transaction_statuses (
     transaction_status_id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -41,11 +41,11 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS fee_nominal.transactions (
     transaction_id SERIAL PRIMARY KEY,
-    merchant_id INTEGER NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
+    merchant_id UUID NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
     transaction_status_id INTEGER NOT NULL REFERENCES fee_nominal.transaction_statuses(transaction_status_id),
     amount DECIMAL(19,4) NOT NULL,
     currency VARCHAR(3) NOT NULL,
-    reference_id VARCHAR(100) NOT NULL,
+    reference_id VARCHAR(255) NOT NULL,
     description TEXT,
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS fee_nominal.transaction_audit_logs (
     action VARCHAR(50) NOT NULL,
     details JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(100)
+    created_by VARCHAR(255)
 );
 DO $$
 BEGIN
@@ -93,7 +93,8 @@ INSERT INTO fee_nominal.transaction_statuses (code, name, description) VALUES
     ('PROCESSING', 'Processing', 'Transaction is being processed'),
     ('COMPLETED', 'Completed', 'Transaction has been completed successfully'),
     ('FAILED', 'Failed', 'Transaction has failed'),
-    ('CANCELLED', 'Cancelled', 'Transaction has been cancelled')
+    ('CANCELLED', 'Cancelled', 'Transaction has been cancelled'),
+    ('REFUNDED', 'Refunded', 'Transaction has been refunded')
 ON CONFLICT (code) DO NOTHING;
 DO $$
 BEGIN

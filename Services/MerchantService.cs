@@ -238,11 +238,19 @@ namespace FeeNominalService.Services
 
         public async Task<bool> IsMerchantActiveAsync(Guid merchantId)
         {
-            var merchant = await _context.Merchants
-                .Include(m => m.Status)
-                .FirstOrDefaultAsync(m => m.MerchantId == merchantId);
+            try
+            {
+                var merchant = await _context.Merchants
+                    .Include(m => m.Status)
+                    .FirstOrDefaultAsync(m => m.MerchantId == merchantId);
 
-            return merchant?.Status?.IsActive ?? false;
+                return merchant?.StatusId == MerchantStatusIds.Active;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking if merchant {MerchantId} is active", merchantId);
+                throw;
+            }
         }
 
         public async Task<ApiKeyInfo> GenerateApiKeyAsync(Guid merchantId, GenerateApiKeyRequest request, OnboardingMetadata? onboardingMetadata)

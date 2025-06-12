@@ -174,7 +174,7 @@ namespace FeeNominalService.Repositories
         {
             try
             {
-                return await _context.MerchantStatuses.AnyAsync(s => s.Id == statusId);
+                return await _context.MerchantStatuses.AnyAsync(s => s. MerchantStatusId == statusId);
             }
             catch (Exception ex)
             {

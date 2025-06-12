@@ -12,6 +12,7 @@ using FeeNominalService.Services.AWS;
 using FeeNominalService.Models.Merchant.Responses;
 using FeeNominalService.Models.Merchant.Requests;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FeeNominalService.Controllers.V1
 {
@@ -43,6 +44,7 @@ namespace FeeNominalService.Controllers.V1
         /// Generates an initial API key for a new merchant
         /// </summary>
         [HttpPost("apikey/initial-generate")]
+        [Authorize(Policy = "InitialKeyGeneration")]
         [ProducesResponseType(typeof(GenerateInitialApiKeyResponse), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(409)]
@@ -111,6 +113,7 @@ namespace FeeNominalService.Controllers.V1
         /// Gets merchant audit trail
         /// </summary>
         [HttpGet("merchants/{merchantId}/audit-trail")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiResponse<IEnumerable<MerchantAuditTrail>>), 200)]
         [ProducesResponseType(typeof(ApiResponse), 404)]
         [ProducesResponseType(typeof(ApiResponse), 500)]
@@ -152,6 +155,7 @@ namespace FeeNominalService.Controllers.V1
         /// Gets merchant by external ID
         /// </summary>
         [HttpGet("merchants/external/{externalMerchantId}")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiResponse<Merchant>), 200)]
         [ProducesResponseType(typeof(ApiResponse), 404)]
         [ProducesResponseType(typeof(ApiResponse), 500)]
@@ -193,6 +197,7 @@ namespace FeeNominalService.Controllers.V1
         /// Gets merchant by external GUID
         /// </summary>
         [HttpGet("merchants/external-guid/{externalMerchantGuid}")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiResponse<Merchant>), 200)]
         [ProducesResponseType(typeof(ApiResponse), 404)]
         [ProducesResponseType(typeof(ApiResponse), 500)]
@@ -231,33 +236,18 @@ namespace FeeNominalService.Controllers.V1
         }
 
         [HttpPost("apikey/generate")]
-        [ProducesResponseType(typeof(ApiResponse<GenerateApiKeyResponse>), 200)]
-        [ProducesResponseType(typeof(ApiResponse), 400)]
-        [ProducesResponseType(typeof(ApiResponse), 404)]
-        [ProducesResponseType(typeof(ApiResponse), 500)]
-        public async Task<ActionResult<ApiResponse<GenerateApiKeyResponse>>> GenerateApiKey([FromBody] GenerateApiKeyRequest request)
+        [Authorize(Policy = "ApiKeyAccess")]
+        [ProducesResponseType(typeof(ApiResponse<GenerateApiKeyResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GenerateApiKey([FromBody] GenerateApiKeyRequest request)
         {
             try
             {
                 _logger.LogInformation("Generating API key for merchant {MerchantId}", request.MerchantId);
-
-                // Check if merchant exists
-                var merchant = await _merchantService.GetMerchantAsync(request.MerchantId);
-                if (merchant == null)
-                {
-                    _logger.LogWarning("Attempt to generate API key for non-existent merchant {MerchantId}", request.MerchantId);
-                    return NotFound(new ApiResponse
-                    {
-                        Message = $"Merchant not found: {request.MerchantId}",
-                        Success = false
-                    });
-                }
-
-                // Generate API key
                 var response = await _apiKeyService.GenerateApiKeyAsync(request);
-
-                var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
-                var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
+                var performedBy = request.OnboardingMetadata.AdminUserId;
 
                 // Create audit trail entry for API key generation
                 await _merchantService.CreateAuditTrailAsync(
@@ -301,6 +291,7 @@ namespace FeeNominalService.Controllers.V1
         /// Updates an existing API key
         /// </summary>
         [HttpPost("apikey/update")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiKeyInfo), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -348,33 +339,30 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
-        /// <summary>
-        /// Revokes an API key
-        /// </summary>
         [HttpPost("apikey/revoke")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> RevokeApiKey([FromBody] RevokeApiKeyRequest request, [FromHeader(Name = "X-API-Key")] string apiKey)
+        public async Task<IActionResult> RevokeApiKey([FromBody] RevokeApiKeyRequest request)
         {
             try
             {
                 _logger.LogInformation("Revoking API key for merchant {MerchantId}", request.MerchantId);
-
-                if (string.IsNullOrEmpty(apiKey))
+                if (!Guid.TryParse(request.MerchantId, out Guid merchantGuid))
                 {
-                    return BadRequest("X-API-Key header is required");
+                    return BadRequest("Invalid merchant ID format");
                 }
 
-                request.ApiKey = apiKey;
+                var apiKey = request.ApiKey;
+                var performedBy = "SYSTEM"; // TODO: Get from authenticated user
+
                 await _apiKeyService.RevokeApiKeyAsync(request);
-                var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
-                var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
 
                 // Create audit trail entry for API key revocation
                 await _merchantService.CreateAuditTrailAsync(
-                    Guid.Parse(request.MerchantId),
+                    merchantGuid,
                     "API_KEY_REVOKED",
                     "api_key",
                     null,
@@ -397,10 +385,8 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
-        /// <summary>
-        /// Gets API key information
-        /// </summary>
         [HttpGet("apikey/list")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiKeyInfo), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -410,6 +396,10 @@ namespace FeeNominalService.Controllers.V1
             try
             {
                 _logger.LogInformation("Retrieving API keys for merchant {MerchantId}", merchantId);
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    return BadRequest("Invalid merchant ID format");
+                }
 
                 var apiKeys = await _apiKeyService.GetMerchantApiKeysAsync(merchantId);
                 return Ok(apiKeys);
@@ -422,11 +412,12 @@ namespace FeeNominalService.Controllers.V1
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", merchantId);
-                return StatusCode(500, "An error occurred while retrieving the API keys");
+                return StatusCode(500, "An error occurred while retrieving API keys");
             }
         }
 
         [HttpPost("merchants")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiResponse<MerchantResponse>), 201)]
         [ProducesResponseType(typeof(ApiResponse), 400)]
         [ProducesResponseType(typeof(ApiResponse), 500)]
@@ -468,6 +459,7 @@ namespace FeeNominalService.Controllers.V1
         }
 
         [HttpGet("merchants/{id}")]
+        [Authorize(Policy = "ApiKeyAccess")]
         public async Task<IActionResult> GetMerchant(Guid id)
         {
             try
@@ -488,6 +480,7 @@ namespace FeeNominalService.Controllers.V1
         }
 
         [HttpPost("merchants/{id}/status")]
+        [Authorize(Policy = "ApiKeyAccess")]
         public async Task<IActionResult> UpdateMerchantStatus(Guid id, [FromBody] UpdateMerchantStatusRequest request)
         {
             try
@@ -508,6 +501,7 @@ namespace FeeNominalService.Controllers.V1
         }
 
         [HttpPost("merchants/{merchantId}/api-keys")]
+        [Authorize(Policy = "ApiKeyAccess")]
         public async Task<ActionResult<ApiKeyInfo>> GenerateApiKey(
             Guid merchantId,
             [FromBody] GenerateApiKeyRequest request,
@@ -540,6 +534,7 @@ namespace FeeNominalService.Controllers.V1
         }
 
         [HttpPut("{merchantId}")]
+        [Authorize(Policy = "ApiKeyAccess")]
         public async Task<ActionResult<MerchantResponse>> UpdateMerchant(
             Guid merchantId,
             [FromBody] UpdateMerchantRequest request)
@@ -598,6 +593,7 @@ namespace FeeNominalService.Controllers.V1
         /// Rotates an API key
         /// </summary>
         [HttpPost("apikey/rotate")]
+        [Authorize(Policy = "ApiKeyAccess")]
         [ProducesResponseType(typeof(ApiResponse<ApiKeyInfo>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

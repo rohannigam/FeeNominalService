@@ -69,8 +69,17 @@ namespace FeeNominalService.Repositories
         {
             try
             {
+                // Get the ACTIVE status ID
+                var activeStatus = await _context.SurchargeProviderStatuses
+                    .FirstOrDefaultAsync(s => s.Code == "ACTIVE");
+                
+                if (activeStatus == null)
+                {
+                    throw new InvalidOperationException("ACTIVE status not found in the database");
+                }
+
                 return await _context.SurchargeProviders
-                    .Where(p => p.Status == "active")
+                    .Where(p => p.StatusId == activeStatus.StatusId)
                     .OrderBy(p => p.Name)
                     .ToListAsync();
             }
@@ -164,6 +173,11 @@ namespace FeeNominalService.Repositories
                 _logger.LogError(ex, "Error checking provider existence by code {ProviderCode}", code);
                 throw;
             }
+        }
+
+        public async Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code)
+        {
+            return await _context.SurchargeProviderStatuses.FirstOrDefaultAsync(s => s.Code == code);
         }
     }
 } 

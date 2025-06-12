@@ -12,7 +12,7 @@ namespace FeeNominalService.Models
 
         [Required]
         [Column("external_transaction_id")]
-        [StringLength(100)]
+        [StringLength(255)]
         public string TransactionId { get; set; } = null!;
 
         [Required]
@@ -66,7 +66,7 @@ namespace FeeNominalService.Models
         public string? ErrorMessage { get; set; }
 
         [Column("reference_id")]
-        [StringLength(100)]
+        [StringLength(255)]
         public string? ReferenceId { get; set; }
 
         [Column("description")]

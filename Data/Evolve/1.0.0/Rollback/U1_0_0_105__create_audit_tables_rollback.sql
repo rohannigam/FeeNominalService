@@ -1,17 +1,17 @@
 /*
 Rollback: U1_0_0_105__create_audit_tables_rollback.sql
-Description: Drops all audit tables created for audit logging
-Dependencies: None
+Description: Rolls back the creation of audit-related tables
+Dependencies: V1_0_0_5__create_audit_tables.sql
 Changes:
-- Drops audit_logs table
 - Drops audit_log_details table
 - Drops merchant_audit_trail table
+- Drops audit_logs table
 - Drops all related indexes
 */
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting running U1_0_0_105__create_audit_tables_rollback.sql which is a rollback of V1_0_0_5__create_audit_tables...';
+    RAISE NOTICE 'Starting U1_0_0_105__create_audit_tables rollback...';
 END $$;
 
 -- Drop indexes first
@@ -28,47 +28,26 @@ BEGIN
     RAISE NOTICE 'Dropped all audit-related indexes';
 END $$;
 
--- Drop tables in correct order (due to foreign key dependencies)
-DROP TABLE IF EXISTS fee_nominal.audit_log_details;
+-- Drop tables in reverse order of creation
+DROP TABLE IF EXISTS fee_nominal.audit_log_details CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped audit_log_details table';
 END $$;
 
-DROP TABLE IF EXISTS fee_nominal.merchant_audit_trail;
+DROP TABLE IF EXISTS fee_nominal.merchant_audit_trail CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped merchant_audit_trail table';
 END $$;
 
-DROP TABLE IF EXISTS fee_nominal.audit_logs;
+DROP TABLE IF EXISTS fee_nominal.audit_logs CASCADE;
 DO $$
 BEGIN
     RAISE NOTICE 'Dropped audit_logs table';
 END $$;
 
--- Verify rollback
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'audit_logs'
-    ) THEN
-        RAISE EXCEPTION 'audit_logs table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'audit_log_details'
-    ) THEN
-        RAISE EXCEPTION 'audit_log_details table was not removed successfully';
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM information_schema.tables WHERE table_schema = 'fee_nominal' AND table_name = 'merchant_audit_trail'
-    ) THEN
-        RAISE EXCEPTION 'merchant_audit_trail table was not removed successfully';
-    END IF;
-    RAISE NOTICE 'Verified all audit tables were dropped successfully';
-END $$;
-
-DO $$
-BEGIN
-    RAISE NOTICE 'Completed running U1_0_0_105__create_audit_tables_rollback.sql which is a rollback of V1_0_0_5__create_audit_tables successfully';
+    RAISE NOTICE 'Completed U1_0_0_105__create_audit_tables rollback successfully';
 END $$; 

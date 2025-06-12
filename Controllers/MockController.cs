@@ -47,11 +47,12 @@ namespace FeeNominalService.Controllers
 
                 // Store in the mock secrets manager
                 var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
+                var merchantIdGuid = Guid.Parse(merchantId);
                 var secretValue = new ApiKeySecret
                 {
                     ApiKey = apiKey,
                     Secret = secret,
-                    MerchantId = merchantId,
+                    MerchantId = merchantIdGuid,
                     CreatedAt = DateTime.UtcNow,
                     LastRotated = null,
                     IsRevoked = false,

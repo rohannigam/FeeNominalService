@@ -142,7 +142,7 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
             {
                 ApiKey = apiKey,
                 Secret = secretValue["Secret"],
-                MerchantId = secretValue["MerchantId"],
+                MerchantId = Guid.Parse(secretValue["MerchantId"]),
                 CreatedAt = DateTime.UtcNow,
                 LastRotated = null,
                 IsRevoked = false,
@@ -223,8 +223,13 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Getting API key for merchant {MerchantId} from database", merchantId);
+            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+            {
+                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
+                return null;
+            }
             var secret = await _context.ApiKeySecrets
-                .FirstOrDefaultAsync(s => s.MerchantId == merchantId && s.Status == "ACTIVE");
+                .FirstOrDefaultAsync(s => s.MerchantId == merchantGuid && s.Status == "ACTIVE");
             return secret?.ApiKey;
         }
         catch (Exception ex)
@@ -239,8 +244,13 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Getting all API keys for merchant {MerchantId} from database", merchantId);
+            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+            {
+                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
+                return Enumerable.Empty<ApiKeyInfo>();
+            }
             var secrets = await _context.ApiKeySecrets
-                .Where(s => s.MerchantId == merchantId)
+                .Where(s => s.MerchantId == merchantGuid)
                 .ToListAsync();
 
             return secrets.Select(s => new ApiKeyInfo
@@ -266,8 +276,13 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Getting API key {ApiKeyId} for merchant {MerchantId} from database", apiKeyId, merchantId);
+            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+            {
+                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
+                return null;
+            }
             var secret = await _context.ApiKeySecrets
-                .FirstOrDefaultAsync(s => s.MerchantId == merchantId && s.ApiKey == apiKeyId);
+                .FirstOrDefaultAsync(s => s.MerchantId == merchantGuid && s.ApiKey == apiKeyId);
             return secret?.ApiKey;
         }
         catch (Exception ex)
@@ -282,8 +297,13 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Validating API key {ApiKey} for merchant {MerchantId} in database", apiKey, merchantId);
+            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+            {
+                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
+                return false;
+            }
             var secret = await _context.ApiKeySecrets
-                .FirstOrDefaultAsync(s => s.MerchantId == merchantId && s.ApiKey == apiKey && s.Status == "ACTIVE");
+                .FirstOrDefaultAsync(s => s.MerchantId == merchantGuid && s.ApiKey == apiKey && s.Status == "ACTIVE");
             return secret != null && !secret.IsRevoked;
         }
         catch (Exception ex)
@@ -298,15 +318,18 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Revoking API key {ApiKey} for merchant {MerchantId} in database", apiKey, merchantId);
+            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+            {
+                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
+                throw new ArgumentException("Invalid merchant ID format", nameof(merchantId));
+            }
             var secret = await _context.ApiKeySecrets
-                .FirstOrDefaultAsync(s => s.MerchantId == merchantId && s.ApiKey == apiKey);
-
+                .FirstOrDefaultAsync(s => s.MerchantId == merchantGuid && s.ApiKey == apiKey);
             if (secret != null)
             {
+                secret.Status = "REVOKED";
                 secret.IsRevoked = true;
                 secret.RevokedAt = DateTime.UtcNow;
-                secret.Status = "REVOKED";
-                _context.ApiKeySecrets.Update(secret);
                 await _context.SaveChangesAsync();
             }
         }

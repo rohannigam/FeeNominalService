@@ -70,17 +70,17 @@ curl -X POST "https://api.feenominal.com/api/v1/surcharge-providers" \
             {
                 "name": "client_secret",
                 "type": "string",
-                "description": "Interpayments Client Secret"
+                "description": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJwYXltZXRyaWMtdGVzdCIsImlkIjoiNmoyY3hjZ21qNGd5NnQyMWo2bnRobmw2byIsImRhdGEiOlsicGF5bWV0cmljLXRlc3QiXSwiZSI6InRlc3QifQ.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs"
             },
             {
                 "name": "audience",
                 "type": "string",
-                "description": "JWT Audience"
+                "description": "Worldpay Merchant"
             },
             {
                 "name": "issuer",
                 "type": "string",
-                "description": "JWT Issuer"
+                "description": "Interpayments"
             }
         ]
     },

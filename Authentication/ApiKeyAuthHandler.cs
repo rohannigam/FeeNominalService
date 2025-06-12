@@ -36,15 +36,21 @@ namespace FeeNominalService.Authentication
         {
             try
             {
+                _logger.LogDebug("Starting API key authentication for path: {Path}", Request.Path);
+
                 // For initial API key generation, only validate timestamp and nonce
                 if (Request.Path.StartsWithSegments("/api/v1/onboarding/apikey/initial-generate"))
                 {
+                    _logger.LogDebug("Processing initial API key generation request");
                     if (!Request.Headers.TryGetValue("X-Timestamp", out var initTimestamp) ||
                         !Request.Headers.TryGetValue("X-Nonce", out var initNonce))
                     {
                         _logger.LogWarning("Missing required headers for initial API key generation");
                         return AuthenticateResult.Fail("Missing required headers: X-Timestamp and X-Nonce");
                     }
+
+                    _logger.LogDebug("Initial generation headers - Timestamp: {Timestamp}, Nonce: {Nonce}", 
+                        initTimestamp, initNonce);
 
                     // Read request body
                     string initRequestBody;
@@ -55,6 +61,8 @@ namespace FeeNominalService.Authentication
                         Request.Body.Position = 0;
                     }
 
+                    _logger.LogDebug("Initial generation request body: {RequestBody}", initRequestBody);
+
                     // Validate timestamp and nonce only
                     var isValidInitTimestampAndNonce = _requestSigningService.ValidateTimestampAndNonce(
                         initTimestamp.ToString(),
@@ -63,8 +71,10 @@ namespace FeeNominalService.Authentication
                     if (!isValidInitTimestampAndNonce)
                     {
                         _logger.LogWarning("Invalid timestamp or nonce for initial API key generation");
-                        return AuthenticateResult.Fail("Invalid timestamp or nonce");
+                        throw new UnauthorizedAccessException("Invalid timestamp or nonce");
                     }
+
+                    _logger.LogDebug("Initial generation timestamp and nonce validation successful");
 
                     // Create claims identity for initial API key generation
                     var initClaims = new[]
@@ -81,39 +91,42 @@ namespace FeeNominalService.Authentication
                 // Skip authentication for ping endpoint
                 if (Request.Path.StartsWithSegments("/api/v1/ping"))
                 {
+                    _logger.LogDebug("Skipping authentication for ping endpoint");
                     return AuthenticateResult.NoResult();
                 }
 
-                // For all other endpoints, require full authentication
-                if (!Request.Headers.TryGetValue("X-Merchant-ID", out var merchantId) ||
-                    !Request.Headers.TryGetValue("X-API-Key", out var apiKey) ||
-                    !Request.Headers.TryGetValue("X-Timestamp", out var timestamp) ||
-                    !Request.Headers.TryGetValue("X-Nonce", out var nonce) ||
-                    !Request.Headers.TryGetValue("X-Signature", out var signature))
+                // Get required headers
+                if (!Request.Headers.TryGetValue("X-Merchant-ID", out var merchantIdValues) ||
+                    !Request.Headers.TryGetValue("X-API-Key", out var apiKeyValues) ||
+                    !Request.Headers.TryGetValue("X-Timestamp", out var timestampValues) ||
+                    !Request.Headers.TryGetValue("X-Nonce", out var nonceValues) ||
+                    !Request.Headers.TryGetValue("X-Signature", out var signatureValues))
                 {
-                    _logger.LogWarning("Missing required headers for API key authentication");
+                    _logger.LogWarning("Missing required headers");
                     return AuthenticateResult.Fail("Missing required headers");
                 }
 
-                // Read request body
-                string requestBody;
-                Request.EnableBuffering();
-                using (var reader = new StreamReader(Request.Body, leaveOpen: true))
-                {
-                    requestBody = await reader.ReadToEndAsync();
-                    Request.Body.Position = 0;
-                }
+                var merchantId = merchantIdValues.ToString();
+                var apiKey = apiKeyValues.ToString();
+                var timestamp = timestampValues.ToString();
+                var nonce = nonceValues.ToString();
+                var receivedSignature = signatureValues.ToString();
 
-                // Validate signature
-                var isValid = await _requestSigningService.ValidateRequestAsync(
-                    merchantId.ToString(),
-                    apiKey.ToString(),
-                    timestamp.ToString(),
-                    nonce.ToString(),
-                    requestBody,
-                    signature.ToString());
+                _logger.LogDebug("Authentication headers - MerchantId: {MerchantId}, ApiKey: {ApiKey}, Timestamp: {Timestamp}, Nonce: {Nonce}, Signature: {Signature}",
+                    merchantId, apiKey, timestamp, nonce, receivedSignature);
 
-                if (!isValid)
+                // Generate expected signature using only specific fields
+                var expectedSignature = await _requestSigningService.GenerateSignatureAsync(
+                    merchantId,
+                    apiKey,
+                    timestamp,
+                    nonce,
+                    string.Empty); // No longer using request body
+
+                _logger.LogDebug("Signature validation details:\nMerchantId: {MerchantId}\nApiKey: {ApiKey}\nTimestamp: {Timestamp}\nNonce: {Nonce}\nReceived signature: {ReceivedSignature}\nExpected signature: {ExpectedSignature}\nMatch: {Match}",
+                    merchantId, apiKey, timestamp, nonce, receivedSignature, expectedSignature, receivedSignature == expectedSignature);
+
+                if (receivedSignature != expectedSignature)
                 {
                     _logger.LogWarning("Invalid request signature");
                     return AuthenticateResult.Fail("Invalid request signature");
@@ -122,8 +135,8 @@ namespace FeeNominalService.Authentication
                 // Create claims identity
                 var claims = new[]
                 {
-                    new Claim("MerchantId", merchantId.ToString()),
-                    new Claim("ApiKey", apiKey.ToString())
+                    new Claim("MerchantId", merchantId),
+                    new Claim("ApiKey", apiKey)
                 };
 
                 var identity = new ClaimsIdentity(claims, Scheme.Name);

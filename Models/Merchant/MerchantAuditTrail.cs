@@ -42,7 +42,7 @@ public class MerchantAuditTrail
     /// <summary>
     /// Name of the property that was changed
     /// </summary>
-    [StringLength(100)]
+    [StringLength(255)]
     [Column("property_name")]
     public string? PropertyName { get; set; }
 
