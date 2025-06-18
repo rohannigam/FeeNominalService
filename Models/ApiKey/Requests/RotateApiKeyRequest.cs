@@ -18,4 +18,10 @@ public class RotateApiKeyRequest
     /// </summary>
     [Required]
     public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Onboarding metadata for the API key
+    /// </summary>
+    [Required]
+    public OnboardingMetadata OnboardingMetadata { get; set; } = new();
 } 

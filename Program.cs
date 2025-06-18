@@ -93,6 +93,7 @@ builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IMerchantRepository, MerchantRepository>();
 builder.Services.AddScoped<IMerchantAuditTrailRepository, MerchantAuditTrailRepository>();
 builder.Services.AddScoped<ISurchargeProviderRepository, SurchargeProviderRepository>();
+builder.Services.AddScoped<IApiKeyUsageRepository, ApiKeyUsageRepository>();
 
 // Register services
 builder.Services.AddScoped<IMerchantService, MerchantService>();
@@ -155,6 +156,9 @@ builder.Services.AddAuthorization(options =>
                 return false;
             }
 
+            Log.Debug("Authorization check for path: {Path}", httpContext.Request.Path);
+            Log.Debug("User claims: {Claims}", string.Join(", ", user.Claims.Select(c => $"{c.Type}: {c.Value}")));
+
             var merchantId = user.FindFirst("MerchantId")?.Value;
             if (string.IsNullOrEmpty(merchantId))
             {
@@ -167,9 +171,18 @@ builder.Services.AddAuthorization(options =>
             if (!string.IsNullOrEmpty(allowedEndpoints))
             {
                 var requestPath = httpContext.Request.Path.Value?.ToLower();
+                if (string.IsNullOrEmpty(requestPath))
+                {
+                    Log.Warning("Authorization failed: Request path is null or empty");
+                    return false;
+                }
+
                 var allowedPaths = allowedEndpoints.Split(',').Select(p => p.Trim().ToLower());
                 
-                if (!allowedPaths.Any(p => requestPath?.StartsWith(p) == true))
+                Log.Debug("Checking endpoint access - Request path: {Path}, Allowed paths: {AllowedPaths}", 
+                    requestPath, string.Join(", ", allowedPaths));
+
+                if (!EndpointMatcher.IsEndpointAllowed(requestPath, allowedPaths))
                 {
                     Log.Warning("Authorization failed: Endpoint {Path} not in allowed endpoints: {AllowedEndpoints}", 
                         requestPath, allowedEndpoints);
@@ -177,11 +190,9 @@ builder.Services.AddAuthorization(options =>
                 }
             }
 
-            // Log the request path and claims for debugging
-            Log.Information("Request path: {Path}", httpContext.Request.Path);
-            Log.Information("Authorization successful for merchant {MerchantId}", merchantId);
-            Log.Information("User claims: {Claims}", string.Join(", ", user.Claims.Select(c => $"{c.Type}: {c.Value}")));
-            
+            Log.Debug("Authorization successful for merchant {MerchantId} and path {Path}", 
+                merchantId, httpContext.Request.Path);
+            Log.Debug("User claims: {Claims}", string.Join(", ", user.Claims.Select(c => $"{c.Type}: {c.Value}")));
             return true;
         }));
 });

@@ -151,6 +151,7 @@ namespace FeeNominalService.Services
                             apiKeys.Add(new ApiKeyInfo
                             {
                                 ApiKey = apiKeySecret.ApiKey,
+                                MerchantId = Guid.Parse(merchantId),
                                 Status = apiKeySecret.Status,
                                 CreatedAt = apiKeySecret.CreatedAt,
                                 LastRotatedAt = apiKeySecret.LastRotated,

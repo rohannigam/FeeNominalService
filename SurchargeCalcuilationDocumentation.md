@@ -3,6 +3,58 @@
 ## Overview
 FeeNominalService is a microservice designed to handle surcharge calculations, merchant onboarding, and transaction processing for payment systems. The service provides a secure API for managing merchant accounts, API keys, calculating surcharges, and processing various types of transactions.
 
+## Supported Endpoints
+
+### Transaction Endpoints
+```
+/api/v1/sales/process
+/api/v1/sales/process-batch
+/api/v1/refunds/process
+/api/v1/refunds/process-batch
+/api/v1/cancel
+/api/v1/cancel/batch
+```
+
+### Surcharge Fee Endpoints
+```
+/api/v1/surchargefee/calculate
+/api/v1/surchargefee/calculate-batch
+```
+
+### Surcharge Provider Endpoints
+```
+/api/v1/surcharge/providers
+/api/v1/surcharge/providers/{id}
+```
+
+### Onboarding Endpoints
+```
+/api/v1/onboarding/merchants
+/api/v1/onboarding/merchants/{id}
+/api/v1/onboarding/merchants/{id}/status
+/api/v1/onboarding/merchants/{merchantId}/api-keys
+/api/v1/onboarding/merchants/{merchantId}/audit-trail
+/api/v1/onboarding/merchants/external/{externalMerchantId}
+/api/v1/onboarding/merchants/external-guid/{externalMerchantGuid}
+```
+
+### API Key Management Endpoints (v1)
+```
+/api/v1/onboarding/apikey/initial-generate
+/api/v1/onboarding/apikey/generate
+/api/v1/onboarding/apikey/list
+/api/v1/onboarding/apikey/update
+/api/v1/onboarding/apikey/revoke
+/api/v1/onboarding/apikey/rotate
+```
+
+### Health Check Endpoint
+```
+/api/v1/ping
+```
+
+Note: When creating an API key, you can use wildcards in the paths (e.g., `/api/v1/sales/*`) to allow all endpoints under a specific path.
+
 ## Architecture
 
 ### Core Components
@@ -128,7 +180,7 @@ The service implements several design patterns to ensure maintainability, scalab
      public interface IRequestSigningService
      {
          Task<bool> ValidateRequestAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature);
-         Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody);
+         Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce);
      }
      ```
    - Benefits:
@@ -362,7 +414,7 @@ The service implements a sophisticated interaction between multiple design patte
      public interface IRequestSigningService
      {
          Task<bool> ValidateRequestAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature);
-         Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody);
+         Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce);
      }
      
      // Chain of Responsibility for validation
@@ -512,25 +564,40 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
 3. **api_keys**
    - Purpose: Manages API keys for merchant authentication
    - Key Fields:
+     - `id`: Unique identifier (GUID)
      - `key`: Unique API key value
      - `merchant_id`: Reference to merchants
+     - `name`: Name of the API key
+     - `description`: Optional description of the API key
      - `rate_limit`: Request rate limit
      - `allowed_endpoints`: Array of permitted endpoints
      - `status`: Key status (ACTIVE, REVOKED, etc.)
      - `expires_at`: Key expiration timestamp
      - `last_used_at`: Last usage timestamp
+     - `last_rotated_at`: Last rotation timestamp
+     - `created_at`: Creation timestamp
+     - `created_by`: User who created the key
      - `onboarding_reference`: Reference to onboarding process
+     - `onboarding_timestamp`: Timestamp of onboarding
+     - `purpose`: Purpose of the API key
    - Usage: API key lifecycle management
 
 4. **api_key_usage**
-   - Purpose: Tracks API key usage for rate limiting
+   - Purpose: Tracks API key usage for rate limiting and monitoring
    - Key Fields:
+     - `api_key_usage_id`: Unique identifier (GUID)
      - `api_key_id`: Reference to api_keys
      - `endpoint`: API endpoint accessed
+     - `ip_address`: IP address of the request
      - `request_count`: Number of requests
      - `window_start`: Rate limit window start
      - `window_end`: Rate limit window end
-   - Usage: Rate limiting and usage monitoring
+     - `created_at`: Creation timestamp
+     - `timestamp`: Request timestamp
+     - `http_method`: HTTP method used
+     - `status_code`: Response status code
+     - `response_time_ms`: Response time in milliseconds
+   - Usage: Rate limiting, usage monitoring, and analytics
 
 5. **audit_logs**
    - Purpose: Comprehensive audit trail
@@ -915,13 +982,16 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   ```json
   {
     "merchantId": "string",
-    "description": "string",
+    "description": "string",          // Optional
     "rateLimit": "integer",
     "allowedEndpoints": ["string"],
     "purpose": "string",
     "merchantName": "string",
-    "adminUserId": "string",
-    "onboardingReference": "string"
+    "onboardingMetadata": {           // Required
+      "adminUserId": "string",        // Required
+      "onboardingReference": "string", // Required
+      "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
   }
   ```
 - **Response**:
@@ -932,7 +1002,13 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "expiresAt": "datetime",
     "rateLimit": "integer",
     "allowedEndpoints": ["string"],
-    "purpose": "string"
+    "purpose": "string",
+    "description": "string",
+    "onboardingMetadata": {
+      "adminUserId": "string",
+      "onboardingReference": "string",
+      "onboardingTimestamp": "datetime"
+    }
   }
   ```
 
@@ -944,11 +1020,15 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   ```json
   {
     "merchantId": "string",
-    "description": "string",
+    "description": "string",          // Optional
     "rateLimit": "integer",
     "allowedEndpoints": ["string"],
     "purpose": "string",
-    "merchantName": "string"
+    "onboardingMetadata": {           // Required
+      "adminUserId": "string",        // Required
+      "onboardingReference": "string", // Required
+      "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
   }
   ```
 - **Response**: Same as Initial API Key generation
@@ -964,14 +1044,23 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   [
     {
       "apiKey": "string",
-      "description": "string",
+      "description": "string",        // Optional, defaults to empty string
       "rateLimit": "integer",
       "allowedEndpoints": ["string"],
       "status": "string",
       "createdAt": "datetime",
       "lastRotatedAt": "datetime",
+      "lastUsedAt": "datetime",
       "revokedAt": "datetime",
-      "secret": "string"
+      "expiresAt": "datetime",
+      "isRevoked": "boolean",
+      "isExpired": "boolean",
+      "usageCount": "integer",
+      "onboardingMetadata": {
+        "adminUserId": "string",
+        "onboardingReference": "string",
+        "onboardingTimestamp": "datetime"
+      }
     }
   ]
   ```
@@ -984,9 +1073,15 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   ```json
   {
     "merchantId": "string",
-    "description": "string",
+    "apiKey": "string",
+    "description": "string",          // Optional
     "rateLimit": "integer",
-    "allowedEndpoints": ["string"]
+    "allowedEndpoints": ["string"],
+    "onboardingMetadata": {           // Required
+      "adminUserId": "string",        // Required
+      "onboardingReference": "string", // Required
+      "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
   }
   ```
 - **Response**: Same as List API Keys response format
@@ -1009,6 +1104,24 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "message": "string"
   }
   ```
+
+#### 6. Rotate API Key
+- **Endpoint**: `POST /api/v1/onboarding/apikey/rotate`
+- **Description**: Rotates (replaces) an existing API key with a new one while maintaining the same secret
+- **Authentication**: Required (X-API-Key header)
+- **Request Body**:
+  ```json
+  {
+    "merchantId": "string",
+    "apiKey": "string",
+    "onboardingMetadata": {           // Required
+      "adminUserId": "string",        // Required
+      "onboardingReference": "string", // Required
+      "onboardingTimestamp": "datetime" // Optional, defaults to UTC now
+    }
+  }
+  ```
+- **Response**: Same as List API Keys response format
 
 ### Merchant Management Endpoints (v1)
 
@@ -1302,11 +1415,17 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 1. **API Key Management**
    - Secure key generation using `IApiKeyGenerator`
    - Key rotation support with `RotateApiKeyAsync`
-   - Rate limiting per API key
+   - Rate limiting per API key with configurable limits
    - Endpoint restrictions via `AllowedEndpoints`
    - Key expiration with `ExpiresAt`
    - Key revocation with audit trail
    - Secret storage in AWS Secrets Manager
+   - Usage tracking and monitoring
+   - Onboarding metadata tracking
+   - Optional description field for better key management
+   - Last used timestamp tracking
+   - Response time monitoring
+   - IP address tracking for security analysis
 
 2. **Request Signing**
    - HMAC-based request signing using SHA-256
@@ -1329,6 +1448,9 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
    - Endpoint-level authorization
    - Merchant-specific access restrictions
    - Admin role requirements for sensitive operations
+   - Usage count tracking for billing and monitoring
+   - Response time monitoring for performance analysis
+   - IP address tracking for security monitoring
 
 4. **Audit Logging**
    - Comprehensive change tracking
@@ -1337,6 +1459,11 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
    - IP address logging
    - Request/response logging middleware
    - Detailed error logging
+   - API key usage tracking
+   - Response time monitoring
+   - Onboarding metadata tracking
+   - Key rotation history
+   - Usage patterns analysis
 
 ## Integration Guide
 

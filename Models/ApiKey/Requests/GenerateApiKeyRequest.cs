@@ -25,7 +25,7 @@ public class GenerateApiKeyRequest
     /// <summary>
     /// Optional rate limit for the API key
     /// </summary>
-    [Range(1, int.MaxValue)]
+    [Range(1, 10000)]
     public int? RateLimit { get; set; }
 
     /// <summary>

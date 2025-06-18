@@ -263,4 +263,9 @@ graph TD
    - Keep documentation updated
    - Monitor API usage
    - Track error rates
-   - Plan for key rotation 
+   - Plan for key rotation
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Signature Formula:** (For future-proofing) If signature validation is added, it will use the format: `"{timestamp}|{nonce}|{externalMerchantId}"`.
+- **Secret Handling:** Secrets are only returned at creation and are masked in all logs (only the first and last four characters are shown). Secrets are never returned in plaintext after creation. 

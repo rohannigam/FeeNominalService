@@ -17,7 +17,7 @@ namespace FeeNominalService.Services
     public interface IRequestSigningService
     {
         Task<bool> ValidateRequestAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature);
-        Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody);
+        Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce);
         bool ValidateTimestampAndNonce(string timestamp, string nonce);
     }
 
@@ -207,7 +207,7 @@ namespace FeeNominalService.Services
 
                 // 5. Validate signature
                 _logger.LogDebug("Generating expected signature...");
-                var expectedSignature = await GenerateSignatureAsync(merchant.MerchantId.ToString("D"), apiKey, timestamp, nonce, requestBody);
+                var expectedSignature = await GenerateSignatureAsync(merchant.MerchantId.ToString("D"), apiKey, timestamp, nonce);
                 
                 _logger.LogDebug(
                     "Signature validation details:\n" +
@@ -237,7 +237,7 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody)
+        public async Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce)
         {
             try
             {

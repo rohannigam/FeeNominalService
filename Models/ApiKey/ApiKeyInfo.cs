@@ -1,4 +1,6 @@
 using System;
+using FeeNominalService.Models.ApiKey.Requests;
+using FeeNominalService.Models;
 
 namespace FeeNominalService.Models.ApiKey
 {
@@ -11,6 +13,11 @@ namespace FeeNominalService.Models.ApiKey
         /// The API key value
         /// </summary>
         public string ApiKey { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The merchant that owns this API key
+        /// </summary>
+        public Guid MerchantId { get; set; }
 
         /// <summary>
         /// Optional description of the API key
@@ -48,6 +55,11 @@ namespace FeeNominalService.Models.ApiKey
         public DateTime? LastRotatedAt { get; set; }
 
         /// <summary>
+        /// When the API key was last used
+        /// </summary>
+        public DateTime? LastUsedAt { get; set; }
+
+        /// <summary>
         /// When the API key was revoked, if applicable
         /// </summary>
         public DateTime? RevokedAt { get; set; }
@@ -61,5 +73,15 @@ namespace FeeNominalService.Models.ApiKey
         /// Whether the API key has expired
         /// </summary>
         public bool IsExpired { get; set; }
+
+        /// <summary>
+        /// Total number of requests made with this API key
+        /// </summary>
+        public int UsageCount { get; set; }
+
+        /// <summary>
+        /// Metadata about the onboarding, update, or rotation event
+        /// </summary>
+        public OnboardingMetadata? OnboardingMetadata { get; set; }
     }
 } 

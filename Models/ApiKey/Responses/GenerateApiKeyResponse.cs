@@ -1,4 +1,5 @@
 using System;
+using FeeNominalService.Models.ApiKey.Requests;
 
 namespace FeeNominalService.Models.ApiKey.Responses
 {
@@ -48,5 +49,15 @@ namespace FeeNominalService.Models.ApiKey.Responses
         /// Purpose of the API key
         /// </summary>
         public string? Purpose { get; set; }
+
+        /// <summary>
+        /// Description of the API key
+        /// </summary>
+        public string? Description { get; set; }
+
+        /// <summary>
+        /// Metadata about the onboarding process
+        /// </summary>
+        public OnboardingMetadata OnboardingMetadata { get; set; } = new();
     }
 } 

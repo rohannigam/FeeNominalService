@@ -200,7 +200,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"API Key for testing\",\n    \"rateLimit\": 1000,\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\"\n    ],\n    \"purpose\": \"TESTING\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"test-admin\",\n        \"onboardingReference\": \"{{$guid}}\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}",
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"API Key for testing\",\n    \"rateLimit\": 444,\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/onboarding/apikey/*\"\n    ],\n    \"purpose\": \"TESTING\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"test-admin\",\n        \"onboardingReference\": \"{{$guid}}\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -292,14 +292,14 @@
 									"    ",
 									"    if (jsonData.data) {",
 									"        pm.expect(jsonData.data).to.have.property('apiKey');",
-									"        pm.expect(jsonData.data).to.have.property('secret');",
+									"        //pm.expect(jsonData.data).to.have.property('secret');",
 									"        ",
 									"        // Save new API key and secret to environment",
 									"        pm.environment.set('apiKey', jsonData.data.apiKey);",
-									"        pm.environment.set('apiSecret', jsonData.data.secret);",
+									"        //pm.environment.set('apiSecret', jsonData.data.secret);",
 									"        ",
 									"        console.log('New API Key saved:', jsonData.data.apiKey);",
-									"        console.log('New API Secret saved:', jsonData.data.secret);",
+									"        //console.log('New API Secret saved:', jsonData.data.secret);",
 									"    }",
 									"});"
 								],
@@ -400,7 +400,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\",\n    \"description\": \"{{apiKeyDescription}}\",\n    \"rateLimit\": {{apiKeyRateLimit}},\n    \"allowedEndpoints\": {{apiKeyAllowedEndpoints}}\n}"
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\",\n    \"description\": \"{{apiKeyDescription}}\",\n    \"rateLimit\": {{apiKeyRateLimit}},\n    \"allowedEndpoints\": {{apiKeyAllowedEndpoints}},\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"admin123\",\n        \"onboardingReference\": \"TEST-UPDATE-005\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/update",

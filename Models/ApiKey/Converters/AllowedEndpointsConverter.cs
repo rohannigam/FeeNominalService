@@ -5,49 +5,52 @@ namespace FeeNominalService.Models.ApiKey.Converters;
 
 public class AllowedEndpointsConverter : JsonConverter<string[]>
 {
-    public override string[]? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        if (reader.TokenType == JsonTokenType.Null)
-            return null;
-
-        if (reader.TokenType == JsonTokenType.String)
-        {
-            var value = reader.GetString();
-            return string.IsNullOrEmpty(value) 
-                ? Array.Empty<string>() 
-                : value.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                       .Select(e => e.Trim())
-                       .ToArray();
-        }
-
         if (reader.TokenType == JsonTokenType.StartArray)
         {
-            var list = new List<string>();
+            var endpoints = new List<string>();
             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
             {
-                if (reader.TokenType == JsonTokenType.String)
+                var endpoint = reader.GetString();
+                if (!string.IsNullOrEmpty(endpoint))
                 {
-                    list.Add(reader.GetString()!);
+                    // Validate endpoint format
+                    if (!IsValidEndpoint(endpoint))
+                    {
+                        throw new JsonException($"Invalid endpoint format: {endpoint}. Endpoints must start with / and can end with * for wildcard.");
+                    }
+                    endpoints.Add(endpoint);
                 }
             }
-            return list.ToArray();
+            return endpoints.ToArray();
         }
+        throw new JsonException("Expected array for AllowedEndpoints");
+    }
 
-        throw new JsonException("Expected string or array for AllowedEndpoints");
+    private bool IsValidEndpoint(string endpoint)
+    {
+        // Must start with /
+        if (!endpoint.StartsWith("/"))
+            return false;
+
+        // If it contains *, it must be at the end
+        if (endpoint.Contains("*") && !endpoint.EndsWith("*"))
+            return false;
+
+        // No consecutive slashes
+        if (endpoint.Contains("//"))
+            return false;
+
+        return true;
     }
 
     public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
     {
-        if (value == null)
-        {
-            writer.WriteNullValue();
-            return;
-        }
-
         writer.WriteStartArray();
-        foreach (var item in value)
+        foreach (var endpoint in value)
         {
-            writer.WriteStringValue(item);
+            writer.WriteStringValue(endpoint);
         }
         writer.WriteEndArray();
     }

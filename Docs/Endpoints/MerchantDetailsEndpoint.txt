@@ -189,4 +189,8 @@ graph TD
    - Regular security audits
    - Review audit logs
    - Update merchant statistics
-   - Maintain data consistency 
+   - Maintain data consistency
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Secret Handling:** If any secret fields are referenced, they are masked in all logs (only the first and last four characters are shown) and are never returned after creation. 

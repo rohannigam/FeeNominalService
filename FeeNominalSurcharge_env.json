@@ -1,5 +1,5 @@
 {
-	"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+	"id": "d0db4ee1-462f-487c-bd97-4a0cc7ba7c75",
 	"name": "FeeNominalSurchargeService Environment",
 	"values": [
 		{
@@ -40,7 +40,7 @@
 		},
 		{
 			"key": "apiKeyAllowedEndpoints",
-			"value": "[\"/api/v1/transactions\", \"/api/v1/batch\"]",
+			"value": "[\"/api/v1/onboarding/apikey/*\", \"/api/v1/onboarding/merchants/*\"]",
 			"type": "default",
 			"enabled": true
 		},
@@ -205,9 +205,63 @@
 			"value": "/api/v1/surchargefee/calculate,/api/v1/surchargefee/calculate-batch",
 			"type": "default",
 			"enabled": true
+		},
+		{
+			"key": "requestBody",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "merchantId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "apiKey",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "apiSecret",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "apiKeyId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "rateLimit",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "allowedEndpoints",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "expiresAt",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "createdAt",
+			"value": "",
+			"type": "any",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2024-03-19T12:00:00.000Z",
-	"_postman_exported_using": "Postman/10.24.3"
-} 
+	"_postman_exported_at": "2025-06-18T18:18:36.883Z",
+	"_postman_exported_using": "Postman/11.49.4"
+}

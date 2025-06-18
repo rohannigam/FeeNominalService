@@ -127,7 +127,7 @@ namespace FeeNominalService.Services
 
                 // 5. Validate signature
                 _logger.LogInformation("Generating expected signature...");
-                var expectedSignature = await GenerateSignatureAsync(merchant.MerchantId.ToString("D"), apiKey, timestamp, nonce, requestBody);
+                var expectedSignature = await GenerateSignatureAsync(merchant.MerchantId.ToString("D"), apiKey, timestamp, nonce);
                 
                 _logger.LogInformation(
                     "Signature validation details:\n" +
@@ -157,41 +157,18 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody)
+        public async Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce)
         {
-            try
+            var secret = await _secretsManager.GetSecretAsync($"feenominal/merchants/{merchantId}/apikeys/{apiKey}");
+            if (string.IsNullOrEmpty(secret))
             {
-                _logger.LogInformation(
-                    "Starting signature generation - MerchantId: {MerchantId}, ApiKey: {ApiKey}, Timestamp: {Timestamp}, Nonce: {Nonce}",
-                    merchantId, apiKey, timestamp, nonce);
-
-                // 1. Get secret from AWS Secrets Manager
-                var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
-                _logger.LogInformation("Retrieving secret from AWS: {SecretName}", secretName);
-                var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
-                if (secretData == null)
-                {
-                    _logger.LogError("Secret not found for API key: {ApiKey}", apiKey);
-                    throw new KeyNotFoundException($"Secret not found for API key: {apiKey}");
-                }
-                _logger.LogInformation("Successfully retrieved secret from AWS");
-
-                // 2. Generate signature
-                var data = $"{timestamp}{nonce}{requestBody}";
-                _logger.LogInformation("Data to sign: {Data}", data);
-                
-                using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretData.Secret));
-                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-                var signature = Convert.ToBase64String(hash);
-                
-                _logger.LogInformation("Generated signature: {Signature}", signature);
-                return signature;
+                throw new KeyNotFoundException($"Secret not found for merchant {merchantId} and API key {apiKey}");
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating signature");
-                throw;
-            }
+
+            var data = $"{timestamp}|{nonce}|{merchantId}|{apiKey}";
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return Convert.ToBase64String(hash);
         }
 
         public bool ValidateTimestampAndNonce(string timestamp, string nonce)

@@ -153,6 +153,12 @@ namespace FeeNominalService.Models.ApiKey
         public string? OnboardingReference { get; set; }
 
         /// <summary>
+        /// Timestamp for onboarding/rotation/update event
+        /// </summary>
+        [Column("onboarding_timestamp")]
+        public DateTime? OnboardingTimestamp { get; set; }
+
+        /// <summary>
         /// Navigation property for the merchant who owns this API key
         /// </summary>
         [ForeignKey("MerchantId")]

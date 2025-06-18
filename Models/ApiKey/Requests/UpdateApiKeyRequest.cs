@@ -22,17 +22,22 @@ public class UpdateApiKeyRequest
     /// <summary>
     /// Description of the API key
     /// </summary>
-    [Required]
-    public string Description { get; set; } = string.Empty;
+    public string? Description { get; set; }
 
     /// <summary>
     /// Rate limit for the API key
     /// </summary>
-    [Range(1, int.MaxValue)]
+    [Range(1, 10000)]
     public int? RateLimit { get; set; }
 
     /// <summary>
     /// List of allowed endpoints
     /// </summary>
     public string[]? AllowedEndpoints { get; set; }
+
+    /// <summary>
+    /// Onboarding metadata for the API key
+    /// </summary>
+    [Required]
+    public OnboardingMetadata OnboardingMetadata { get; set; } = new();
 } 

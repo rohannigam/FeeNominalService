@@ -219,4 +219,9 @@ graph TD
    - Track error rates
    - Regular security audits
    - Review audit logs
-   - Clean up revoked keys periodically 
+   - Clean up revoked keys periodically
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Irreversible Revocation:** Once an API key is revoked, it cannot be reactivated.
+- **Secret Handling:** Secrets are masked in all logs (only the first and last four characters are shown) and are never returned after creation. 

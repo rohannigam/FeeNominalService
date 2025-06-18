@@ -177,4 +177,9 @@ graph TD
    - Track error rates
    - Regular security audits
    - Review audit logs
-   - Clean up old records periodically 
+   - Clean up old records periodically
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Merchant Ownership:** Only API keys for the authenticated merchant are returned, regardless of the merchantId query parameter.
+- **Secret Handling:** Secrets are never returned in this endpoint. All secret values are masked in logs (only the first and last four characters are shown). 

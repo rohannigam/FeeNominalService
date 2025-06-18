@@ -9,14 +9,14 @@ namespace FeeNominalService.Services
 {
     public interface IApiKeyService
     {
-        Task<GenerateInitialApiKeyResponse> GenerateInitialApiKeyAsync(Guid merchantId);
+        Task<GenerateInitialApiKeyResponse> GenerateInitialApiKeyAsync(Guid merchantId, GenerateInitialApiKeyRequest request);
         Task<GenerateApiKeyResponse> GenerateApiKeyAsync(GenerateApiKeyRequest request);
         Task<bool> RevokeApiKeyAsync(RevokeApiKeyRequest request);
         Task<IEnumerable<ApiKeyInfo>> GetMerchantApiKeysAsync(string merchantId);
         Task<ApiKeyInfo> GetApiKeyInfoAsync(string apiKey);
-        Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature);
+        Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey, string timestamp, string nonce, string signature);
         Task<ApiKeyInfo> GetApiKeyAsync(string merchantId);
-        Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request);
-        Task<ApiKeyInfo> RotateApiKeyAsync(string merchantId);
+        Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request, OnboardingMetadata onboardingMetadata);
+        Task<GenerateApiKeyResponse> RotateApiKeyAsync(string merchantId, OnboardingMetadata onboardingMetadata);
     }
 } 

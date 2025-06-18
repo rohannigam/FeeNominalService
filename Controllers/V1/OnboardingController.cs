@@ -13,6 +13,7 @@ using FeeNominalService.Models.Merchant.Responses;
 using FeeNominalService.Models.Merchant.Requests;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Controllers.V1
 {
@@ -60,7 +61,7 @@ namespace FeeNominalService.Controllers.V1
                 var merchant = await _merchantService.CreateMerchantAsync(request, "SYSTEM");
 
                 // Generate API key
-                var apiKeyResponse = await _apiKeyService.GenerateInitialApiKeyAsync(merchant.MerchantId);
+                var apiKeyResponse = await _apiKeyService.GenerateInitialApiKeyAsync(merchant.MerchantId, request);
 
                 var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
                 var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
@@ -79,7 +80,7 @@ namespace FeeNominalService.Controllers.V1
                 {
                     MerchantId = merchant.MerchantId,
                     ExternalMerchantId = merchant.ExternalMerchantId,
-                    ExternalMerchantGuid = merchant.ExternalMerchantGuid,
+                    ExternalMerchantGuid = merchant.ExternalMerchantGuid.HasValue ? merchant.ExternalMerchantGuid : null,
                     MerchantName = merchant.Name,
                     StatusId = merchant.StatusId,
                     StatusCode = merchant.StatusCode,
@@ -91,6 +92,8 @@ namespace FeeNominalService.Controllers.V1
                     CreatedAt = apiKeyResponse.CreatedAt,
                     RateLimit = apiKeyResponse.RateLimit,
                     AllowedEndpoints = apiKeyResponse.AllowedEndpoints,
+                    Description = apiKeyResponse.Description,
+                    Purpose = apiKeyResponse.Purpose,
                     OnboardingMetadata = apiKeyResponse.OnboardingMetadata
                 };
 
@@ -235,55 +238,94 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
-        [HttpPost("apikey/generate")]
         [Authorize(Policy = "ApiKeyAccess")]
+        [HttpPost("apikey/generate")]
         [ProducesResponseType(typeof(ApiResponse<GenerateApiKeyResponse>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GenerateApiKey([FromBody] GenerateApiKeyRequest request)
         {
+            if (User.Identity == null || !User.Identity.IsAuthenticated)
+            {
+                return Unauthorized(new ApiResponse { Message = "Authentication failed", Success = false });
+            }
             try
             {
-                _logger.LogInformation("Generating API key for merchant {MerchantId}", request.MerchantId);
-                var response = await _apiKeyService.GenerateApiKeyAsync(request);
-                var performedBy = request.OnboardingMetadata.AdminUserId;
+                // Validate merchant ID header matches request
+                var (isValidMerchantId, headerMerchantId, merchantIdError) = HeaderValidationHelper.ValidateRequiredGuidHeader(Request.Headers, "X-Merchant-ID");
+                if (!isValidMerchantId || headerMerchantId != request.MerchantId)
+                {
+                    return Unauthorized(new ApiResponse { Message = merchantIdError ?? "Invalid X-Merchant-ID header", Success = false });
+                }
 
-                // Create audit trail entry for API key generation
+                // Get the API key from the header
+                var (apiKeyHeaderValid, apiKeyHeader, apiKeyHeaderError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-API-Key");
+                if (!apiKeyHeaderValid || string.IsNullOrEmpty(apiKeyHeader))
+                {
+                    return Unauthorized(new ApiResponse { Message = apiKeyHeaderError ?? "Missing X-API-Key header", Success = false });
+                }
+
+                // Fetch the API key entity from the database
+                var apiKeyEntity = await _apiKeyService.GetApiKeyInfoAsync(apiKeyHeader);
+                if (apiKeyEntity == null || apiKeyEntity.Status != "ACTIVE")
+                {
+                    return Unauthorized(new ApiResponse { Message = "Invalid or inactive API key", Success = false });
+                }
+
+                // Ensure the API key's merchant matches the request's merchant
+                if (apiKeyEntity.MerchantId != request.MerchantId)
+                {
+                    return Forbid(); // Or return Unauthorized with a message
+                }
+
+                // Get merchant
+                _logger.LogInformation("Retrieving merchant with ID {MerchantId}", request.MerchantId);
+                var merchant = await _merchantService.GetMerchantAsync(request.MerchantId);
+                if (merchant == null)
+                {
+                    _logger.LogWarning("Merchant not found with ID {MerchantId}", request.MerchantId);
+                    return NotFound(new ApiResponse { Message = "Merchant not found", Success = false });
+                }
+
+                // Validate onboarding metadata from request body
+                if (request.OnboardingMetadata == null || 
+                    string.IsNullOrEmpty(request.OnboardingMetadata.AdminUserId) || 
+                    string.IsNullOrEmpty(request.OnboardingMetadata.OnboardingReference))
+                {
+                    return BadRequest(new ApiResponse { Message = "Invalid onboarding metadata in request body", Success = false });
+                }
+
+                // Log claims for debugging
+                var claims = User.Claims.Select(c => $"{c.Type}: {c.Value}");
+                _logger.LogInformation("Claims present: {Claims}", string.Join(", ", claims));
+
+                // Generate API key
+                var apiKeyResponse = await _apiKeyService.GenerateApiKeyAsync(request);
+
+                // Add audit trail entry for API key generation
+                var onboardingMetadata = request.OnboardingMetadata;
+                var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
                 await _merchantService.CreateAuditTrailAsync(
                     request.MerchantId,
                     "API_KEY_GENERATED",
                     "api_key",
                     null,
-                    JsonSerializer.Serialize(new
-                    {
-                        ApiKey = response.ApiKey,
-                        MerchantId = response.MerchantId,
-                        ExternalMerchantId = response.ExternalMerchantId,
-                        MerchantName = response.MerchantName,
-                        RateLimit = response.RateLimit,
-                        AllowedEndpoints = response.AllowedEndpoints,
-                        Purpose = response.Purpose,
-                        ExpiresAt = response.ExpiresAt
-                    }),
+                    apiKeyResponse.ApiKey,
                     performedBy
                 );
 
                 return Ok(new ApiResponse<GenerateApiKeyResponse>
                 {
-                    Message = "API key generated successfully",
                     Success = true,
-                    Data = response
+                    Message = "API key generated successfully",
+                    Data = apiKeyResponse
                 });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", request.MerchantId);
-                return StatusCode(500, new ApiResponse
-                {
-                    Message = "Failed to generate API key",
-                    Success = false
-                });
+                return StatusCode(500, new ApiResponse { Message = "An error occurred while generating the API key", Success = false });
             }
         }
 
@@ -302,15 +344,15 @@ namespace FeeNominalService.Controllers.V1
             {
                 _logger.LogInformation("Updating API key for merchant {MerchantId}", request.MerchantId);
 
-                var apiKeyInfo = await _apiKeyService.UpdateApiKeyAsync(request);
-                if (apiKeyInfo?.ApiKey == null)
+                var updatedApiKeyResponse = await _apiKeyService.UpdateApiKeyAsync(request, request.OnboardingMetadata);
+                if (updatedApiKeyResponse?.ApiKey == null)
                 {
                     _logger.LogWarning("Failed to update API key for merchant {MerchantId}", request.MerchantId);
                     return BadRequest("Failed to update API key");
                 }
 
                 // Fetch old API key info for audit trail
-                var oldApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(apiKeyInfo.ApiKey);
+                var oldApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(updatedApiKeyResponse.ApiKey);
                 var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
                 var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
 
@@ -320,12 +362,12 @@ namespace FeeNominalService.Controllers.V1
                     "API_KEY_UPDATED",
                     "api_key",
                     JsonSerializer.Serialize(oldApiKeyInfo),
-                    JsonSerializer.Serialize(apiKeyInfo),
+                    JsonSerializer.Serialize(updatedApiKeyResponse),
                     performedBy
                 );
 
                 _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", request.MerchantId);
-                return Ok(apiKeyInfo);
+                return Ok(updatedApiKeyResponse);
             }
             catch (KeyNotFoundException ex)
             {
@@ -594,7 +636,7 @@ namespace FeeNominalService.Controllers.V1
         /// </summary>
         [HttpPost("apikey/rotate")]
         [Authorize(Policy = "ApiKeyAccess")]
-        [ProducesResponseType(typeof(ApiResponse<ApiKeyInfo>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<GenerateApiKeyResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -616,9 +658,9 @@ namespace FeeNominalService.Controllers.V1
                     });
                 }
 
-                // Rotate the API key
-                var rotatedApiKeyInfo = await _apiKeyService.RotateApiKeyAsync(request.MerchantId);
-                if (rotatedApiKeyInfo == null)
+                // Rotate the API key and get the new secret
+                var rotatedApiKeyResponse = await _apiKeyService.RotateApiKeyAsync(request.MerchantId, request.OnboardingMetadata);
+                if (rotatedApiKeyResponse == null)
                 {
                     _logger.LogWarning("Failed to rotate API key for merchant {MerchantId}", request.MerchantId);
                     return BadRequest(new ApiResponse
@@ -637,16 +679,16 @@ namespace FeeNominalService.Controllers.V1
                     "API_KEY_ROTATED",
                     "api_key",
                     JsonSerializer.Serialize(apiKeyInfo),
-                    JsonSerializer.Serialize(rotatedApiKeyInfo),
+                    JsonSerializer.Serialize(rotatedApiKeyResponse),
                     performedBy
                 );
 
                 _logger.LogInformation("Successfully rotated API key for merchant {MerchantId}", request.MerchantId);
-                return Ok(new ApiResponse<ApiKeyInfo>
+                return Ok(new ApiResponse<GenerateApiKeyResponse>
                 {
                     Message = "API key rotated successfully",
                     Success = true,
-                    Data = rotatedApiKeyInfo
+                    Data = rotatedApiKeyResponse
                 });
             }
             catch (KeyNotFoundException ex)

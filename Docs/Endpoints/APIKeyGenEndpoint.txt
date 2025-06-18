@@ -266,4 +266,10 @@ graph TD
    - Monitor API usage
    - Track error rates
    - Plan for key rotation
-   - Regular security audits 
+   - Regular security audits
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Signature Formula:** The signature must be generated as follows: `"{timestamp}|{nonce}|{merchantId}|{apiKey}"` using HMAC-SHA256 with the API secret.
+- **Merchant Ownership:** API keys and secrets are strictly bound to the merchant they were issued to. They cannot be used to access resources for other merchants.
+- **Secret Handling:** Secrets are only returned at creation and are masked in all logs (only the first and last four characters are shown). Secrets are never returned in plaintext after creation. 

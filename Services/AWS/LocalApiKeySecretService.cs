@@ -256,6 +256,7 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
             return secrets.Select(s => new ApiKeyInfo
             {
                 ApiKey = s.ApiKey,
+                MerchantId = s.MerchantId,
                 Status = s.Status,
                 CreatedAt = s.CreatedAt,
                 LastRotatedAt = s.LastRotated,

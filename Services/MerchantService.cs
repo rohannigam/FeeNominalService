@@ -301,6 +301,7 @@ namespace FeeNominalService.Services
                 return new ApiKeyInfo
                 {
                     ApiKey = createdApiKey.Entity.Key,
+                    MerchantId = merchantId,
                     Description = createdApiKey.Entity.Description ?? string.Empty,
                     RateLimit = createdApiKey.Entity.RateLimit,
                     AllowedEndpoints = createdApiKey.Entity.AllowedEndpoints,

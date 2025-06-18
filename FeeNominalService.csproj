@@ -45,10 +45,4 @@
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="2.3.2" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Data\Evolve\" />
-    <Folder Include="Data\Evolve\1.0.0\" />
-    <Folder Include="Data\Evolve\1.0.0\Rollback\" />
-  </ItemGroup>
-
 </Project>

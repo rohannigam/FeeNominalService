@@ -193,4 +193,8 @@ graph TD
    - Regular security audits
    - Review audit logs
    - Archive old audit entries
-   - Implement data retention policies 
+   - Implement data retention policies
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Secret Handling:** If any secret fields are referenced, they are masked in all logs (only the first and last four characters are shown) and are never returned after creation. 

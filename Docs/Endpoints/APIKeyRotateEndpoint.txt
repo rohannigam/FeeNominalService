@@ -210,4 +210,9 @@ graph TD
    - Monitor API usage
    - Track error rates
    - Regular security audits
-   - Plan for key rotation 
+   - Plan for key rotation
+
+## Important Notes
+- **Header Validation:** All required headers are validated in a case-insensitive manner.
+- **Secret Reuse:** The secret associated with the API key is reused during rotation and is not regenerated.
+- **Secret Handling:** Secrets are masked in all logs (only the first and last four characters are shown) and are never returned after creation. 
