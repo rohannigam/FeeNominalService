@@ -15,6 +15,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_6__create_functions migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 CREATE OR REPLACE FUNCTION fee_nominal.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

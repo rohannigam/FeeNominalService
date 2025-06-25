@@ -15,6 +15,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_3__create_api_key_tables migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Add extension if not exists
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

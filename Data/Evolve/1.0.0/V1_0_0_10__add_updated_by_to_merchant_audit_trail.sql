@@ -15,6 +15,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_10__add_updated_by_to_merchant_audit_trail migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Add updated_by column if it doesn't exist
 DO $$
 BEGIN

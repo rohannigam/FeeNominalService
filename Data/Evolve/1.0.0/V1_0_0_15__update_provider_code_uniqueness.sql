@@ -6,6 +6,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_15__update_provider_code_uniqueness migration';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Drop the existing unique constraint on code
 ALTER TABLE fee_nominal.surcharge_providers DROP CONSTRAINT IF EXISTS surcharge_providers_code_key;
 

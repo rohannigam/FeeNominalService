@@ -16,6 +16,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_4__create_transaction_tables migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 CREATE TABLE IF NOT EXISTS fee_nominal.transaction_statuses (
     transaction_status_id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,

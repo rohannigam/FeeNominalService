@@ -17,6 +17,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_9__alter_api_key_secrets migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Add updated_at column
 ALTER TABLE fee_nominal.api_key_secrets 
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;

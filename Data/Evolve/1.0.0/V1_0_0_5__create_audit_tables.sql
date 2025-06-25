@@ -16,6 +16,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_5__create_audit_tables migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 CREATE TABLE IF NOT EXISTS fee_nominal.audit_logs (
     audit_log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(50) NOT NULL,

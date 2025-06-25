@@ -6,6 +6,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_16__add_deleted_status migration';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Add DELETED status to surcharge_provider_statuses
 INSERT INTO fee_nominal.surcharge_provider_statuses (code, name, description) VALUES
     ('DELETED', 'Deleted', 'Provider has been permanently removed (soft delete)')

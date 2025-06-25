@@ -18,6 +18,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_7__create_indexes migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_merchants_status ON fee_nominal.merchants(status_id);
 DO $$
 BEGIN

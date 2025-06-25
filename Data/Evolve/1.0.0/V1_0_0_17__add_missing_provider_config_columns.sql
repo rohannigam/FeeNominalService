@@ -14,6 +14,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_17__add_missing_provider_config_columns migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Add missing columns to surcharge_provider_configs table
 ALTER TABLE fee_nominal.surcharge_provider_configs 
 ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT false,

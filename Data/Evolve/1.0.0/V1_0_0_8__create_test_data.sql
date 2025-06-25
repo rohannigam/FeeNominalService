@@ -16,6 +16,13 @@ BEGIN
     RAISE NOTICE 'Starting V1_0_0_8__create_test_data migration...';
 END $$;
 
+-- Set search path
+SET search_path TO fee_nominal;
+DO $$
+BEGIN
+    RAISE NOTICE 'Set search path to fee_nominal';
+END $$;
+
 -- Temporarily disable audit triggers
 ALTER TABLE fee_nominal.merchants DISABLE TRIGGER audit_merchants;
 ALTER TABLE fee_nominal.api_keys DISABLE TRIGGER audit_api_keys;
