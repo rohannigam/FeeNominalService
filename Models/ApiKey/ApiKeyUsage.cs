@@ -35,7 +35,7 @@ namespace FeeNominalService.Models.ApiKey
         /// The IP address of the client that made the request
         /// </summary>
         [Required]
-        [Column(TypeName = "varchar(45)")]  // IPv6 addresses can be up to 45 characters
+        [Column("ip_address", TypeName = "varchar(45)")]  // IPv6 addresses can be up to 45 characters
         public string IpAddress { get; set; } = string.Empty;
 
         /// <summary>
@@ -60,6 +60,13 @@ namespace FeeNominalService.Models.ApiKey
         public DateTime WindowEnd { get; set; }
 
         /// <summary>
+        /// When the API key was used
+        /// </summary>
+        [Required]
+        [Column("timestamp")]
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
         /// When this usage record was created
         /// </summary>
         [Required]
@@ -67,33 +74,29 @@ namespace FeeNominalService.Models.ApiKey
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         /// <summary>
-        /// Navigation property for the API key
-        /// </summary>
-        public virtual ApiKey ApiKey { get; set; } = null!;
-
-        /// <summary>
-        /// When the API key was used
-        /// </summary>
-        [Required]
-        public DateTime Timestamp { get; set; }
-
-        /// <summary>
         /// The HTTP method used in the request
         /// </summary>
         [Required]
-        [Column(TypeName = "varchar(10)")]
+        [Column("http_method", TypeName = "varchar(10)")]
         public string HttpMethod { get; set; } = string.Empty;
 
         /// <summary>
         /// The HTTP status code of the response
         /// </summary>
         [Required]
+        [Column("status_code")]
         public int StatusCode { get; set; }
 
         /// <summary>
         /// The response time in milliseconds
         /// </summary>
         [Required]
+        [Column("response_time_ms")]
         public int ResponseTimeMs { get; set; }
+
+        /// <summary>
+        /// Navigation property for the API key
+        /// </summary>
+        public virtual ApiKey ApiKey { get; set; } = null!;
     }
 } 

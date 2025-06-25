@@ -1,0 +1,688 @@
+@FeeNominalService_HostAddress = https://localhost:7139
+
+### Authentication Endpoints
+
+### Note: Request Signing
+# All API requests (except initial API key generation) require a signature for authentication.
+# The signature is calculated using the following components:
+# 1. Timestamp: Current UTC time in ISO 8601 format
+# 2. Nonce: A unique random string for each request
+# 3. MerchantId: Your merchant ID
+# 4. ApiKey: Your API key
+# 5. Secret: The API key secret (not the API key itself)
+#
+# Signature Calculation:
+# 1. Concatenate: timestamp|nonce|merchantId|apiKey (using pipe separator)
+# 2. Create HMAC-SHA256 hash using the secret key
+# 3. Base64 encode the hash
+#
+# Required Headers:
+# X-Merchant-ID: Your merchant ID
+# X-API-Key: Your API key
+# X-Timestamp: Current UTC time in ISO 8601 format
+# X-Nonce: Unique random string
+# X-Signature: The calculated signature
+
+### Generate Initial API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/initial-generate
+Content-Type: application/json
+
+{
+  "merchantId": "DEV001",
+  "description": "Initial API key for development",
+  "rateLimit": 1000,
+  "allowedEndpoints": [
+    "/api/v1/surchargefee/calculate",
+    "/api/v1/surchargefee/calculate-batch",
+    "/api/v1/refunds/process",
+    "/api/v1/refunds/process-batch",
+    "/api/v1/sales/process",
+    "/api/v1/sales/process-batch",
+    "/api/v1/cancel",
+    "/api/v1/cancel/batch"
+  ],
+  "purpose": "GENERAL",
+  "merchantName": "Development Merchant",
+  "adminUserId": "admin",
+  "onboardingReference": "DEV-001"
+}
+
+### Response Example:
+# {
+#   "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#   "secret": "sk_test_51NxYz...",
+#   "expiresAt": "2026-05-20T04:52:24.803373Z",
+#   "rateLimit": 1000,
+#   "allowedEndpoints": [
+#     "/api/v1/surchargefee/calculate",
+#     "/api/v1/surchargefee/calculate-batch",
+#     "/api/v1/refunds/process",
+#     "/api/v1/refunds/process-batch",
+#     "/api/v1/sales/process",
+#     "/api/v1/sales/process-batch",
+#     "/api/v1/cancel",
+#     "/api/v1/cancel/batch"
+#   ],
+#   "purpose": "GENERAL"
+# }
+
+### Generate Additional API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/generate
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "merchantId": "DEV001",
+  "description": "Additional API key for development",
+  "rateLimit": 1000,
+  "allowedEndpoints": [
+    "/api/v1/surchargefee/calculate",
+    "/api/v1/surchargefee/calculate-batch",
+    "/api/v1/refunds/process",
+    "/api/v1/refunds/process-batch",
+    "/api/v1/sales/process",
+    "/api/v1/sales/process-batch",
+    "/api/v1/cancel",
+    "/api/v1/cancel/batch"
+  ],
+  "purpose": "GENERAL",
+  "merchantName": "Development Merchant"
+}
+
+### Response Example:
+# {
+#   "apiKey": "9kurb2PpvevX22Ex1uroWlhe-DCs1g3H",
+#   "secret": "sk_test_51NxYz...",
+#   "expiresAt": "2026-05-20T04:52:24.803373Z",
+#   "rateLimit": 1000,
+#   "allowedEndpoints": [
+#     "/api/v1/surchargefee/calculate",
+#     "/api/v1/surchargefee/calculate-batch",
+#     "/api/v1/refunds/process",
+#     "/api/v1/refunds/process-batch",
+#     "/api/v1/sales/process",
+#     "/api/v1/sales/process-batch",
+#     "/api/v1/cancel",
+#     "/api/v1/cancel/batch"
+#   ],
+#   "purpose": "GENERAL"
+# }
+
+### List API Keys
+GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/list?merchantId=DEV001
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# [
+#   {
+#     "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#     "description": "Initial API key for development",
+#     "rateLimit": 1000,
+#     "allowedEndpoints": [
+#       "/api/v1/surchargefee/calculate",
+#       "/api/v1/surchargefee/calculate-batch",
+#       "/api/v1/refunds/process",
+#       "/api/v1/refunds/process-batch",
+#       "/api/v1/sales/process",
+#       "/api/v1/sales/process-batch",
+#       "/api/v1/cancel",
+#       "/api/v1/cancel/batch"
+#     ],
+#     "status": "ACTIVE",
+#     "createdAt": "2025-05-20T04:52:24.803373Z",
+#     "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
+#     "revokedAt": null,
+#     "secret": "sk_test_51NxYz..."
+#   }
+# ]
+
+### Update API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/update
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "merchantId": "DEV001",
+  "description": "Updated API key description",
+  "rateLimit": 2000,
+  "allowedEndpoints": [
+    "/api/v1/surchargefee/calculate",
+    "/api/v1/surchargefee/calculate-batch",
+    "/api/v1/refunds/process",
+    "/api/v1/refunds/process-batch",
+    "/api/v1/sales/process",
+    "/api/v1/sales/process-batch",
+    "/api/v1/cancel",
+    "/api/v1/cancel/batch"
+  ]
+}
+
+### Response Example:
+# {
+#   "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#   "description": "Updated API key description",
+#   "rateLimit": 2000,
+#   "allowedEndpoints": [
+#     "/api/v1/surchargefee/calculate",
+#     "/api/v1/surchargefee/calculate-batch",
+#     "/api/v1/refunds/process",
+#     "/api/v1/refunds/process-batch",
+#     "/api/v1/sales/process",
+#     "/api/v1/sales/process-batch",
+#     "/api/v1/cancel",
+#     "/api/v1/cancel/batch"
+#   ],
+#   "status": "ACTIVE",
+#   "createdAt": "2025-05-20T04:52:24.803373Z",
+#   "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
+#   "revokedAt": null,
+#   "secret": "sk_test_51NxYz..."
+# }
+
+### Revoke API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/revoke
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "merchantId": "DEV001",
+  "apiKey": "api-key-to-revoke"
+}
+
+### Response Example:
+# {
+#   "success": true,
+#   "message": "API key revoked successfully"
+# }
+
+### Surcharge Endpoints
+
+### Calculate Surcharge
+POST {{FeeNominalService_HostAddress}}/api/v1/surchargefee/calculate
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "amount": 100.00,
+  "sTxId": "test-transaction-123",
+  "mTxId": "merchant-transaction-456",
+  "country": "US",
+  "region": "CA"
+}
+
+### Response Example:
+# {
+#   "surchargeAmount": 3.50,
+#   "totalAmount": 103.50,
+#   "sTxId": "test-transaction-123",
+#   "mTxId": "merchant-transaction-456",
+#   "provider": "DEFAULT",
+#   "calculatedAt": "2025-05-20T04:52:24.803373Z"
+# }
+
+### Batch Calculate Surcharges
+POST {{FeeNominalService_HostAddress}}/api/v1/surchargefee/calculate-batch
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+[
+  {
+    "amount": 100.00,
+    "sTxId": "test-transaction-123",
+    "mTxId": "merchant-transaction-456",
+    "country": "US",
+    "region": "CA"
+  },
+  {
+    "amount": 200.00,
+    "sTxId": "test-transaction-789",
+    "mTxId": "merchant-transaction-012",
+    "country": "US",
+    "region": "NY"
+  }
+]
+
+### Response Example:
+# [
+#   {
+#     "surchargeAmount": 3.50,
+#     "totalAmount": 103.50,
+#     "sTxId": "test-transaction-123",
+#     "mTxId": "merchant-transaction-456",
+#     "provider": "DEFAULT",
+#     "calculatedAt": "2025-05-20T04:52:24.803373Z"
+#   },
+#   {
+#     "surchargeAmount": 7.00,
+#     "totalAmount": 207.00,
+#     "sTxId": "test-transaction-789",
+#     "mTxId": "merchant-transaction-012",
+#     "provider": "DEFAULT",
+#     "calculatedAt": "2025-05-20T04:52:24.803373Z"
+#   }
+# ]
+
+### Sale Endpoints
+
+### Process Sale
+POST {{FeeNominalService_HostAddress}}/api/v1/sales/process
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "sTxId": "test-sale-123",
+  "amount": 150.00,
+  "currency": "USD",
+  "mTxId": "merchant-sale-456"
+}
+
+### Response Example:
+# {
+#   "sTxId": "test-sale-123",
+#   "mTxId": "merchant-sale-456",
+#   "amount": 150.00,
+#   "currency": "USD",
+#   "status": "COMPLETED",
+#   "processedAt": "2025-05-20T04:52:24.803373Z"
+# }
+
+### Batch Process Sales
+POST {{FeeNominalService_HostAddress}}/api/v1/sales/process-batch
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+[
+  {
+    "sTxId": "test-sale-123",
+    "amount": 150.00,
+    "currency": "USD",
+    "mTxId": "merchant-sale-456"
+  },
+  {
+    "sTxId": "test-sale-789",
+    "amount": 250.00,
+    "currency": "USD",
+    "mTxId": "merchant-sale-012"
+  }
+]
+
+### Response Example:
+# [
+#   {
+#     "sTxId": "test-sale-123",
+#     "mTxId": "merchant-sale-456",
+#     "amount": 150.00,
+#     "currency": "USD",
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   },
+#   {
+#     "sTxId": "test-sale-789",
+#     "mTxId": "merchant-sale-012",
+#     "amount": 250.00,
+#     "currency": "USD",
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   }
+# ]
+
+### Refund Endpoints
+
+### Process Refund
+POST {{FeeNominalService_HostAddress}}/api/v1/refunds/process
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "sTxId": "test-refund-123",
+  "amount": 50.00,
+  "mTxId": "merchant-refund-456",
+  "cardToken": "card-token-123"
+}
+
+### Response Example:
+# {
+#   "sTxId": "test-refund-123",
+#   "mTxId": "merchant-refund-456",
+#   "amount": 50.00,
+#   "status": "COMPLETED",
+#   "processedAt": "2025-05-20T04:52:24.803373Z"
+# }
+
+### Batch Process Refunds
+POST {{FeeNominalService_HostAddress}}/api/v1/refunds/process-batch
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+[
+  {
+    "sTxId": "test-refund-123",
+    "amount": 50.00,
+    "mTxId": "merchant-refund-456",
+    "cardToken": "card-token-123"
+  },
+  {
+    "sTxId": "test-refund-789",
+    "amount": 75.00,
+    "mTxId": "merchant-refund-012",
+    "cardToken": "card-token-456"
+  }
+]
+
+### Response Example:
+# [
+#   {
+#     "sTxId": "test-refund-123",
+#     "mTxId": "merchant-refund-456",
+#     "amount": 50.00,
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   },
+#   {
+#     "sTxId": "test-refund-789",
+#     "mTxId": "merchant-refund-012",
+#     "amount": 75.00,
+#     "status": "COMPLETED",
+#     "processedAt": "2025-05-20T04:52:24.803373Z"
+#   }
+# ]
+
+### Surcharge Provider Endpoints
+
+### Create Surcharge Provider
+POST {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+    "name": "Interpayments",
+    "code": "INTERPAY",
+    "description": "Interpayments Surcharge Provider",
+    "baseUrl": "https://api.interpayments.com/v1",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            }
+        ]
+    },
+    "status": "active"
+}
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments",
+#   "code": "INTERPAY",
+#   "description": "Interpayments Surcharge Provider",
+#   "baseUrl": "https://api.interpayments.com/v1",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [
+#           {
+#               "name": "client_id",
+#               "type": "string",
+#               "description": "Interpayments Client ID"
+#           },
+#           {
+#               "name": "client_secret",
+#               "type": "string",
+#               "description": "Interpayments Client Secret"
+#           },
+#           {
+#               "name": "audience",
+#               "type": "string",
+#               "description": "JWT Audience"
+#           },
+#           {
+#               "name": "issuer",
+#               "type": "string",
+#               "description": "JWT Issuer"
+#           }
+#       ]
+#   },
+#   "status": "active",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:30:00Z"
+# }
+
+### Get All Surcharge Providers
+GET {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# [
+#   {
+#     "id": "123e4567-e89b-12d3-a456-426614174000",
+#     "name": "Interpayments",
+#     "code": "INTERPAY",
+#     "description": "Interpayments Surcharge Provider",
+#     "baseUrl": "https://api.interpayments.com/v1",
+#     "authenticationType": "JWT",
+#     "credentialsSchema": {
+#         "required_fields": [
+#             {
+#                 "name": "client_id",
+#                 "type": "string",
+#                 "description": "Interpayments Client ID"
+#             },
+#             {
+#                 "name": "client_secret",
+#                 "type": "string",
+#                 "description": "Interpayments Client Secret"
+#             },
+#             {
+#                 "name": "audience",
+#                 "type": "string",
+#                 "description": "JWT Audience"
+#             },
+#             {
+#                 "name": "issuer",
+#                 "type": "string",
+#                 "description": "JWT Issuer"
+#             }
+#         ]
+#     },
+#     "status": "active",
+#     "createdAt": "2024-03-20T10:30:00Z",
+#     "updatedAt": "2024-03-20T10:30:00Z"
+#   }
+# ]
+
+### Get Surcharge Provider by ID
+GET {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments",
+#   "code": "INTERPAY",
+#   "description": "Interpayments Surcharge Provider",
+#   "baseUrl": "https://api.interpayments.com/v1",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [
+#           {
+#               "name": "client_id",
+#               "type": "string",
+#               "description": "Interpayments Client ID"
+#           },
+#           {
+#               "name": "client_secret",
+#               "type": "string",
+#               "description": "Interpayments Client Secret"
+#           },
+#           {
+#               "name": "audience",
+#               "type": "string",
+#               "description": "JWT Audience"
+#           },
+#           {
+#               "name": "issuer",
+#               "type": "string",
+#               "description": "JWT Issuer"
+#           }
+#       ]
+#   },
+#   "status": "active",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:30:00Z"
+# }
+
+### Update Surcharge Provider
+PUT {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+    "name": "Interpayments Updated",
+    "description": "Updated Interpayments Configuration",
+    "baseUrl": "https://api.interpayments.com/v2",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            },
+            {
+                "name": "token_endpoint",
+                "type": "string",
+                "description": "JWT Token Endpoint"
+            }
+        ]
+    },
+    "status": "active"
+}
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments Updated",
+#   "code": "INTERPAY",
+#   "description": "Updated Interpayments Configuration",
+#   "baseUrl": "https://api.interpayments.com/v2",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [
+#           {
+#               "name": "client_id",
+#               "type": "string",
+#               "description": "Interpayments Client ID"
+#           },
+#           {
+#               "name": "client_secret",
+#               "type": "string",
+#               "description": "Interpayments Client Secret"
+#           },
+#           {
+#               "name": "audience",
+#               "type": "string",
+#               "description": "JWT Audience"
+#           },
+#           {
+#               "name": "issuer",
+#               "type": "string",
+#               "description": "JWT Issuer"
+#           },
+#           {
+#               "name": "token_endpoint",
+#               "type": "string",
+#               "description": "JWT Token Endpoint"
+#           }
+#       ]
+#   },
+#   "status": "active",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:35:00Z"
+# }
+
+### Delete Surcharge Provider
+DELETE {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Response Example:
+# {
+#   "success": true,
+#   "message": "Provider deleted successfully"
+# }

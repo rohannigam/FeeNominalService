@@ -66,5 +66,8 @@ namespace FeeNominalService.Models.SurchargeProvider
         [Column("updated_by")]
         [MaxLength(50)]
         public required string UpdatedBy { get; set; }
+
+        // Navigation properties
+        public virtual ICollection<SurchargeProviderConfig>? Configurations { get; set; }
     }
 } 

@@ -1,0 +1,930 @@
+I'll analyze your codebase and provide a comprehensive step-by-step plan to implement the surcharge endpoints with Interpayments integration. Let me first examine your current structure.
+
+Ran tool
+Read file: Controllers/V1/SurchargeFeeController.cs
+Read file: Services/ISurchargeFeeService.cs
+Read file: Models/SurchargeRequest.cs
+Ran tool
+Read file: Data/Evolve/1.0.0/V1_0_0_4__create_transaction_tables.sql
+Read file: Models/SurchargeProvider/SurchargeProvider.cs
+Read file: Models/SurchargeProvider/SurchargeProviderConfig.cs
+Read file: Program.cs
+Read file: Program.cs
+Now let me examine the existing surcharge provider structure to understand what's already in place:
+
+Read file: Controllers/V1/SurchargeProviderController.cs
+Based on my analysis of your codebase, here's a comprehensive step-by-step plan to implement the surcharge endpoints with Interpayments integration:
+
+## **Comprehensive Implementation Plan for Surcharge Endpoints**
+
+### **Phase 1: Database Schema Changes**
+
+#### **Step 1.1: Create surcharge_trans table migration**
+- **File**: `Data/Evolve/1.0.0/V1_0_0_13__create_surcharge_trans_table.sql`
+- **Purpose**: Create the main table for storing surcharge transaction records
+- **Key Fields**:
+  - `surcharge_trans_id` (UUID, Primary Key)
+  - `merchant_id` (UUID, Foreign Key to merchants)
+  - `provider_config_id` (UUID, Foreign Key to surcharge_provider_configs)
+  - `operation_type` (VARCHAR(20) - 'auth', 'refund', 'void', 'split_shipment')
+  - `source_transaction_id` (VARCHAR(255) - upstream payment transaction ID)
+  - `request_payload` (JSONB - full request sent to Interpayments)
+  - `response_payload` (JSONB - full response from Interpayments)
+  - `status` (VARCHAR(20) - 'pending', 'processing', 'completed', 'failed', 'cancelled')
+  - `amount` (DECIMAL(19,4) - surcharge amount)
+  - `currency` (VARCHAR(3))
+  - `error_message` (TEXT)
+  - `created_at`, `updated_at` (timestamps)
+  - `processed_at` (timestamp when Interpayments responded)
+
+#### **Step 1.2: Create rollback script**
+- **File**: `Data/Evolve/1.0.0/Rollback/V1_0_0_13__create_surcharge_trans_table_rollback.sql`
+- **Purpose**: Drop the surcharge_trans table if needed
+
+#### **Step 1.3: Create indexes for performance**
+- **File**: `Data/Evolve/1.0.0/V1_0_0_14__create_surcharge_trans_indexes.sql`
+- **Indexes**:
+  - `idx_surcharge_trans_merchant_id`
+  - `idx_surcharge_trans_provider_config_id`
+  - `idx_surcharge_trans_source_transaction_id`
+  - `idx_surcharge_trans_status`
+  - `idx_surcharge_trans_created_at`
+  - `idx_surcharge_trans_operation_type`
+
+### **Phase 2: Model Updates**
+
+#### **Step 2.1: Create SurchargeTransaction model**
+- **File**: `Models/SurchargeTransaction.cs`
+- **Purpose**: Entity model for surcharge_trans table
+- **Include**: All fields from the database schema with proper annotations
+
+#### **Step 2.2: Create SurchargeOperationType enum**
+- **File**: `Models/SurchargeOperationType.cs`
+- **Values**: Auth, Refund, Void, SplitShipment
+
+#### **Step 2.3: Create SurchargeTransactionStatus enum**
+- **File**: `Models/SurchargeTransactionStatus.cs`
+- **Values**: Pending, Processing, Completed, Failed, Cancelled
+
+#### **Step 2.4: Create request/response models for each operation**
+- **Files**:
+  - `Models/Surcharge/Requests/SurchargeAuthRequest.cs`
+  - `Models/Surcharge/Requests/SurchargeRefundRequest.cs`
+  - `Models/Surcharge/Requests/SurchargeVoidRequest.cs`
+  - `Models/Surcharge/Requests/SurchargeSplitShipmentRequest.cs`
+  - `Models/Surcharge/Responses/SurchargeAuthResponse.cs`
+  - `Models/Surcharge/Responses/SurchargeRefundResponse.cs`
+  - `Models/Surcharge/Responses/SurchargeVoidResponse.cs`
+  - `Models/Surcharge/Responses/SurchargeSplitShipmentResponse.cs`
+
+### **Phase 3: Repository Layer**
+
+#### **Step 3.1: Create ISurchargeTransactionRepository interface**
+- **File**: `Repositories/ISurchargeTransactionRepository.cs`
+- **Methods**:
+  - `CreateAsync(SurchargeTransaction transaction)`
+  - `GetByIdAsync(Guid id)`
+  - `GetBySourceTransactionIdAsync(string sourceTransactionId)`
+  - `GetByMerchantIdAsync(string merchantId, int page, int pageSize)`
+  - `UpdateAsync(SurchargeTransaction transaction)`
+  - `GetByStatusAsync(SurchargeTransactionStatus status)`
+
+#### **Step 3.2: Create SurchargeTransactionRepository implementation**
+- **File**: `Repositories/SurchargeTransactionRepository.cs`
+- **Purpose**: Implement all repository methods with proper Entity Framework queries
+
+### **Phase 4: Service Layer**
+
+#### **Step 4.1: Create ISurchargeTransactionService interface**
+- **File**: `Services/ISurchargeTransactionService.cs`
+- **Methods**:
+  - `ProcessAuthAsync(SurchargeAuthRequest request)`
+  - `ProcessRefundAsync(SurchargeRefundRequest request)`
+  - `ProcessVoidAsync(SurchargeVoidRequest request)`
+  - `ProcessSplitShipmentAsync(SurchargeSplitShipmentRequest request)`
+  - `GetTransactionByIdAsync(Guid id)`
+  - `GetTransactionsByMerchantAsync(string merchantId, int page, int pageSize)`
+
+#### **Step 4.2: Create SurchargeTransactionService implementation**
+- **File**: `Services/SurchargeTransactionService.cs`
+- **Purpose**: Core business logic for surcharge operations
+- **Features**:
+  - Validate requests
+  - Create transaction records
+  - Call Interpayments API
+  - Update transaction status
+  - Handle errors and retries
+  - Audit logging
+
+#### **Step 4.3: Create Interpayments integration service**
+- **File**: `Services/InterpaymentsService.cs`
+- **Purpose**: Handle all HTTP communication with Interpayments
+- **Features**:
+  - Authentication with Interpayments
+  - Request signing
+  - Response parsing
+  - Error handling
+  - Retry logic
+
+### **Phase 5: Controller Layer**
+
+#### **Step 5.1: Create new SurchargeController**
+- **File**: `Controllers/V1/SurchargeController.cs`
+- **Endpoints**:
+  - `POST /api/v1/surcharge/auth` - Process authorization surcharge
+  - `POST /api/v1/surcharge/refund` - Process refund surcharge
+  - `POST /api/v1/surcharge/void` - Process void surcharge
+  - `POST /api/v1/surcharge/split-shipment` - Process split shipment surcharge
+  - `GET /api/v1/surcharge/transactions/{id}` - Get transaction by ID
+  - `GET /api/v1/surcharge/transactions` - Get merchant transactions (paginated)
+
+#### **Step 5.2: Update existing SurchargeFeeController**
+- **Purpose**: Deprecate old endpoints and redirect to new ones
+- **Add**: Deprecation warnings and redirects
+
+### **Phase 6: Configuration and Integration**
+
+#### **Step 6.1: Add Interpayments configuration**
+- **File**: `appsettings.json` updates
+- **Settings**:
+  - Interpayments base URL
+  - Authentication credentials
+  - Timeout settings
+  - Retry configuration
+
+#### **Step 6.2: Update Program.cs**
+- **Add**: Service registrations for new services and repositories
+- **Register**: InterpaymentsService, SurchargeTransactionService, SurchargeTransactionRepository
+
+#### **Step 6.3: Update ApplicationDbContext**
+- **Add**: DbSet for SurchargeTransaction
+- **Configure**: Entity relationships and constraints
+
+### **Phase 7: Testing and Documentation**
+
+#### **Step 7.1: Update Swagger configuration**
+- **File**: `Swagger/SwaggerConfiguration.cs`
+- **Add**: New endpoint documentation
+- **Include**: Request/response examples
+
+#### **Step 7.2: Update HTTP test file**
+- **File**: `FeeNominalService.http`
+- **Add**: Test requests for all new endpoints
+
+#### **Step 7.3: Update documentation**
+- **File**: `SurchargeCalcuilationDocumentation.md`
+- **Add**: New endpoint documentation
+- **Include**: Request/response schemas
+- **Add**: Integration examples
+
+### **Phase 8: Migration and Deployment**
+
+#### **Step 8.1: Test migrations locally**
+- **Run**: Migration scripts in development environment
+- **Verify**: Table creation and data integrity
+
+#### **Step 8.2: Update database seeder**
+- **File**: `Data/DbSeeder.cs`
+- **Add**: Sample surcharge transaction data for testing
+
+#### **Step 8.3: Performance testing**
+- **Test**: API response times
+- **Verify**: Database query performance
+- **Optimize**: Indexes if needed
+
+### **Key Implementation Details:**
+
+1. **Foreign Key Constraints**: Ensure `surcharge_trans.provider_config_id` references `surcharge_provider_configs.surcharge_provider_config_id`
+
+2. **JSONB Storage**: Use PostgreSQL JSONB for request/response payloads with compression
+
+3. **Audit Trail**: Every surcharge transaction will be logged with full request/response data
+
+4. **Error Handling**: Comprehensive error handling with proper HTTP status codes
+
+5. **Rate Limiting**: Implement rate limiting per merchant and provider configuration
+
+6. **Security**: All endpoints require API key authentication with proper authorization
+
+Would you like me to start implementing this plan? I can begin with any specific phase or step you'd prefer to tackle first.
+
+
+
+######################################################################################################################################
+As of 6/20/2025 - What we achieved
+######################################################################################################################################
+I'll analyze the source code to document the surcharge-related transactions and endpoints that have been implemented, particularly focusing on the Interpayments integration. Let me examine the relevant files.
+
+Search files...
+Search files...
+Search files...
+Ran tool
+Search files...
+Read file: Services/SurchargeTransactionService.cs
+Read file: Models/SurchargeProvider/SurchargeProvider.cs
+Read file: Models/SurchargeProvider/SurchargeProviderConfig.cs
+Read file: Data/Evolve/1.0.0/V1_0_0_13__create_surcharge_trans_table.sql
+Read file: Data/Evolve/1.0.0/V1_0_0_14__create_supported_providers_table.sql
+Based on my comprehensive analysis of the source code, here's a detailed documentation of all the surcharge-related transactions and endpoints that have been implemented, particularly focusing on the Interpayments integration:
+
+# **Surcharge-Related Transactions and Endpoints Documentation**
+
+## **Overview**
+The FeeNominalService has been architected to support comprehensive surcharge transaction processing with provider integration capabilities, particularly designed for Interpayments integration. The system implements a complete workflow-based approach that replaces the deprecated simple calculation endpoints.
+
+---
+
+## **1. Database Schema & Infrastructure**
+
+### **Core Tables Implemented:**
+
+#### **1.1 Surcharge Transaction Table (`surcharge_trans`)**
+- **Purpose**: Stores all surcharge transaction records with full audit trail
+- **Key Fields**:
+  - `surcharge_trans_id` (UUID, Primary Key)
+  - `merchant_id` (UUID, Foreign Key to merchants)
+  - `provider_config_id` (UUID, Foreign Key to surcharge_provider_configs)
+  - `operation_type` (ENUM: 'auth', 'sale', 'refund', 'cancel')
+  - `source_transaction_id` (VARCHAR(255))
+  - `request_payload` (JSONB) - Full request sent to provider
+  - `response_payload` (JSONB) - Full response from provider
+  - `status` (ENUM: 'pending', 'processing', 'completed', 'failed', 'cancelled')
+  - `amount` (DECIMAL(19,4))
+  - `currency` (VARCHAR(3), Default: 'USD')
+  - `error_message` (TEXT)
+  - `created_at`, `updated_at`, `processed_at` (Timestamps)
+
+#### **1.2 Surcharge Provider Table (`surcharge_providers`)**
+- **Purpose**: Defines available surcharge service providers
+- **Key Fields**:
+  - `surcharge_provider_id` (UUID, Primary Key)
+  - `name`, `code`, `description`
+  - `base_url` (Provider API endpoint)
+  - `authentication_type` (e.g., 'JWT', 'API_KEY')
+  - `credentials_schema` (JSONB) - Schema for required credentials
+  - `status_id` (Foreign Key to status table)
+
+#### **1.3 Surcharge Provider Config Table (`surcharge_provider_configs`)**
+- **Purpose**: Merchant-specific provider configurations
+- **Key Fields**:
+  - `surcharge_provider_config_id` (UUID, Primary Key)
+  - `merchant_id` (VARCHAR(50))
+  - `provider_id` (UUID, Foreign Key to surcharge_providers)
+  - `config_name` (VARCHAR(100))
+  - `credentials` (JSONB) - Encrypted provider credentials
+  - `is_active`, `is_primary` (Boolean flags)
+  - Performance tracking fields: `rate_limit`, `timeout`, `retry_count`
+  - Usage statistics: `success_count`, `error_count`, `average_response_time`
+
+#### **1.4 Supported Providers Table (`supported_providers`)**
+- **Purpose**: Pre-configured provider metadata
+- **Pre-loaded Data**:
+  - `INTERPAYMENTS` - Interpayments Surcharge Provider (JWT authentication)
+  - `GENERIC` - Generic provider for future use (API_KEY authentication)
+
+---
+
+## **2. Surcharge Transaction Models & DTOs**
+
+### **2.1 Request Models**
+
+#### **SurchargeAuthRequest**
+```csharp
+public class SurchargeAuthRequest
+{
+    public required string Nicn { get; set; }                    // Network Interchange Card Number
+    public required string Processor { get; set; }               // Processor configuration
+    public decimal Amount { get; set; }                          // Transaction amount
+    public decimal? TotalAmount { get; set; }                    // Total with surcharge
+    public required string Country { get; set; }                 // 2-letter country code
+    public string? Region { get; set; }                          // 2-letter region code
+    public List<string>? Campaign { get; set; }                  // Campaign identifiers
+    public List<string>? Data { get; set; }                      // Additional data points
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public string? CardToken { get; set; }                       // Tokenized card info
+    public EntryMethod EntryMethod { get; set; }                 // Card entry method
+    public decimal? NonSurchargableAmount { get; set; }          // Non-surchargable amount
+}
+```
+
+#### **SurchargeSaleRequest**
+```csharp
+public class SurchargeSaleRequest
+{
+    public required string Nicn { get; set; }                    // Network Interchange Card Number
+    public required string Processor { get; set; }               // Processor configuration
+    public decimal Amount { get; set; }                          // Transaction amount
+    public decimal? TotalAmount { get; set; }                    // Total with surcharge
+    public required string Country { get; set; }                 // 2-letter country code
+    public string? Region { get; set; }                          // 2-letter region code
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public string? CardToken { get; set; }                       // Tokenized card info
+    public EntryMethod EntryMethod { get; set; }                 // Card entry method
+    public required string AuthorizationTransactionId { get; set; } // Auth transaction ID
+}
+```
+
+#### **SurchargeRefundRequest**
+```csharp
+public class SurchargeRefundRequest
+{
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public required string OriginalTransactionId { get; set; }   // Original transaction ID
+    public decimal Amount { get; set; }                          // Refund amount
+    public string Currency { get; set; } = "USD";                // Currency code
+    public string? RefundReason { get; set; }                    // Refund reason
+    public string? CardToken { get; set; }                       // Tokenized card info
+}
+```
+
+#### **SurchargeCancelRequest**
+```csharp
+public class SurchargeCancelRequest
+{
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public required string OriginalTransactionId { get; set; }   // Original transaction ID
+    public string? CancelReason { get; set; }                    // Cancel reason
+}
+```
+
+### **2.2 Response Models**
+
+#### **SurchargeAuthResponse**
+```csharp
+public class SurchargeAuthResponse
+{
+    public required Guid SurchargeTransactionId { get; set; }    // Unique transaction ID
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public required decimal OriginalAmount { get; set; }         // Original amount
+    public required decimal SurchargeAmount { get; set; }        // Surcharge calculated
+    public required decimal TotalAmount { get; set; }            // Total with surcharge
+    public required string Currency { get; set; }                // Currency code
+    public required string Status { get; set; }                  // Transaction status
+    public required string Provider { get; set; }                // Provider used
+    public required DateTime ProcessedAt { get; set; }           // Processing timestamp
+    public string? ErrorMessage { get; set; }                    // Error message if failed
+}
+```
+
+#### **SurchargeSaleResponse**
+```csharp
+public class SurchargeSaleResponse
+{
+    public required Guid SurchargeTransactionId { get; set; }    // Unique transaction ID
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public required decimal OriginalAmount { get; set; }         // Original amount
+    public required decimal SurchargeAmount { get; set; }        // Surcharge amount
+    public required decimal TotalAmount { get; set; }            // Total with surcharge
+    public required string Currency { get; set; }                // Currency code
+    public required string Status { get; set; }                  // Transaction status
+    public required string Provider { get; set; }                // Provider used
+    public required DateTime ProcessedAt { get; set; }           // Processing timestamp
+    public string? ErrorMessage { get; set; }                    // Error message if failed
+}
+```
+
+#### **SurchargeRefundResponse**
+```csharp
+public class SurchargeRefundResponse
+{
+    public required string RefundId { get; set; }                // Refund transaction ID
+    public required string Status { get; set; }                  // Refund status
+    public required int RefundAmount { get; set; }               // Refund amount (cents)
+    public required string Currency { get; set; }                // Currency code
+    public required string OriginalTransactionId { get; set; }   // Original transaction ID
+    public required DateTime ProcessedAt { get; set; }           // Processing timestamp
+    public string? ErrorMessage { get; set; }                    // Error message if failed
+}
+```
+
+#### **SurchargeCancelResponse**
+```csharp
+public class SurchargeCancelResponse
+{
+    public required Guid SurchargeTransactionId { get; set; }    // Unique transaction ID
+    public required string SystemTransactionId { get; set; }     // System transaction ID
+    public string? MerchantTransactionId { get; set; }           // Merchant transaction ID
+    public required string OriginalTransactionId { get; set; }   // Original transaction ID
+    public required string Status { get; set; }                  // Transaction status
+    public required string Provider { get; set; }                // Provider used
+    public required DateTime ProcessedAt { get; set; }           // Processing timestamp
+    public string? ErrorMessage { get; set; }                    // Error message if failed
+}
+```
+
+---
+
+## **3. Service Layer Implementation**
+
+### **3.1 SurchargeTransactionService Interface**
+```csharp
+public interface ISurchargeTransactionService
+{
+    Task<SurchargeAuthResponse> ProcessAuthAsync(SurchargeAuthRequest request, Guid merchantId);
+    Task<SurchargeSaleResponse> ProcessSaleAsync(SurchargeSaleRequest request, Guid merchantId);
+    Task<SurchargeRefundResponse> ProcessRefundAsync(SurchargeRefundRequest request, Guid merchantId);
+    Task<SurchargeCancelResponse> ProcessCancelAsync(SurchargeCancelRequest request, Guid merchantId);
+    Task<SurchargeTransaction?> GetTransactionByIdAsync(Guid id, Guid merchantId);
+    Task<(List<SurchargeTransaction> Transactions, int TotalCount)> GetTransactionsByMerchantAsync(
+        Guid merchantId, int page, int pageSize, SurchargeOperationType? operationType, SurchargeTransactionStatus? status);
+}
+```
+
+### **3.2 Current Implementation Status**
+- **Service Layer**: ✅ **Fully Defined** - All interfaces and method signatures implemented
+- **Repository Layer**: ✅ **Fully Implemented** - Complete CRUD operations with pagination
+- **Business Logic**: ⚠️ **Partially Implemented** - Service methods have TODO placeholders for Interpayments integration
+- **Provider Integration**: ⚠️ **Framework Ready** - Provider configuration system implemented, awaiting Interpayments API integration
+
+---
+
+## **4. Surcharge Provider Management**
+
+### **4.1 Provider Endpoints (Fully Implemented)**
+
+#### **Base Route**: `/api/v1/surcharge/providers`
+
+#### **4.1.1 Create Surcharge Provider**
+- **Endpoint**: `POST /api/v1/surcharge/providers`
+- **Purpose**: Register a new surcharge provider (e.g., Interpayments)
+- **Request Body**:
+```json
+{
+    "name": "Interpayments",
+    "code": "INTERPAY",
+    "description": "Interpayments Surcharge Provider",
+    "baseUrl": "https://api.interpayments.com/v1",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "JWT Audience"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "JWT Issuer"
+            }
+        ]
+    },
+    "statusCode": "active"
+}
+```
+
+#### **4.1.2 Get All Providers**
+- **Endpoint**: `GET /api/v1/surcharge/providers`
+- **Purpose**: Retrieve all configured surcharge providers
+
+#### **4.1.3 Get Provider by ID**
+- **Endpoint**: `GET /api/v1/surcharge/providers/{id}`
+- **Purpose**: Retrieve specific provider configuration
+
+#### **4.1.4 Update Provider**
+- **Endpoint**: `PUT /api/v1/surcharge/providers/{id}`
+- **Purpose**: Update existing provider configuration
+
+#### **4.1.5 Delete Provider**
+- **Endpoint**: `DELETE /api/v1/surcharge/providers/{id}`
+- **Purpose**: Remove provider configuration
+
+---
+
+## **5. Planned Surcharge Transaction Endpoints**
+
+### **5.1 New Endpoints (Coming Soon)**
+
+#### **Base Route**: `/api/v1/surcharge`
+
+#### **5.1.1 Authorization Endpoint**
+- **Endpoint**: `POST /api/v1/surcharge/auth`
+- **Purpose**: Process authorization surcharge calculation
+- **Authentication**: Required (X-API-Key header)
+- **Request Body**: `SurchargeAuthRequest`
+- **Response**: `SurchargeAuthResponse`
+
+#### **5.1.2 Sale Endpoint**
+- **Endpoint**: `POST /api/v1/surcharge/sale`
+- **Purpose**: Process sale surcharge calculation
+- **Authentication**: Required (X-API-Key header)
+- **Request Body**: `SurchargeSaleRequest`
+- **Response**: `SurchargeSaleResponse`
+
+#### **5.1.3 Refund Endpoint**
+- **Endpoint**: `POST /api/v1/surcharge/refund`
+- **Purpose**: Process refund surcharge calculation
+- **Authentication**: Required (X-API-Key header)
+- **Request Body**: `SurchargeRefundRequest`
+- **Response**: `SurchargeRefundResponse`
+
+#### **5.1.4 Cancel Endpoint**
+- **Endpoint**: `POST /api/v1/surcharge/cancel`
+- **Purpose**: Process cancellation surcharge calculation
+- **Authentication**: Required (X-API-Key header)
+- **Request Body**: `SurchargeCancelRequest`
+- **Response**: `SurchargeCancelResponse`
+
+#### **5.1.5 Transaction Management Endpoints**
+- **Get Transaction**: `GET /api/v1/surcharge/transactions/{id}`
+- **List Transactions**: `GET /api/v1/surcharge/transactions`
+- **Split Shipment**: `POST /api/v1/surcharge/split-shipment`
+
+---
+
+## **6. Interpayments Integration Framework**
+
+### **6.1 Provider Configuration for Interpayments**
+```json
+{
+    "name": "Interpayments",
+    "code": "INTERPAYMENTS",
+    "description": "Interpayments Surcharge Provider",
+    "baseUrl": "https://api.interpayments.com/v1",
+    "authenticationType": "JWT",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "client_id",
+                "type": "string",
+                "description": "Interpayments Client ID"
+            },
+            {
+                "name": "client_secret",
+                "type": "string",
+                "description": "Interpayments Client Secret"
+            },
+            {
+                "name": "audience",
+                "type": "string",
+                "description": "Worldpay Merchant"
+            },
+            {
+                "name": "issuer",
+                "type": "string",
+                "description": "Interpayments"
+            }
+        ]
+    }
+}
+```
+
+### **6.2 Integration Features**
+- **JWT Authentication**: Support for Interpayments JWT token-based authentication
+- **Credential Management**: Secure storage of Interpayments credentials
+- **Rate Limiting**: Configurable rate limits per provider configuration
+- **Retry Logic**: Automatic retry with exponential backoff
+- **Performance Monitoring**: Track response times, success/error rates
+- **Audit Trail**: Complete request/response logging
+
+---
+
+## **7. Deprecated Endpoints**
+
+### **7.1 Old Surcharge Fee Endpoints (Deprecated)**
+- `POST /api/v1/surchargefee/calculate` - Simple calculation endpoint
+- `POST /api/v1/surchargefee/calculate-batch` - Batch calculation endpoint
+
+**Note**: These endpoints have been deprecated in favor of the new workflow-based endpoints that integrate directly with surcharge providers and store transaction records.
+
+---
+
+## **8. Implementation Status Summary**
+
+### **✅ Completed Components**
+1. **Database Schema**: Complete with all necessary tables, indexes, and enums
+2. **Data Models**: All request/response DTOs fully implemented
+3. **Repository Layer**: Complete CRUD operations with pagination and filtering
+4. **Provider Management**: Full provider CRUD operations implemented
+5. **Service Interfaces**: All service contracts defined
+6. **Authentication & Authorization**: Integrated with existing API key system
+
+### **⚠️ Partially Implemented Components**
+1. **Business Logic**: Service methods have TODO placeholders
+2. **Provider Integration**: Framework ready, awaiting Interpayments API integration
+3. **Transaction Endpoints**: Controllers not yet implemented
+
+### **🚧 Next Steps Required**
+1. **Implement SurchargeTransactionController** with all CRUD endpoints
+2. **Complete SurchargeTransactionService** business logic
+3. **Integrate Interpayments API** calls in service methods
+4. **Add comprehensive error handling** and validation
+5. **Implement provider credential encryption** and secure storage
+6. **Add comprehensive logging** and monitoring
+
+---
+
+## **9. Security & Compliance Features**
+
+### **9.1 Security Measures**
+- **API Key Authentication**: All endpoints require valid API keys
+- **Merchant Isolation**: Transactions are isolated by merchant ID
+- **Credential Encryption**: Provider credentials stored securely
+- **Audit Logging**: Complete transaction audit trail
+- **Rate Limiting**: Configurable per provider configuration
+
+### **9.2 Compliance Features**
+- **PCI Compliance**: Card tokenization support
+- **Data Retention**: Configurable data retention policies
+- **Audit Trail**: Complete request/response logging
+- **Error Handling**: Comprehensive error tracking and reporting
+
+This comprehensive framework provides a solid foundation for surcharge transaction processing with Interpayments integration, offering scalability, security, and full audit capabilities.
+
+# Surcharge Transaction Implementation Guide
+
+## **Overview**
+This document outlines the implementation of surcharge transaction processing in the FeeNominalService, including provider management, credential validation, and transaction processing.
+
+## **1. Enhanced Validation System**
+
+### **1.1 Configurable Validation Settings**
+The system now includes comprehensive, configurable validation for surcharge providers and credentials:
+
+**Configuration Section:** `SurchargeProviderValidation`
+```json
+{
+  "SurchargeProviderValidation": {
+    "MaxSchemaNameLength": 100,
+    "MaxSchemaDescriptionLength": 500,
+    "MaxFieldNameLength": 100,
+    "MaxFieldDescriptionLength": 500,
+    "MaxCredentialValueLength": 10000,
+    "MaxCredentialsObjectSize": 50000,
+    "MaxSchemaObjectSize": 10000,
+    "MaxRequiredFields": 20,
+    "MaxOptionalFields": 10,
+    "ValidateJwtFormat": true,
+    "ValidateApiKeyFormat": true,
+    "ValidateEmailFormat": true,
+    "ValidateUrlFormat": true,
+    "MinCredentialValueLength": 1,
+    "MaxConfigNameLength": 100,
+    "MaxTimeoutSeconds": 300,
+    "MaxRetryCount": 10,
+    "MaxRetryDelaySeconds": 60,
+    "MaxRateLimit": 10000,
+    "MaxRateLimitPeriodSeconds": 3600
+  }
+}
+```
+
+### **1.2 Credential Format Validation**
+The system validates credential formats based on field types:
+
+- **JWT Tokens**: Validates 3-part structure with base64url encoding
+- **API Keys**: Validates alphanumeric format with hyphens/underscores (16-128 chars)
+- **Emails**: Validates email format using regex
+- **URLs**: Validates HTTP/HTTPS URL format
+- **Certificates**: Validates PEM certificate format
+- **Private/Public Keys**: Validates PEM key format
+- **Base64**: Validates base64url encoding
+- **JSON**: Validates JSON structure
+
+### **1.3 Size and Content Validation**
+- **Schema Size**: Configurable maximum schema object size
+- **Credentials Size**: Configurable maximum credentials object size
+- **Field Limits**: Configurable maximum number of required/optional fields
+- **Value Length**: Configurable minimum/maximum credential value lengths
+
+## **2. Single API Call Provider Creation**
+
+### **2.1 Enhanced Request Model**
+The `SurchargeProviderRequest` now supports creating both provider and configuration in a single call:
+
+```json
+{
+  "name": "Interpayments",
+  "code": "INTERPAY",
+  "description": "Interpayments Surcharge Provider",
+  "baseUrl": "https://api.interpayments.com/v1",
+  "authenticationType": "JWT",
+  "credentialsSchema": {
+    "name": "JWT Credentials",
+    "description": "JWT-based authentication for Interpayments",
+    "required_fields": [
+      {
+        "name": "client_id",
+        "type": "string",
+        "description": "Interpayments Client ID"
+      },
+      {
+        "name": "client_secret",
+        "type": "string",
+        "description": "Interpayments Client Secret"
+      },
+      {
+        "name": "jwt_token",
+        "type": "jwt",
+        "description": "JWT Token for authentication"
+      }
+    ]
+  },
+  "statusCode": "ACTIVE",
+  "configuration": {
+    "configName": "Production Config",
+    "credentials": {
+      "client_id": "interpayments_client_123",
+      "client_secret": "interpayments_secret_456",
+      "jwt_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.actual.jwt.token.here"
+    },
+    "isPrimary": true,
+    "timeout": 30,
+    "retryCount": 3,
+    "retryDelay": 5
+  }
+}
+```
+
+### **2.2 Enhanced Response Model**
+The response includes both provider and configuration details:
+
+```json
+{
+  "id": "provider-guid-here",
+  "name": "Interpayments",
+  "code": "INTERPAY",
+  "description": "Interpayments Surcharge Provider",
+  "baseUrl": "https://api.interpayments.com/v1",
+  "authenticationType": "JWT",
+  "credentialsSchema": { ... },
+  "status": "ACTIVE",
+  "createdAt": "2024-06-10T12:00:00Z",
+  "updatedAt": "2024-06-10T12:00:00Z",
+  "createdBy": "merchant-guid-here",
+  "updatedBy": "merchant-guid-here",
+  "configuration": {
+    "id": "config-guid-here",
+    "configName": "Production Config",
+    "isActive": true,
+    "isPrimary": true,
+    "timeout": 30,
+    "retryCount": 3,
+    "retryDelay": 5,
+    "createdAt": "2024-06-10T12:00:00Z",
+    "updatedAt": "2024-06-10T12:00:00Z"
+  }
+}
+```
+
+## **3. Validation Features**
+
+### **3.1 Schema Validation**
+- **Structure Validation**: Ensures proper JSON structure with required properties
+- **Field Validation**: Validates field names, types, and descriptions
+- **Size Validation**: Configurable limits for schema object size
+- **Field Count Validation**: Configurable limits for required/optional fields
+
+### **3.2 Credential Validation**
+- **Format Validation**: Validates credential formats based on field types
+- **Size Validation**: Configurable limits for credential object and value sizes
+- **Content Validation**: Validates actual credential content (JWT, API keys, etc.)
+- **Length Validation**: Configurable minimum/maximum value lengths
+
+### **3.3 Configuration Validation**
+- **Name Validation**: Configurable maximum configuration name length
+- **Parameter Validation**: Configurable limits for timeout, retry, rate limit settings
+- **Credential Validation**: Validates actual credential values against schema
+
+## **4. Error Handling**
+
+### **4.1 Validation Errors**
+The system provides detailed validation error messages:
+
+```json
+{
+  "message": "Invalid credentials schema",
+  "errors": [
+    "Schema name cannot exceed 100 characters",
+    "required_fields[0].name cannot exceed 100 characters",
+    "required_fields[0].type 'invalid_type' is not a valid field type"
+  ]
+}
+```
+
+### **4.2 Credential Errors**
+```json
+{
+  "message": "Invalid credentials",
+  "errors": [
+    "Credential value 'jwt_token' length (15000) exceeds maximum (10000)",
+    "Invalid JWT token format"
+  ]
+}
+```
+
+## **5. Development vs Production Settings**
+
+### **5.1 Development Environment**
+- **Relaxed Limits**: Higher size and count limits for testing
+- **Disabled Format Validation**: Faster development cycles
+- **Extended Timeouts**: Longer timeouts for debugging
+
+### **5.2 Production Environment**
+- **Strict Limits**: Conservative size and count limits
+- **Enabled Format Validation**: Ensures data quality
+- **Optimized Timeouts**: Performance-focused settings
+
+## **6. Service Architecture**
+
+### **6.1 Validation Services**
+- **`ICredentialValidationService`**: Handles credential format validation
+- **`SurchargeProviderValidationSettings`**: Configurable validation settings
+- **Enhanced Request Models**: Built-in validation with configuration support
+
+### **6.2 Controller Integration**
+- **Enhanced Validation**: Uses configuration settings for validation
+- **Credential Validation**: Validates actual credential values
+- **Atomic Operations**: Single API call for provider + configuration creation
+
+## **7. Benefits of Enhanced Validation**
+
+### **7.1 Improved Data Quality**
+- **Format Validation**: Ensures credentials are in correct format
+- **Size Limits**: Prevents oversized data from affecting performance
+- **Content Validation**: Validates actual credential content
+
+### **7.2 Configurable Limits**
+- **Environment-Specific**: Different limits for dev/prod
+- **Runtime Configuration**: Can be changed without code deployment
+- **Flexible Validation**: Enable/disable specific validation types
+
+### **7.3 Better Developer Experience**
+- **Single API Call**: Create provider + configuration atomically
+- **Detailed Error Messages**: Clear validation error descriptions
+- **Backward Compatibility**: Existing API calls still work
+
+## **8. Migration Guide**
+
+### **8.1 Existing Integrations**
+- **No Breaking Changes**: Existing API calls continue to work
+- **Optional Configuration**: Configuration parameter is optional
+- **Enhanced Validation**: Better validation without breaking changes
+
+### **8.2 New Integrations**
+- **Single Call Creation**: Use configuration parameter for atomic creation
+- **Enhanced Validation**: Benefit from improved validation
+- **Better Error Handling**: More detailed error messages
+
+## **9. Security Considerations**
+
+### **9.1 Credential Security**
+- **Format Validation**: Ensures credentials are in expected format
+- **Size Limits**: Prevents credential stuffing attacks
+- **Content Validation**: Validates credential structure
+
+### **9.2 Configuration Security**
+- **Parameter Limits**: Prevents resource exhaustion
+- **Validation Rules**: Ensures configuration parameters are reasonable
+- **Error Handling**: Secure error messages without information leakage
+
+## **10. Performance Considerations**
+
+### **10.1 Validation Performance**
+- **Configurable Validation**: Enable/disable validation types as needed
+- **Size Limits**: Prevent oversized data from affecting performance
+- **Efficient Validation**: Optimized validation algorithms
+
+### **10.2 Database Performance**
+- **Size Constraints**: Database-level size limits
+- **Indexed Fields**: Proper indexing for performance
+- **Efficient Queries**: Optimized database queries
+
+---
+
+## **Implementation Status**
+
+### **✅ Completed Features**
+- **Enhanced Validation System**: Configurable validation with format checking
+- **Single API Call Creation**: Provider + configuration in one call
+- **Credential Format Validation**: JWT, API key, email, URL validation
+- **Size and Content Validation**: Configurable limits for all aspects
+- **Error Handling**: Detailed validation error messages
+- **Configuration Management**: Environment-specific settings
+
+### **🔄 In Progress**
+- **Provider Integration**: Framework ready for Interpayments integration
+- **Transaction Processing**: Ready for surcharge transaction endpoints
+
+### **📋 Planned Features**
+- **Advanced Credential Validation**: More sophisticated format validation
+- **Performance Monitoring**: Validation performance metrics
+- **Audit Logging**: Validation attempt logging
+- **Rate Limiting**: Validation rate limiting
+

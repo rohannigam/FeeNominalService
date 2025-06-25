@@ -17,11 +17,10 @@ namespace FeeNominalService.Models.SurchargeProvider
 
         [Required]
         [Column("merchant_id")]
-        [MaxLength(50)]
-        public required string MerchantId { get; set; } = string.Empty;
+        public Guid MerchantId { get; set; }
 
         [Required]
-        [Column("provider_id")]
+        [Column("surcharge_provider_id")]
         public Guid ProviderId { get; set; }
 
         [Required]

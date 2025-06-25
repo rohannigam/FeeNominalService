@@ -105,10 +105,17 @@ namespace FeeNominalService.Repositories
         {
             try
             {
+                // Convert string merchantId to Guid for database comparison
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return Enumerable.Empty<SurchargeProviderConfigHistory>();
+                }
+
                 var histories = await _context.SurchargeProviderConfigHistory
                     .Include(h => h.Config)
                     .ThenInclude(c => c!.Provider)
-                    .Where(h => h.Config != null && h.Config.MerchantId == merchantId)
+                    .Where(h => h.Config != null && h.Config.MerchantId == merchantGuid)
                     .OrderByDescending(h => h.ChangedAt)
                     .ToListAsync();
 

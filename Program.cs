@@ -75,6 +75,10 @@ builder.Services.AddHttpClient();
 builder.Services.Configure<ApiKeySettings>(builder.Configuration.GetSection("ApiKeySettings"));
 builder.Services.Configure<ApiKeyConfiguration>(builder.Configuration.GetSection("ApiKeyConfiguration"));
 
+// Configure Surcharge Provider validation settings
+builder.Services.Configure<SurchargeProviderValidationSettings>(builder.Configuration.GetSection("SurchargeProviderValidation"));
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<SurchargeProviderValidationSettings>>().Value);
+
 // Add AWS Secrets Manager
 builder.Services.AddAWSService<IAmazonSecretsManager>();
 
@@ -93,7 +97,11 @@ builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<IMerchantRepository, MerchantRepository>();
 builder.Services.AddScoped<IMerchantAuditTrailRepository, MerchantAuditTrailRepository>();
 builder.Services.AddScoped<ISurchargeProviderRepository, SurchargeProviderRepository>();
+builder.Services.AddScoped<ISurchargeProviderConfigRepository, SurchargeProviderConfigRepository>();
+builder.Services.AddScoped<ISurchargeProviderConfigHistoryRepository, SurchargeProviderConfigHistoryRepository>();
 builder.Services.AddScoped<IApiKeyUsageRepository, ApiKeyUsageRepository>();
+builder.Services.AddScoped<ISurchargeTransactionRepository, SurchargeTransactionRepository>();
+builder.Services.AddScoped<ISupportedProviderRepository, SupportedProviderRepository>();
 
 // Register services
 builder.Services.AddScoped<IMerchantService, MerchantService>();
@@ -101,11 +109,11 @@ builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IRequestSigningService, RequestSigningService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
-builder.Services.AddScoped<ISurchargeFeeService, SurchargeFeeService>();
 builder.Services.AddScoped<ISurchargeProviderService, SurchargeProviderService>();
-builder.Services.AddScoped<IRefundService, RefundService>();
-builder.Services.AddScoped<ISaleService, SaleService>();
+builder.Services.AddScoped<ISurchargeProviderConfigService, SurchargeProviderConfigService>();
 builder.Services.AddScoped<IApiKeyGenerator, ApiKeyGenerator>();
+builder.Services.AddScoped<IProviderValidationService, ProviderValidationService>();
+builder.Services.AddScoped<ICredentialValidationService, CredentialValidationService>();
 builder.Services.AddHostedService<ApiKeyExpirationService>();
 
 // Configure authentication

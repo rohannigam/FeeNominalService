@@ -1139,7 +1139,8 @@
 									"console.log('Generated Timestamp:', timestamp);",
 									"console.log('Generated Nonce:', nonce);",
 									"console.log('Generated Signature:', signature);",
-									"console.log('Data being signed:', dataToSign);"
+									"console.log('Data being signed:', dataToSign);",
+									"console.log('Create Provider URL will be:', pm.request.url.toString());"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1149,46 +1150,56 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// Verify response\r",
-									"pm.test('Status code is 200', function () {\r",
-									"    pm.response.to.have.status(200);\r",
-									"});\r",
-									"\r",
-									"pm.test('Response has required fields', function () {\r",
-									"    var jsonData = pm.response.json();\r",
-									"    pm.expect(jsonData).to.have.property('success', true);\r",
-									"    pm.expect(jsonData).to.have.property('data');\r",
-									"    \r",
-									"    if (jsonData.data) {\r",
-									"        pm.expect(jsonData.data).to.have.property('providerId');\r",
-									"        pm.expect(jsonData.data).to.have.property('merchantId');\r",
-									"        pm.expect(jsonData.data).to.have.property('providerName');\r",
-									"        pm.expect(jsonData.data).to.have.property('providerType');\r",
-									"        pm.expect(jsonData.data).to.have.property('status');\r",
-									"        pm.expect(jsonData.data).to.have.property('createdAt');\r",
-									"        pm.expect(jsonData.data).to.have.property('updatedAt');\r",
-									"        \r",
-									"        // Log the provider details\r",
-									"        console.log('Provider ID:', jsonData.data.providerId);\r",
-									"        console.log('Merchant ID:', jsonData.data.merchantId);\r",
-									"        console.log('Provider Name:', jsonData.data.providerName);\r",
-									"        console.log('Provider Type:', jsonData.data.providerType);\r",
-									"        console.log('Status:', jsonData.data.status);\r",
-									"        console.log('Created At:', jsonData.data.createdAt);\r",
-									"        console.log('Updated At:', jsonData.data.updatedAt);\r",
-									"    }\r",
-									"});\r",
-									"\r",
-									"// Verify the provider was created with correct data\r",
-									"pm.test('Provider was created with correct data', function () {\r",
-									"    var jsonData = pm.response.json();\r",
-									"    var requestBody = JSON.parse(pm.request.body.raw);\r",
-									"    \r",
-									"    if (jsonData.data && requestBody) {\r",
-									"        pm.expect(jsonData.data.providerName).to.equal(requestBody.providerName);\r",
-									"        pm.expect(jsonData.data.providerType).to.equal(requestBody.providerType);\r",
-									"        pm.expect(jsonData.data.status).to.equal('Active');\r",
-									"    }\r",
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    // Check if response is direct provider object or wrapped",
+									"    let providerData = jsonData;",
+									"    if (jsonData.data) {",
+									"        providerData = jsonData.data;",
+									"    }",
+									"    ",
+									"    pm.expect(providerData).to.have.property('id');",
+									"    pm.expect(providerData).to.have.property('name');",
+									"    pm.expect(providerData).to.have.property('code');",
+									"    pm.expect(providerData).to.have.property('baseUrl');",
+									"    pm.expect(providerData).to.have.property('authenticationType');",
+									"    pm.expect(providerData).to.have.property('status');",
+									"    pm.expect(providerData).to.have.property('createdAt');",
+									"    pm.expect(providerData).to.have.property('updatedAt');",
+									"    pm.expect(providerData).to.have.property('createdBy');",
+									"    pm.expect(providerData).to.have.property('updatedBy');",
+									"    ",
+									"    // Save provider data to environment variables for follow-up requests",
+									"    pm.environment.set('providerId', providerData.id);",
+									"    pm.environment.set('providerName', providerData.name);",
+									"    pm.environment.set('providerCode', providerData.code);",
+									"    pm.environment.set('providerDescription', providerData.description || '');",
+									"    pm.environment.set('providerBaseUrl', providerData.baseUrl);",
+									"    pm.environment.set('providerAuthType', providerData.authenticationType);",
+									"    pm.environment.set('providerStatus', providerData.status);",
+									"    ",
+									"    console.log('Saved provider data to environment:');",
+									"    console.log('Provider ID:', providerData.id);",
+									"    console.log('Provider Name:', providerData.name);",
+									"    console.log('Provider Code:', providerData.code);",
+									"    console.log('Provider Status:', providerData.status);",
+									"    ",
+									"    // Verify status is ACTIVE",
+									"    pm.expect(providerData.status).to.equal('ACTIVE');",
+									"    ",
+									"    // Check if configuration was created",
+									"    if (providerData.configuration) {",
+									"        console.log('Provider configuration created successfully');",
+									"        console.log('Configuration ID:', providerData.configuration.id);",
+									"        console.log('Configuration Name:', providerData.configuration.name);",
+									"        console.log('Configuration Status:', providerData.configuration.status);",
+									"    }",
 									"});"
 								],
 								"type": "text/javascript",
@@ -1206,18 +1217,19 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"code\": \"{{providerCode}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"status\": \"{{providerStatus}}\"\n}"
+							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"code\": \"{{providerCode}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"configuration\": {\n        \"ConfigName\": \"{{providerConfigName}}\",\n        \"credentials\": {{providerConfigCredentials}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/surcharge/providers",
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"surcharge",
-								"providers"
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers"
 							]
 						}
 					},
@@ -1230,61 +1242,45 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"// Debug: Check environment variables",
-									"console.log('Environment Variables:');",
-									"console.log('Merchant ID:', pm.environment.get('merchantId'));",
-									"console.log('API Key:', pm.environment.get('apiKey'));",
-									"console.log('Secret Key:', pm.environment.get('apiSecret') ? 'Set' : 'Not Set');",
-									"",
-									"// Generate a nonce (random string)",
-									"const nonce = Math.random().toString(36).substring(2, 12);",
-									"",
-									"// Get current timestamp in ISO format",
+									"// Generate timestamp and nonce",
 									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
-									"// Set environment variables",
-									"pm.environment.set('nonce', nonce);",
-									"pm.environment.set('timestamp', timestamp);",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Get merchant ID and API key from environment variables",
+									"// Get merchant ID from environment",
 									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
 									"const apiKey = pm.environment.get('apiKey');",
-									"const secretKey = pm.environment.get('apiSecret');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Set request headers",
-									"pm.request.headers.add({",
-									"    key: 'X-Merchant-ID',",
-									"    value: merchantId",
-									"});",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
 									"",
-									"pm.request.headers.add({",
-									"    key: 'X-API-Key',",
-									"    value: apiKey",
-									"});",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
 									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Timestamp',",
-									"    value: timestamp",
-									"});",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
 									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Nonce',",
-									"    value: nonce",
-									"});",
-									"",
-									"// Generate signature",
-									"const data = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
-									"const signature = CryptoJS.HmacSHA256(data, secretKey).toString(CryptoJS.enc.Base64);",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Signature',",
-									"    value: signature",
-									"});",
-									"",
-									"// Log the signature generation details for debugging",
-									"console.log('Signature Generation Details:');",
-									"console.log('Data to sign:', data);",
-									"console.log('Generated signature:', signature);"
+									"console.log('Get All Providers URL will be:', pm.request.url.toString());"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1294,30 +1290,47 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// Test script\r",
-									"pm.test(\"Status code is 200\", function () {\r",
-									"    pm.response.to.have.status(200);\r",
-									"});\r",
-									"\r",
-									"pm.test(\"Response is JSON\", function () {\r",
-									"    pm.response.to.be.json;\r",
-									"});\r",
-									"\r",
-									"pm.test(\"Response has providers array\", function () {\r",
-									"    const response = pm.response.json();\r",
-									"    pm.expect(response).to.be.an('array');\r",
-									"});\r",
-									"\r",
-									"pm.test(\"Each provider has required fields\", function () {\r",
-									"    const response = pm.response.json();\r",
-									"    response.forEach(provider => {\r",
-									"        pm.expect(provider).to.have.property('id');\r",
-									"        pm.expect(provider).to.have.property('name');\r",
-									"        pm.expect(provider).to.have.property('code');\r",
-									"        pm.expect(provider).to.have.property('baseUrl');\r",
-									"        pm.expect(provider).to.have.property('authenticationType');\r",
-									"        pm.expect(provider).to.have.property('statusId');\r",
-									"    });\r",
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is an array of providers', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Each provider has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        const provider = jsonData[0];",
+									"        pm.expect(provider).to.have.property('id');",
+									"        pm.expect(provider).to.have.property('name');",
+									"        pm.expect(provider).to.have.property('code');",
+									"        pm.expect(provider).to.have.property('baseUrl');",
+									"        pm.expect(provider).to.have.property('authenticationType');",
+									"        pm.expect(provider).to.have.property('status');",
+									"        pm.expect(provider).to.have.property('createdAt');",
+									"        pm.expect(provider).to.have.property('updatedAt');",
+									"        pm.expect(provider).to.have.property('createdBy');",
+									"        pm.expect(provider).to.have.property('updatedBy');",
+									"        ",
+									"        // Save first provider data to environment variables",
+									"        pm.environment.set('providerId', provider.id);",
+									"        pm.environment.set('providerName', provider.name);",
+									"        pm.environment.set('providerCode', provider.code);",
+									"        pm.environment.set('providerDescription', provider.description || '');",
+									"        pm.environment.set('providerBaseUrl', provider.baseUrl);",
+									"        pm.environment.set('providerAuthType', provider.authenticationType);",
+									"        pm.environment.set('providerStatus', provider.status);",
+									"        ",
+									"        console.log('Saved first provider data to environment:');",
+									"        console.log('Provider ID:', provider.id);",
+									"        console.log('Provider Name:', provider.name);",
+									"        console.log('Provider Status:', provider.status);",
+									"    } else {",
+									"        console.log('No providers found in response');",
+									"    }",
 									"});"
 								],
 								"type": "text/javascript",
@@ -1329,15 +1342,16 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/surcharge/providers",
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"surcharge",
-								"providers"
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers"
 							]
 						}
 					},
@@ -1350,61 +1364,93 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"// Debug: Check environment variables",
-									"console.log('Environment Variables:');",
-									"console.log('Merchant ID:', pm.environment.get('merchantId'));",
-									"console.log('API Key:', pm.environment.get('apiKey'));",
-									"console.log('Secret Key:', pm.environment.get('apiSecret') ? 'Set' : 'Not Set');",
-									"",
-									"// Generate a nonce (random string)",
-									"const nonce = Math.random().toString(36).substring(2, 12);",
-									"",
-									"// Get current timestamp in ISO format",
+									"// Generate timestamp and nonce",
 									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
-									"// Set environment variables",
-									"pm.environment.set('nonce', nonce);",
-									"pm.environment.set('timestamp', timestamp);",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Get merchant ID and API key from environment variables",
+									"// Get merchant ID from environment",
 									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
 									"const apiKey = pm.environment.get('apiKey');",
-									"const secretKey = pm.environment.get('apiSecret');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Set request headers",
-									"pm.request.headers.add({",
-									"    key: 'X-Merchant-ID',",
-									"    value: merchantId",
+									"// Check if providerId is available",
+									"const providerId = pm.environment.get('providerId');",
+									"if (!providerId) {",
+									"    console.error('Provider ID not found in environment. Please run Create Surcharge Provider first.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Get Provider by ID URL will be:', pm.request.url.toString());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
 									"});",
 									"",
-									"pm.request.headers.add({",
-									"    key: 'X-API-Key',",
-									"    value: apiKey",
-									"});",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Timestamp',",
-									"    value: timestamp",
-									"});",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Nonce',",
-									"    value: nonce",
-									"});",
-									"",
-									"// Generate signature",
-									"const data = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
-									"const signature = CryptoJS.HmacSHA256(data, secretKey).toString(CryptoJS.enc.Base64);",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Signature',",
-									"    value: signature",
-									"});",
-									"",
-									"// Log the signature generation details for debugging",
-									"console.log('Signature Generation Details:');",
-									"console.log('Data to sign:', data);",
-									"console.log('Generated signature:', signature);"
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('code');",
+									"    pm.expect(jsonData).to.have.property('baseUrl');",
+									"    pm.expect(jsonData).to.have.property('authenticationType');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData).to.have.property('createdAt');",
+									"    pm.expect(jsonData).to.have.property('updatedAt');",
+									"    pm.expect(jsonData).to.have.property('createdBy');",
+									"    pm.expect(jsonData).to.have.property('updatedBy');",
+									"    ",
+									"    // Save provider data to environment variables",
+									"    pm.environment.set('providerId', jsonData.id);",
+									"    pm.environment.set('providerName', jsonData.name);",
+									"    pm.environment.set('providerCode', jsonData.code);",
+									"    pm.environment.set('providerDescription', jsonData.description || '');",
+									"    pm.environment.set('providerBaseUrl', jsonData.baseUrl);",
+									"    pm.environment.set('providerAuthType', jsonData.authenticationType);",
+									"    pm.environment.set('providerStatus', jsonData.status);",
+									"    ",
+									"    console.log('Provider details:');",
+									"    console.log('Provider ID:', jsonData.id);",
+									"    console.log('Provider Name:', jsonData.name);",
+									"    console.log('Provider Status:', jsonData.status);",
+									"});"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1415,15 +1461,16 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/surcharge/providers/{{providerId}}",
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers/{{providerId}}",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"surcharge",
-								"providers",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers",
 								"{{providerId}}"
 							]
 						}
@@ -1437,61 +1484,93 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"// Debug: Check environment variables",
-									"console.log('Environment Variables:');",
-									"console.log('Merchant ID:', pm.environment.get('merchantId'));",
-									"console.log('API Key:', pm.environment.get('apiKey'));",
-									"console.log('Secret Key:', pm.environment.get('apiSecret') ? 'Set' : 'Not Set');",
-									"",
-									"// Generate a nonce (random string)",
-									"const nonce = Math.random().toString(36).substring(2, 12);",
-									"",
-									"// Get current timestamp in ISO format",
+									"// Generate timestamp and nonce",
 									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
-									"// Set environment variables",
-									"pm.environment.set('nonce', nonce);",
-									"pm.environment.set('timestamp', timestamp);",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Get merchant ID and API key from environment variables",
+									"// Get merchant ID from environment",
 									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
 									"const apiKey = pm.environment.get('apiKey');",
-									"const secretKey = pm.environment.get('apiSecret');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Set request headers",
-									"pm.request.headers.add({",
-									"    key: 'X-Merchant-ID',",
-									"    value: merchantId",
+									"// Check if providerId is available",
+									"const providerId = pm.environment.get('providerId');",
+									"if (!providerId) {",
+									"    console.error('Provider ID not found in environment. Please run Create Surcharge Provider first.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Update Provider URL will be:', pm.request.url.toString());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
 									"});",
 									"",
-									"pm.request.headers.add({",
-									"    key: 'X-API-Key',",
-									"    value: apiKey",
-									"});",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Timestamp',",
-									"    value: timestamp",
-									"});",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Nonce',",
-									"    value: nonce",
-									"});",
-									"",
-									"// Generate signature",
-									"const data = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
-									"const signature = CryptoJS.HmacSHA256(data, secretKey).toString(CryptoJS.enc.Base64);",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Signature',",
-									"    value: signature",
-									"});",
-									"",
-									"// Log the signature generation details for debugging",
-									"console.log('Signature Generation Details:');",
-									"console.log('Data to sign:', data);",
-									"console.log('Generated signature:', signature);"
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('code');",
+									"    pm.expect(jsonData).to.have.property('baseUrl');",
+									"    pm.expect(jsonData).to.have.property('authenticationType');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData).to.have.property('createdAt');",
+									"    pm.expect(jsonData).to.have.property('updatedAt');",
+									"    pm.expect(jsonData).to.have.property('createdBy');",
+									"    pm.expect(jsonData).to.have.property('updatedBy');",
+									"    ",
+									"    // Save updated provider data to environment variables",
+									"    pm.environment.set('providerId', jsonData.id);",
+									"    pm.environment.set('providerName', jsonData.name);",
+									"    pm.environment.set('providerCode', jsonData.code);",
+									"    pm.environment.set('providerDescription', jsonData.description || '');",
+									"    pm.environment.set('providerBaseUrl', jsonData.baseUrl);",
+									"    pm.environment.set('providerAuthType', jsonData.authenticationType);",
+									"    pm.environment.set('providerStatus', jsonData.status);",
+									"    ",
+									"    console.log('Updated provider details:');",
+									"    console.log('Provider ID:', jsonData.id);",
+									"    console.log('Provider Name:', jsonData.name);",
+									"    console.log('Provider Status:', jsonData.status);",
+									"});"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1508,18 +1587,19 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"status\": \"{{providerStatus}}\"\n}"
+							"raw": "{\n    \"name\": \"{{providerName}} Updated\",\n    \"code\": \"{{providerCode}}\",\n    \"description\": \"{{providerDescription}} - Updated\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"configuration\": {\n        \"ConfigName\": \"{{providerConfigName}}\",\n        \"credentials\": {{providerConfigCredentials}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/surcharge/providers/{{providerId}}",
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers/{{providerId}}",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"surcharge",
-								"providers",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers",
 								"{{providerId}}"
 							]
 						}
@@ -1527,67 +1607,89 @@
 					"response": []
 				},
 				{
-					"name": "Delete Surcharge Provider",
+					"name": "Delete Surcharge Provider (Soft Delete)",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"// Debug: Check environment variables",
-									"console.log('Environment Variables:');",
-									"console.log('Merchant ID:', pm.environment.get('merchantId'));",
-									"console.log('API Key:', pm.environment.get('apiKey'));",
-									"console.log('Secret Key:', pm.environment.get('apiSecret') ? 'Set' : 'Not Set');",
-									"",
-									"// Generate a nonce (random string)",
-									"const nonce = Math.random().toString(36).substring(2, 12);",
-									"",
-									"// Get current timestamp in ISO format",
+									"// Generate timestamp and nonce",
 									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
-									"// Set environment variables",
-									"pm.environment.set('nonce', nonce);",
-									"pm.environment.set('timestamp', timestamp);",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Get merchant ID and API key from environment variables",
+									"// Get merchant ID from environment",
 									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
 									"const apiKey = pm.environment.get('apiKey');",
-									"const secretKey = pm.environment.get('apiSecret');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
 									"",
-									"// Set request headers",
-									"pm.request.headers.add({",
-									"    key: 'X-Merchant-ID',",
-									"    value: merchantId",
+									"// Check if providerId is available",
+									"const providerId = pm.environment.get('providerId');",
+									"if (!providerId) {",
+									"    console.error('Provider ID not found in environment. Please run Create Surcharge Provider first.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Delete Provider URL will be:', pm.request.url.toString());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
 									"});",
 									"",
-									"pm.request.headers.add({",
-									"    key: 'X-API-Key',",
-									"    value: apiKey",
-									"});",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Timestamp',",
-									"    value: timestamp",
-									"});",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Nonce',",
-									"    value: nonce",
-									"});",
-									"",
-									"// Generate signature",
-									"const data = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
-									"const signature = CryptoJS.HmacSHA256(data, secretKey).toString(CryptoJS.enc.Base64);",
-									"",
-									"pm.request.headers.add({",
-									"    key: 'X-Signature',",
-									"    value: signature",
-									"});",
-									"",
-									"// Log the signature generation details for debugging",
-									"console.log('Signature Generation Details:');",
-									"console.log('Data to sign:', data);",
-									"console.log('Generated signature:', signature);"
+									"pm.test('Response shows provider with DELETED status', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('code');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData.status).to.equal('DELETED');",
+									"    ",
+									"    console.log('Provider soft deleted successfully:');",
+									"    console.log('Provider ID:', jsonData.id);",
+									"    console.log('Provider Name:', jsonData.name);",
+									"    console.log('Provider Status:', jsonData.status);",
+									"    ",
+									"    // Keep provider data in environment for restore test",
+									"    pm.environment.set('deletedProviderId', jsonData.id);",
+									"    pm.environment.set('deletedProviderName', jsonData.name);",
+									"});"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1598,16 +1700,137 @@
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/surcharge/providers/{{providerId}}",
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers/{{providerId}}",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"surcharge",
-								"providers",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers",
 								"{{providerId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Restore Surcharge Provider",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Check if deleted provider ID is available",
+									"const deletedProviderId = pm.environment.get('deletedProviderId');",
+									"if (!deletedProviderId) {",
+									"    console.error('Deleted Provider ID not found in environment. Please run Delete Surcharge Provider first.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Restore Provider URL will be:', pm.request.url.toString());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response shows provider with ACTIVE status', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('code');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData.status).to.equal('ACTIVE');",
+									"    ",
+									"    console.log('Provider restored successfully:');",
+									"    console.log('Provider ID:', jsonData.id);",
+									"    console.log('Provider Name:', jsonData.name);",
+									"    console.log('Provider Status:', jsonData.status);",
+									"    ",
+									"    // Update environment variables with restored provider data",
+									"    pm.environment.set('providerId', jsonData.id);",
+									"    pm.environment.set('providerName', jsonData.name);",
+									"    pm.environment.set('providerCode', jsonData.code);",
+									"    pm.environment.set('providerDescription', jsonData.description || '');",
+									"    pm.environment.set('providerBaseUrl', jsonData.baseUrl);",
+									"    pm.environment.set('providerAuthType', jsonData.authenticationType);",
+									"    pm.environment.set('providerStatus', jsonData.status);",
+									"    ",
+									"    // Clear deleted provider variables",
+									"    pm.environment.unset('deletedProviderId');",
+									"    pm.environment.unset('deletedProviderName');",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers/{{deletedProviderId}}/restore",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers",
+								"{{deletedProviderId}}",
+								"restore"
 							]
 						}
 					},
@@ -1907,6 +2130,245 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Provider Examples",
+			"item": [
+				{
+					"name": "Create Provider with OAuth2",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"OAuth2 Test Provider\",\n    \"code\": \"OAUTH2\",\n    \"description\": \"OAuth2 Authentication Provider Example\",\n    \"baseUrl\": \"https://api.oauth2-provider.com\",\n    \"authenticationType\": \"OAUTH2\",\n    \"credentialsSchema\": {{providerCredentialsSchemaOAuth2}},\n    \"configuration\": {\n        \"ConfigName\": \"OAuth2 Production Config\",\n        \"credentials\": {{providerConfigCredentialsOAuth2}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Provider with API Key",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"API Key Test Provider\",\n    \"code\": \"APIKEY\",\n    \"description\": \"API Key Authentication Provider Example\",\n    \"baseUrl\": \"https://api.apikey-provider.com\",\n    \"authenticationType\": \"API_KEY\",\n    \"credentialsSchema\": {{providerCredentialsSchemaAPIKey}},\n    \"configuration\": {\n        \"ConfigName\": \"API Key Production Config\",\n        \"credentials\": {{providerConfigCredentialsAPIKey}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Provider with Basic Auth",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Basic Auth Test Provider\",\n    \"code\": \"BASIC\",\n    \"description\": \"Basic Authentication Provider Example\",\n    \"baseUrl\": \"https://api.basic-provider.com\",\n    \"authenticationType\": \"BASIC\",\n    \"credentialsSchema\": {{providerCredentialsSchemaBasic}},\n    \"configuration\": {\n        \"ConfigName\": \"Basic Auth Production Config\",\n        \"credentials\": {{providerConfigCredentialsBasic}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
@@ -2127,12 +2589,32 @@
 		},
 		{
 			"key": "providerAuthType",
-			"value": "API_KEY",
+			"value": "JWT",
 			"type": "string"
 		},
 		{
 			"key": "providerCredentialsSchema",
-			"value": "{\"required_fields\":[{\"name\":\"api_key\",\"type\":\"string\",\"description\":\"API Key for authentication\"}]}",
+			"value": "{\"name\":\"JWT Authentication\",\"description\":\"JSON Web Token based authentication\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"jwt_token\",\"type\":\"jwt\",\"description\":\"JSON Web Token for authentication\",\"displayName\":\"JWT Token\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":2000}],\"optional_fields\":[{\"name\":\"token_type\",\"type\":\"string\",\"description\":\"Token type (e.g., Bearer)\",\"displayName\":\"Token Type\",\"required\":false,\"sensitive\":false,\"defaultValue\":\"Bearer\",\"allowedValues\":[\"Bearer\",\"JWT\"]}]}",
+			"type": "string"
+		},
+		{
+			"key": "providerCredentialsSchemaJWT",
+			"value": "{\"name\":\"JWT Authentication\",\"description\":\"JSON Web Token based authentication\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"jwt_token\",\"type\":\"jwt\",\"description\":\"JSON Web Token for authentication\",\"displayName\":\"JWT Token\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":2000}],\"optional_fields\":[{\"name\":\"token_type\",\"type\":\"string\",\"description\":\"Token type (e.g., Bearer)\",\"displayName\":\"Token Type\",\"required\":false,\"sensitive\":false,\"defaultValue\":\"Bearer\",\"allowedValues\":[\"Bearer\",\"JWT\"]}]}",
+			"type": "string"
+		},
+		{
+			"key": "providerCredentialsSchemaOAuth2",
+			"value": "{\"name\":\"OAuth 2.0 Authentication\",\"description\":\"OAuth 2.0 client credentials flow\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"client_id\",\"type\":\"client_id\",\"description\":\"OAuth 2.0 client identifier\",\"displayName\":\"Client ID\",\"required\":true,\"sensitive\":false,\"minLength\":1,\"maxLength\":255},{\"name\":\"client_secret\",\"type\":\"client_secret\",\"description\":\"OAuth 2.0 client secret\",\"displayName\":\"Client Secret\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":255},{\"name\":\"token_url\",\"type\":\"url\",\"description\":\"OAuth 2.0 token endpoint URL\",\"displayName\":\"Token URL\",\"required\":true,\"sensitive\":false,\"pattern\":\"^https?://.+\"}],\"optional_fields\":[{\"name\":\"scope\",\"type\":\"string\",\"description\":\"OAuth 2.0 scope (optional)\",\"displayName\":\"Scope\",\"required\":false,\"sensitive\":false,\"maxLength\":500}]}",
+			"type": "string"
+		},
+		{
+			"key": "providerCredentialsSchemaAPIKey",
+			"value": "{\"name\":\"API Key Authentication\",\"description\":\"API key based authentication for surcharge provider\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"api_key\",\"type\":\"api_key\",\"description\":\"API key for authentication\",\"displayName\":\"API Key\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":500},{\"name\":\"api_key_header\",\"type\":\"string\",\"description\":\"HTTP header name for the API key\",\"displayName\":\"API Key Header\",\"required\":true,\"sensitive\":false,\"defaultValue\":\"X-API-Key\",\"minLength\":1,\"maxLength\":100}],\"optional_fields\":[{\"name\":\"timeout\",\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"displayName\":\"Timeout\",\"required\":false,\"sensitive\":false,\"defaultValue\":\"30\",\"minLength\":1,\"maxLength\":3}]}",
+			"type": "string"
+		},
+		{
+			"key": "providerCredentialsSchemaBasic",
+			"value": "{\"name\":\"Basic Authentication\",\"description\":\"Username and password authentication\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"username\",\"type\":\"string\",\"description\":\"Username for authentication\",\"displayName\":\"Username\",\"required\":true,\"sensitive\":false,\"minLength\":1,\"maxLength\":100},{\"name\":\"password\",\"type\":\"password\",\"description\":\"Password for authentication\",\"displayName\":\"Password\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":255}]}",
 			"type": "string"
 		},
 		{
@@ -2143,6 +2625,71 @@
 		{
 			"key": "providerId",
 			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "deletedProviderId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "deletedProviderName",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigName",
+			"value": "Production Config",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigCredentials",
+			"value": "{\"jwt_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJ0ZXN0LXByb3ZpZGVyIiwiaWQiOiI2ajJjeGNnbWo0Z3k2dDIxajZudGhubDZvIiwiZGF0YSI6WyJ0ZXN0LXByb3ZpZGVyIl0sImUiOiJ0ZXN0In0.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs\",\"token_type\":\"Bearer\"}",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigCredentialsOAuth2",
+			"value": "{\"client_id\":\"oauth2_client_123\",\"client_secret\":\"oauth2_secret_456\",\"token_url\":\"https://api.test-provider.com/oauth/token\",\"scope\":\"read write\"}",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigCredentialsAPIKey",
+			"value": "{\"api_key\":\"api_key_123456789\",\"api_key_header\":\"X-API-Key\",\"timeout\":30}",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigCredentialsBasic",
+			"value": "{\"username\":\"testuser\",\"password\":\"testpass123\"}",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigTimeout",
+			"value": "30",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigRetryCount",
+			"value": "3",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigRetryDelay",
+			"value": "5",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigRateLimit",
+			"value": "1000",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigRateLimitPeriod",
+			"value": "3600",
+			"type": "string"
+		},
+		{
+			"key": "providerConfigMetadata",
+			"value": "{\"environment\":\"production\",\"version\":\"1.0\",\"features\":[\"surcharge\",\"refund\",\"cancel\"]}",
 			"type": "string"
 		}
 	]

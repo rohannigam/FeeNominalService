@@ -12,16 +12,13 @@ namespace FeeNominalService.Services
     public class SurchargeProviderConfigService : ISurchargeProviderConfigService
     {
         private readonly ISurchargeProviderConfigRepository _repository;
-        private readonly ISurchargeProviderService _providerService;
         private readonly ILogger<SurchargeProviderConfigService> _logger;
 
         public SurchargeProviderConfigService(
             ISurchargeProviderConfigRepository repository,
-            ISurchargeProviderService providerService,
             ILogger<SurchargeProviderConfigService> logger)
         {
             _repository = repository;
-            _providerService = providerService;
             _logger = logger;
         }
 
@@ -43,9 +40,15 @@ namespace FeeNominalService.Services
         {
             try
             {
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return null;
+                }
+
                 _logger.LogInformation("Getting primary config for merchant {MerchantId} and provider {ProviderId}", 
                     merchantId, providerId);
-                return await _repository.GetPrimaryConfigAsync(merchantId, providerId);
+                return await _repository.GetPrimaryConfigAsync(merchantGuid, providerId);
             }
             catch (Exception ex)
             {
@@ -59,8 +62,14 @@ namespace FeeNominalService.Services
         {
             try
             {
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return Enumerable.Empty<SurchargeProviderConfig>();
+                }
+
                 _logger.LogInformation("Getting configs for merchant {MerchantId}", merchantId);
-                return await _repository.GetByMerchantIdAsync(merchantId);
+                return await _repository.GetByMerchantIdAsync(merchantGuid);
             }
             catch (Exception ex)
             {
@@ -87,8 +96,14 @@ namespace FeeNominalService.Services
         {
             try
             {
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return Enumerable.Empty<SurchargeProviderConfig>();
+                }
+
                 _logger.LogInformation("Getting active configs for merchant {MerchantId}", merchantId);
-                return await _repository.GetActiveConfigsAsync(merchantId);
+                return await _repository.GetActiveConfigsAsync(merchantGuid);
             }
             catch (Exception ex)
             {
@@ -104,25 +119,10 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Creating config for merchant {MerchantId} and provider {ProviderId}", 
                     config.MerchantId, config.ProviderId);
 
-                // Validate provider exists
-                if (!await _providerService.ExistsAsync(config.ProviderId))
-                {
-                    throw new KeyNotFoundException($"Provider with ID {config.ProviderId} not found");
-                }
-
-                // Validate credentials schema
-                if (config.Credentials != null)
-                {
-                    if (!await _providerService.ValidateCredentialsSchemaAsync(config.ProviderId, config.Credentials))
-                    {
-                        throw new InvalidOperationException("Invalid credentials schema");
-                    }
-                }
-
                 // Handle primary config
                 if (config.IsPrimary)
                 {
-                    var existingPrimary = await _repository.GetPrimaryConfigAsync(config.MerchantId, config.ProviderId);
+                    var existingPrimary = await GetPrimaryConfigAsync(config.MerchantId.ToString(), config.ProviderId);
                     if (existingPrimary != null)
                     {
                         existingPrimary.IsPrimary = false;
@@ -161,25 +161,10 @@ namespace FeeNominalService.Services
                     throw new KeyNotFoundException($"Config with ID {config.Id} not found");
                 }
 
-                // Validate provider exists
-                if (!await _providerService.ExistsAsync(config.ProviderId))
-                {
-                    throw new KeyNotFoundException($"Provider with ID {config.ProviderId} not found");
-                }
-
-                // Validate credentials schema if changed
-                if (config.Credentials != null && config.Credentials != existingConfig.Credentials)
-                {
-                    if (!await _providerService.ValidateCredentialsSchemaAsync(config.ProviderId, config.Credentials))
-                    {
-                        throw new InvalidOperationException("Invalid credentials schema");
-                    }
-                }
-
                 // Handle primary config
                 if (config.IsPrimary && !existingConfig.IsPrimary)
                 {
-                    var existingPrimary = await _repository.GetPrimaryConfigAsync(config.MerchantId, config.ProviderId);
+                    var existingPrimary = await GetPrimaryConfigAsync(config.MerchantId.ToString(), config.ProviderId);
                     if (existingPrimary != null && existingPrimary.Id != config.Id)
                     {
                         existingPrimary.IsPrimary = false;
@@ -237,7 +222,13 @@ namespace FeeNominalService.Services
         {
             try
             {
-                return await _repository.HasActiveConfigAsync(merchantId, providerId);
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return false;
+                }
+
+                return await _repository.HasActiveConfigAsync(merchantGuid, providerId);
             }
             catch (Exception ex)
             {
@@ -251,7 +242,13 @@ namespace FeeNominalService.Services
         {
             try
             {
-                return await _repository.HasPrimaryConfigAsync(merchantId, providerId);
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return false;
+                }
+
+                return await _repository.HasPrimaryConfigAsync(merchantGuid, providerId);
             }
             catch (Exception ex)
             {
@@ -284,12 +281,6 @@ namespace FeeNominalService.Services
                 if (config == null)
                 {
                     throw new KeyNotFoundException($"Config with ID {configId} not found");
-                }
-
-                // Validate against provider's schema
-                if (!await _providerService.ValidateCredentialsSchemaAsync(config.ProviderId, credentials))
-                {
-                    return false;
                 }
 
                 // TODO: Implement additional validation logic

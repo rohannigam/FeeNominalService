@@ -37,7 +37,7 @@ namespace FeeNominalService.Repositories
             }
         }
 
-        public async Task<SurchargeProviderConfig?> GetPrimaryConfigAsync(string merchantId, Guid providerId)
+        public async Task<SurchargeProviderConfig?> GetPrimaryConfigAsync(Guid merchantId, Guid providerId)
         {
             try
             {
@@ -56,7 +56,7 @@ namespace FeeNominalService.Repositories
             }
         }
 
-        public async Task<IEnumerable<SurchargeProviderConfig>> GetByMerchantIdAsync(string merchantId)
+        public async Task<IEnumerable<SurchargeProviderConfig>> GetByMerchantIdAsync(Guid merchantId)
         {
             try
             {
@@ -91,7 +91,7 @@ namespace FeeNominalService.Repositories
             }
         }
 
-        public async Task<IEnumerable<SurchargeProviderConfig>> GetActiveConfigsAsync(string merchantId)
+        public async Task<IEnumerable<SurchargeProviderConfig>> GetActiveConfigsAsync(Guid merchantId)
         {
             try
             {
@@ -179,7 +179,7 @@ namespace FeeNominalService.Repositories
             }
         }
 
-        public async Task<bool> HasActiveConfigAsync(string merchantId, Guid providerId)
+        public async Task<bool> HasActiveConfigAsync(Guid merchantId, Guid providerId)
         {
             try
             {
@@ -197,7 +197,7 @@ namespace FeeNominalService.Repositories
             }
         }
 
-        public async Task<bool> HasPrimaryConfigAsync(string merchantId, Guid providerId)
+        public async Task<bool> HasPrimaryConfigAsync(Guid merchantId, Guid providerId)
         {
             try
             {

@@ -1,5 +1,5 @@
 {
-	"id": "d0db4ee1-462f-487c-bd97-4a0cc7ba7c75",
+	"id": "f6a1d2c7-b07e-4c06-906d-362269c1511f",
 	"name": "FeeNominalSurchargeService Environment",
 	"values": [
 		{
@@ -40,7 +40,7 @@
 		},
 		{
 			"key": "apiKeyAllowedEndpoints",
-			"value": "[\"/api/v1/onboarding/apikey/*\", \"/api/v1/onboarding/merchants/*\"]",
+			"value": "[\"/api/v1/onboarding/apikey/*\", \"/api/v1/onboarding/merchants/*\", \"/api/v1/merchants/*\"]",
 			"type": "default",
 			"enabled": true
 		},
@@ -259,9 +259,219 @@
 			"value": "",
 			"type": "any",
 			"enabled": true
+		},
+		{
+			"key": "providerCredentialsSchema",
+			"value": "{\"name\":\"JWT Authentication\",\"description\":\"JSON Web Token based authentication\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"jwt_token\",\"type\":\"jwt\",\"description\":\"JSON Web Token for authentication\",\"displayName\":\"JWT Token\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":2000}],\"optional_fields\":[{\"name\":\"token_type\",\"type\":\"string\",\"description\":\"Token type (e.g., Bearer)\",\"displayName\":\"Token Type\",\"required\":false,\"sensitive\":false,\"defaultValue\":\"Bearer\",\"allowedValues\":[\"Bearer\",\"JWT\"]}]}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerCredentialsSchemaOAuth2",
+			"value": "{\"name\":\"OAuth 2.0 Authentication\",\"description\":\"OAuth 2.0 client credentials flow\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"client_id\",\"type\":\"client_id\",\"description\":\"OAuth 2.0 client identifier\",\"displayName\":\"Client ID\",\"required\":true,\"sensitive\":false,\"minLength\":1,\"maxLength\":255},{\"name\":\"client_secret\",\"type\":\"client_secret\",\"description\":\"OAuth 2.0 client secret\",\"displayName\":\"Client Secret\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":255},{\"name\":\"token_url\",\"type\":\"url\",\"description\":\"OAuth 2.0 token endpoint URL\",\"displayName\":\"Token URL\",\"required\":true,\"sensitive\":false,\"pattern\":\"^https?://.+\"}],\"optional_fields\":[{\"name\":\"scope\",\"type\":\"string\",\"description\":\"OAuth 2.0 scope (optional)\",\"displayName\":\"Scope\",\"required\":false,\"sensitive\":false,\"maxLength\":500}]}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerCredentialsSchemaJWT",
+			"value": "{\"name\":\"JWT Authentication\",\"description\":\"JSON Web Token based authentication\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"jwt_token\",\"type\":\"jwt\",\"description\":\"JSON Web Token for authentication\",\"displayName\":\"JWT Token\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":2000}],\"optional_fields\":[{\"name\":\"token_type\",\"type\":\"string\",\"description\":\"Token type (e.g., Bearer)\",\"displayName\":\"Token Type\",\"required\":false,\"sensitive\":false,\"defaultValue\":\"Bearer\",\"allowedValues\":[\"Bearer\",\"JWT\"]}]}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerCredentialsSchemaBasic",
+			"value": "{\"name\":\"Basic Authentication\",\"description\":\"Username and password authentication\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"username\",\"type\":\"string\",\"description\":\"Username for authentication\",\"displayName\":\"Username\",\"required\":true,\"sensitive\":false,\"minLength\":1,\"maxLength\":100},{\"name\":\"password\",\"type\":\"password\",\"description\":\"Password for authentication\",\"displayName\":\"Password\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":255}]}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerCredentialsSchemaAPIKey",
+			"value": "{\"name\":\"API Key Authentication\",\"description\":\"API key based authentication for surcharge provider\",\"version\":\"1.0\",\"required_fields\":[{\"name\":\"api_key\",\"type\":\"api_key\",\"description\":\"API key for authentication\",\"displayName\":\"API Key\",\"required\":true,\"sensitive\":true,\"minLength\":1,\"maxLength\":500},{\"name\":\"api_key_header\",\"type\":\"string\",\"description\":\"HTTP header name for the API key\",\"displayName\":\"API Key Header\",\"required\":true,\"sensitive\":false,\"defaultValue\":\"X-API-Key\",\"minLength\":1,\"maxLength\":100}],\"optional_fields\":[{\"name\":\"timeout\",\"type\":\"integer\",\"description\":\"Request timeout in seconds\",\"displayName\":\"Timeout\",\"required\":false,\"sensitive\":false,\"defaultValue\":\"30\",\"minLength\":1,\"maxLength\":3}]}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "providerName",
+			"value": "Test Provider",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerCode",
+			"value": "TEST",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerDescription",
+			"value": "Test Surcharge Provider",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerBaseUrl",
+			"value": "https://api.test-provider.com",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerAuthType",
+			"value": "JWT",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerStatus",
+			"value": "ACTIVE",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "deletedProviderId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "deletedProviderName",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "processor",
+			"value": "VISA",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "amount",
+			"value": "100.00",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "totalAmount",
+			"value": "100.00",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "country",
+			"value": "US",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "region",
+			"value": "CA",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "campaign",
+			"value": "[\"SUMMER2024\"]",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "data",
+			"value": "[\"ECOMMERCE\"]",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "entryMethod",
+			"value": "DIPPED",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "nonSurchargableAmount",
+			"value": "0",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "statusId",
+			"value": "00000000-0000-0000-0000-000000000000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigName",
+			"value": "Production Config",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigCredentials",
+			"value": "{\"jwt_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJ0ZXN0LXByb3ZpZGVyIiwiaWQiOiI2ajJjeGNnbWo0Z3k2dDIxajZudGhubDZvIiwiZGF0YSI6WyJ0ZXN0LXByb3ZpZGVyIl0sImUiOiJ0ZXN0In0.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs\",\"token_type\":\"Bearer\"}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigCredentialsOAuth2",
+			"value": "{\"client_id\":\"oauth2_client_123\",\"client_secret\":\"oauth2_secret_456\",\"token_url\":\"https://api.test-provider.com/oauth/token\",\"scope\":\"read write\"}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigCredentialsAPIKey",
+			"value": "{\"api_key\":\"api_key_123456789\",\"api_key_header\":\"X-API-Key\",\"timeout\":30}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigCredentialsBasic",
+			"value": "{\"username\":\"testuser\",\"password\":\"testpass123\"}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigTimeout",
+			"value": "30",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigRetryCount",
+			"value": "3",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigRetryDelay",
+			"value": "5",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigRateLimit",
+			"value": "1000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigRateLimitPeriod",
+			"value": "3600",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "providerConfigMetadata",
+			"value": "{\"environment\":\"production\",\"version\":\"1.0\",\"features\":[\"surcharge\",\"refund\",\"cancel\"]}",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2025-06-18T18:18:36.883Z",
+	"_postman_exported_at": "2025-06-25T15:26:40.948Z",
 	"_postman_exported_using": "Postman/11.49.4"
 }

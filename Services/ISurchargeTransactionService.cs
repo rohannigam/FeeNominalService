@@ -1,0 +1,16 @@
+using FeeNominalService.Models;
+using FeeNominalService.Models.Surcharge.Requests;
+using FeeNominalService.Models.Surcharge.Responses;
+
+namespace FeeNominalService.Services;
+
+public interface ISurchargeTransactionService
+{
+    Task<SurchargeAuthResponse> ProcessAuthAsync(SurchargeAuthRequest request, Guid merchantId);
+    Task<SurchargeSaleResponse> ProcessSaleAsync(SurchargeSaleRequest request, Guid merchantId);
+    Task<SurchargeRefundResponse> ProcessRefundAsync(SurchargeRefundRequest request, Guid merchantId);
+    Task<SurchargeCancelResponse> ProcessCancelAsync(SurchargeCancelRequest request, Guid merchantId);
+    Task<SurchargeTransaction?> GetTransactionByIdAsync(Guid id, Guid merchantId);
+    Task<(List<SurchargeTransaction> Transactions, int TotalCount)> GetTransactionsByMerchantAsync(
+        Guid merchantId, int page, int pageSize, SurchargeOperationType? operationType, SurchargeTransactionStatus? status);
+} 

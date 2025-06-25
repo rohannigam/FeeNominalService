@@ -1,0 +1,49 @@
+# Ping Endpoints
+
+## Overview
+This document covers the ping endpoints used for health checks and service availability verification.
+
+## Endpoints
+
+### 1. V1 Ping Endpoint
+**GET** `/api/v1/ping`
+
+Simple health check endpoint that returns "pong" to verify the API is running.
+
+#### Response
+```
+pong
+```
+
+#### Example Request
+```bash
+curl -X GET "https://api.feenominal.com/api/v1/ping"
+```
+
+### 2. Common Ping Endpoint
+**POST** `/api/ping`
+
+Alternative health check endpoint that returns "pong" to verify the API is running.
+
+#### Response
+```
+pong
+```
+
+#### Example Request
+```bash
+curl -X POST "https://api.feenominal.com/api/ping"
+```
+
+## Use Cases
+
+- **Health Checks**: Monitoring systems can use these endpoints to verify service availability
+- **Load Balancer Health Checks**: Load balancers can use these endpoints to determine if the service is healthy
+- **Development Testing**: Developers can use these endpoints to quickly verify the API is accessible
+
+## Notes
+
+- No authentication required
+- No request body required
+- Simple text response
+- Fast response time for health check purposes 

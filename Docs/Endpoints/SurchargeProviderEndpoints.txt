@@ -1,42 +1,46 @@
 # Surcharge Provider Endpoints
 
 ## Overview
-This document covers all endpoints related to managing surcharge providers in the system. These endpoints allow for creating, retrieving, updating, and managing surcharge provider configurations, with special consideration for Interpayments integration.
+This document covers all endpoints related to managing surcharge providers in the system. These endpoints allow for creating, retrieving, updating, and managing surcharge provider configurations with merchant-specific access control.
 
 ## Base Endpoint
-`/api/v1/surcharge-providers`
+`/api/v1/merchants/{merchantId}/surcharge-providers`
 
 ## Security Considerations
 - Requires valid API key authentication
 - Request must include valid timestamp and nonce
+- Merchant ID in URL must match authenticated merchant
 - Rate limiting applies based on merchant's plan
 - All sensitive data is encrypted at rest
 - Provider credentials are stored securely
 - Access is logged in audit trail
 
 ## Common Request Headers (Required)
-1. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
-2. `X-Nonce`: Unique string for request (e.g., GUID)
-3. `X-Api-Key`: Valid API key for authentication
-4. `X-Signature`: HMAC-SHA256 signature of the request
+1. `X-Merchant-ID`: Merchant ID (must match URL parameter)
+2. `X-Timestamp`: Current UTC timestamp (e.g., "2024-03-20T10:30:00Z")
+3. `X-Nonce`: Unique string for request (e.g., GUID)
+4. `X-API-Key`: Valid API key for authentication
+5. `X-Signature`: HMAC-SHA256 signature of the request
 
 ## Important Notes
-- **Header Validation:** All required headers are validated in a case-insensitive manner.
-- **Credential Security:** Provider credentials are stored securely and are never returned in any API response.
-- **Secret Handling:** If any secret fields are referenced, they are masked in all logs (only the first and last four characters are shown) and are never returned after creation.
+- **Merchant Isolation:** Each merchant can only access their own surcharge providers
+- **Header Validation:** All required headers are validated in a case-insensitive manner
+- **Credential Security:** Provider credentials are stored securely and included in responses
+- **Soft Delete:** Providers are soft deleted (status changed to "DELETED") rather than hard deleted
+- **Status Code:** The `statusCode` field is optional in requests and defaults to "ACTIVE"
 
 ## Endpoints
 
 ### 1. Create Surcharge Provider
-**POST** `/api/v1/surcharge-providers`
+**POST** `/api/v1/merchants/{merchantId}/surcharge-providers`
 
 #### Request Body
 ```json
 {
     "name": "string",                // Required, max 100 chars
-    "code": "string",                // Required, max 20 chars
-    "description": "string",         // Optional
-    "baseUrl": "string",            // Required, max 255 chars
+    "code": "string",                // Required, max 50 chars, unique per merchant
+    "description": "string",         // Optional, max 500 chars
+    "baseUrl": "string",            // Required, max 200 chars
     "authenticationType": "string",  // Required, max 50 chars
     "credentialsSchema": {           // Required
         "required_fields": [
@@ -45,22 +49,87 @@ This document covers all endpoints related to managing surcharge providers in th
                 "type": "string",
                 "description": "string"
             }
+        ],
+        "optional_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
         ]
     },
-    "status": "string"              // Required, max 20 chars
+    "statusCode": "string",         // Optional, defaults to "ACTIVE"
+    "configuration": {              // Optional
+        "ConfigName": "string",     // Required if configuration provided
+        "credentials": {            // Required if configuration provided
+            "field_name": "value"
+        },
+        "timeout": 30,              // Optional, 1-300 seconds
+        "retryCount": 3,            // Optional, 0-10
+        "retryDelay": 5,            // Optional, 1-60 seconds
+        "rateLimit": 1000,          // Optional, 1-10000
+        "rateLimitPeriod": 3600,    // Optional, 1-3600 seconds
+        "metadata": {}              // Optional, JSON object
+    }
 }
 ```
 
-#### Example: Adding Interpayments Provider
+#### Response
+```json
+{
+    "id": "guid",
+    "name": "string",
+    "code": "string",
+    "description": "string",
+    "baseUrl": "string",
+    "authenticationType": "string",
+    "credentialsSchema": {
+        "required_fields": [...],
+        "optional_fields": [...]
+    },
+    "status": "string",
+    "createdAt": "datetime",
+    "updatedAt": "datetime",
+    "createdBy": "string",
+    "updatedBy": "string",
+    "configuration": {
+        "id": "guid",
+        "configName": "string",
+        "isActive": true,
+        "isPrimary": true,
+        "credentials": {
+            "field_name": "value"
+        },
+        "timeout": 30,
+        "retryCount": 3,
+        "retryDelay": 5,
+        "rateLimit": 1000,
+        "rateLimitPeriod": 3600,
+        "metadata": {},
+        "createdAt": "datetime",
+        "updatedAt": "datetime",
+        "lastUsedAt": "datetime",
+        "lastSuccessAt": "datetime",
+        "lastErrorAt": "datetime",
+        "lastErrorMessage": "string",
+        "successCount": 0,
+        "errorCount": 0,
+        "averageResponseTime": 150.5
+    }
+}
+```
+
+#### Example: Creating a JWT Provider with Configuration
 ```bash
-curl -X POST "https://api.feenominal.com/api/v1/surcharge-providers" \
+curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers" \
   -H "Content-Type: application/json" \
+  -H "X-Merchant-ID: MERCHANT001" \
   -H "X-Timestamp: 2024-03-20T10:30:00Z" \
   -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
-  -H "X-Api-Key: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -H "X-Signature: calculated-signature" \
   -d '{
-    "name": "Interpayments",
+    "name": "Interpayments Provider",
     "code": "INTERPAY",
     "description": "Interpayments Surcharge Provider",
     "baseUrl": "https://api.interpayments.com/v1",
@@ -68,254 +137,588 @@ curl -X POST "https://api.feenominal.com/api/v1/surcharge-providers" \
     "credentialsSchema": {
         "required_fields": [
             {
+                "name": "jwt_token",
+                "type": "jwt",
+                "description": "JWT token for authentication"
+            },
+            {
                 "name": "client_id",
-                "type": "string",
-                "description": "Interpayments Client ID"
-            },
-            {
-                "name": "client_secret",
-                "type": "string",
-                "description": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJwYXltZXRyaWMtdGVzdCIsImlkIjoiNmoyY3hjZ21qNGd5NnQyMWo2bnRobmw2byIsImRhdGEiOlsicGF5bWV0cmljLXRlc3QiXSwiZSI6InRlc3QifQ.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs"
-            },
-            {
-                "name": "audience",
-                "type": "string",
-                "description": "Worldpay Merchant"
-            },
-            {
-                "name": "issuer",
-                "type": "string",
-                "description": "Interpayments"
+                "type": "client_id",
+                "description": "Client ID for the provider"
             }
         ]
     },
-    "status": "active"
+    "configuration": {
+        "ConfigName": "Production Config",
+        "credentials": {
+            "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "client_id": "interpayments-client-123"
+        },
+        "timeout": 30,
+        "retryCount": 3,
+        "retryDelay": 5,
+        "rateLimit": 1000,
+        "rateLimitPeriod": 3600
+    }
 }'
 ```
 
 ### 2. Get All Surcharge Providers
-**GET** `/api/v1/surcharge-providers`
+**GET** `/api/v1/merchants/{merchantId}/surcharge-providers`
+
+Returns all surcharge providers created by the specified merchant.
+
+#### Response
+```json
+[
+    {
+        "id": "guid",
+        "name": "string",
+        "code": "string",
+        "description": "string",
+        "baseUrl": "string",
+        "authenticationType": "string",
+        "credentialsSchema": {...},
+        "status": "string",
+        "createdAt": "datetime",
+        "updatedAt": "datetime",
+        "createdBy": "string",
+        "updatedBy": "string",
+        "configuration": {...}
+    }
+]
+```
 
 #### Example Request
 ```bash
-curl -X GET "https://api.feenominal.com/api/v1/surcharge-providers" \
+curl -X GET "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers" \
+  -H "X-Merchant-ID: MERCHANT001" \
   -H "X-Timestamp: 2024-03-20T10:30:00Z" \
   -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
-  -H "X-Api-Key: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -H "X-Signature: calculated-signature"
 ```
 
 ### 3. Get Surcharge Provider by ID
-**GET** `/api/v1/surcharge-providers/{providerId}`
+**GET** `/api/v1/merchants/{merchantId}/surcharge-providers/{id}`
+
+Returns a specific surcharge provider by ID. Only returns providers created by the specified merchant.
+
+#### Response
+Same format as Create Surcharge Provider response.
 
 #### Example Request
 ```bash
-curl -X GET "https://api.feenominal.com/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+curl -X GET "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Merchant-ID: MERCHANT001" \
   -H "X-Timestamp: 2024-03-20T10:30:00Z" \
   -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
-  -H "X-Api-Key: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -H "X-Signature: calculated-signature"
 ```
 
 ### 4. Update Surcharge Provider
-**PUT** `/api/v1/surcharge-providers/{providerId}`
+**PUT** `/api/v1/merchants/{merchantId}/surcharge-providers/{id}`
+
+Updates an existing surcharge provider. Only allows updates to providers created by the specified merchant.
 
 #### Request Body
-```json
-{
-    "name": "string",                // Required, max 100 chars
-    "description": "string",         // Optional
-    "baseUrl": "string",            // Required, max 255 chars
-    "authenticationType": "string",  // Required, max 50 chars
-    "credentialsSchema": {           // Required
-        "required_fields": [
-            {
-                "name": "string",
-                "type": "string",
-                "description": "string"
-            }
-        ]
-    },
-    "status": "string"              // Required, max 20 chars
-}
-```
+Same format as Create Surcharge Provider request body.
 
-#### Example: Updating Interpayments Provider
+#### Response
+Same format as Create Surcharge Provider response.
+
+#### Example Request
 ```bash
-curl -X PUT "https://api.feenominal.com/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+curl -X PUT "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
   -H "Content-Type: application/json" \
+  -H "X-Merchant-ID: MERCHANT001" \
   -H "X-Timestamp: 2024-03-20T10:30:00Z" \
   -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
-  -H "X-Api-Key: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -H "X-Signature: calculated-signature" \
   -d '{
-    "name": "Interpayments Updated",
+    "name": "Updated Interpayments Provider",
+    "code": "INTERPAY",
     "description": "Updated Interpayments Configuration",
     "baseUrl": "https://api.interpayments.com/v2",
     "authenticationType": "JWT",
     "credentialsSchema": {
         "required_fields": [
             {
-                "name": "client_id",
-                "type": "string",
-                "description": "Interpayments Client ID"
-            },
-            {
-                "name": "client_secret",
-                "type": "string",
-                "description": "Interpayments Client Secret"
-            },
-            {
-                "name": "audience",
-                "type": "string",
-                "description": "JWT Audience"
-            },
-            {
-                "name": "issuer",
-                "type": "string",
-                "description": "JWT Issuer"
-            },
-            {
-                "name": "token_endpoint",
-                "type": "string",
-                "description": "JWT Token Endpoint"
+                "name": "jwt_token",
+                "type": "jwt",
+                "description": "JWT token for authentication"
             }
         ]
-    },
-    "status": "active"
-}'
+    }
+  }'
 ```
 
-### 5. Delete Surcharge Provider
-**DELETE** `/api/v1/surcharge-providers/{providerId}`
+### 5. Delete Surcharge Provider (Soft Delete)
+**DELETE** `/api/v1/merchants/{merchantId}/surcharge-providers/{id}`
+
+Soft deletes a surcharge provider by setting its status to "DELETED". Only allows deletion of providers created by the specified merchant.
+
+#### Response
+```json
+{
+    "id": "guid",
+    "name": "string",
+    "code": "string",
+    "description": "string",
+    "baseUrl": "string",
+    "authenticationType": "string",
+    "credentialsSchema": {...},
+    "status": "DELETED",
+    "createdAt": "datetime",
+    "updatedAt": "datetime",
+    "createdBy": "string",
+    "updatedBy": "string",
+    "configuration": {...}
+}
+```
 
 #### Example Request
 ```bash
-curl -X DELETE "https://api.feenominal.com/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+curl -X DELETE "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers/123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-Merchant-ID: MERCHANT001" \
   -H "X-Timestamp: 2024-03-20T10:30:00Z" \
   -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
-  -H "X-Api-Key: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -H "X-Signature: calculated-signature"
 ```
 
-## Response Formats
+### 6. Restore Surcharge Provider
+**POST** `/api/v1/merchants/{merchantId}/surcharge-providers/{id}/restore`
 
-### Success Response
+Restores a soft-deleted surcharge provider by setting its status back to "ACTIVE". Only allows restoration of providers created by the specified merchant.
+
+#### Response
 ```json
 {
-    "id": "guid",                    // Provider ID
-    "name": "string",                // Provider name
-    "code": "string",                // Provider code
-    "description": "string",         // Provider description
-    "baseUrl": "string",            // Base URL
-    "authenticationType": "string",  // Authentication type
-    "credentialsSchema": {           // Credentials schema
-        "required_fields": [
-            {
-                "name": "string",
-                "type": "string",
-                "description": "string"
-            }
-        ]
-    },
-    "status": "string",             // Provider status
-    "createdAt": "datetime",        // Creation timestamp
-    "updatedAt": "datetime"         // Last update timestamp
+    "id": "guid",
+    "name": "string",
+    "code": "string",
+    "description": "string",
+    "baseUrl": "string",
+    "authenticationType": "string",
+    "credentialsSchema": {...},
+    "status": "ACTIVE",
+    "createdAt": "datetime",
+    "updatedAt": "datetime",
+    "createdBy": "string",
+    "updatedBy": "string",
+    "configuration": {...}
 }
 ```
 
-### Error Response
+#### Example Request
+```bash
+curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers/123e4567-e89b-12d3-a456-426614174000/restore" \
+  -H "X-Merchant-ID: MERCHANT001" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-API-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
+```
+
+## Error Responses
+
+### 400 Bad Request
 ```json
 {
-    "error": "string",               // Error message
-    "code": "string",               // Error code
-    "details": {                    // Optional error details
-        "field": "string",          // Field with error
-        "message": "string"         // Field-specific error message
-    }
+    "message": "Invalid credentials schema",
+    "errors": ["Field 'name' is required", "Invalid field type 'invalid_type'"]
 }
 ```
 
-Common error codes:
-- `INVALID_REQUEST`: Request validation failed
-- `UNAUTHORIZED`: Invalid API key or signature
-- `PROVIDER_NOT_FOUND`: Provider does not exist
-- `DUPLICATE_CODE`: Provider code already exists
-- `RATE_LIMIT_EXCEEDED`: Too many requests
-- `INTERNAL_ERROR`: Server error
+### 401 Unauthorized
+```json
+{
+    "message": "Invalid API key or signature"
+}
+```
+
+### 403 Forbidden
+```json
+{
+    "message": "Merchant ID in URL does not match authenticated merchant"
+}
+```
+
+### 404 Not Found
+```json
+{
+    "message": "Provider with ID 123e4567-e89b-12d3-a456-426614174000 not found"
+}
+```
+
+### 409 Conflict
+```json
+{
+    "message": "Provider with code 'INTERPAY' already exists for this merchant"
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+    "message": "An error occurred while creating the surcharge provider"
+}
+```
+
+## Authentication Types Supported
+
+- **JWT**: JSON Web Token authentication
+- **API_KEY**: API key authentication
+- **OAUTH2**: OAuth 2.0 authentication
+- **BASIC**: Basic authentication
+
+## Field Types Supported
+
+- **string**: Plain text string
+- **number**: Numeric value
+- **integer**: Integer value
+- **boolean**: Boolean value
+- **email**: Email address
+- **url**: URL
+- **password**: Password field
+- **jwt**: JWT token
+- **api_key**: API key
+- **client_id**: Client ID
+- **client_secret**: Client secret
+- **access_token**: Access token
+- **refresh_token**: Refresh token
+- **username**: Username
+- **certificate**: Certificate
+- **private_key**: Private key
+- **public_key**: Public key
+- **base64**: Base64 encoded data
+- **json**: JSON data
 
 ## Workflow Diagrams
 
-### Provider Management Flow
+### Create Surcharge Provider Workflow
 ```mermaid
 sequenceDiagram
     participant Client
     participant API
     participant Auth
-    participant DB
-    participant Audit
+    participant Validation
+    participant Service
+    participant Database
+    participant Secrets
 
-    Client->>API: Request
-    API->>Auth: Validate API key & signature
-    Auth-->>API: Validation result
-    API->>DB: Perform operation
-    DB-->>API: Operation result
-    API->>Audit: Log action
-    API-->>Client: Return response
+    Client->>API: POST /api/v1/merchants/{merchantId}/surcharge-providers
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Validation: Validate Request Headers
+        Validation-->>API: Header Validation Result
+        
+        alt Header Validation Failed
+            API-->>Client: 400 Bad Request
+        else Header Validation Success
+            API->>Validation: Validate Request Body
+            Validation-->>API: Body Validation Result
+            
+            alt Body Validation Failed
+                API-->>Client: 400 Bad Request (with errors)
+            else Body Validation Success
+                API->>Service: Create Provider
+                Service->>Database: Check Provider Code Uniqueness
+                Database-->>Service: Uniqueness Result
+                
+                alt Code Already Exists
+                    Service-->>API: 409 Conflict
+                    API-->>Client: 409 Conflict
+                else Code is Unique
+                    Service->>Database: Create Provider Record
+                    Database-->>Service: Provider Created
+                    
+                    alt Configuration Provided
+                        Service->>Validation: Validate Configuration
+                        Validation-->>Service: Configuration Valid
+                        Service->>Database: Create Configuration
+                        Database-->>Service: Configuration Created
+                    end
+                    
+                    Service->>Secrets: Store Credentials (if provided)
+                    Secrets-->>Service: Credentials Stored
+                    Service-->>API: Provider with Configuration
+                    API-->>Client: 200 OK (Provider Response)
+                end
+            end
+        end
+    end
 ```
 
-### Provider Creation Flow
+### Get All Surcharge Providers Workflow
 ```mermaid
-graph TD
-    A[Request] --> B{Validate Input}
-    B -->|Invalid| C[400 Bad Request]
-    B -->|Valid| D{Check Duplicate}
-    D -->|Exists| E[409 Conflict]
-    D -->|New| F[Create Provider]
-    F --> G[Store Credentials]
-    G --> H[Return Response]
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant Service
+    participant Database
+
+    Client->>API: GET /api/v1/merchants/{merchantId}/surcharge-providers
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Service: Get Providers by Merchant ID
+        Service->>Database: Query Providers for Merchant
+        Database-->>Service: Provider List
+        Service->>Database: Load Configurations for Providers
+        Database-->>Service: Configuration Data
+        Service-->>API: Providers with Configurations
+        API-->>Client: 200 OK (Provider Array)
+    end
+```
+
+### Update Surcharge Provider Workflow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant Service
+    participant Database
+    participant Validation
+
+    Client->>API: PUT /api/v1/merchants/{merchantId}/surcharge-providers/{id}
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Service: Get Provider by ID
+        Service->>Database: Query Provider
+        Database-->>Service: Provider Data
+        
+        alt Provider Not Found
+            Service-->>API: 404 Not Found
+            API-->>Client: 404 Not Found
+        else Provider Found
+            API->>Validation: Validate Merchant Ownership
+            Validation-->>API: Ownership Result
+            
+            alt Wrong Merchant
+                API-->>Client: 403 Forbidden
+            else Correct Merchant
+                API->>Validation: Validate Request Body
+                Validation-->>API: Body Validation Result
+                
+                alt Body Validation Failed
+                    API-->>Client: 400 Bad Request
+                else Body Validation Success
+                    API->>Service: Update Provider
+                    Service->>Database: Update Provider Record
+                    Database-->>Service: Provider Updated
+                    Service-->>API: Updated Provider
+                    API-->>Client: 200 OK (Provider Response)
+                end
+            end
+        end
+    end
+```
+
+### Delete Surcharge Provider Workflow (Soft Delete)
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant Service
+    participant Database
+
+    Client->>API: DELETE /api/v1/merchants/{merchantId}/surcharge-providers/{id}
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Service: Get Provider by ID
+        Service->>Database: Query Provider
+        Database-->>Service: Provider Data
+        
+        alt Provider Not Found
+            Service-->>API: 404 Not Found
+            API-->>Client: 404 Not Found
+        else Provider Found
+            API->>Service: Validate Merchant Ownership
+            Service-->>API: Ownership Result
+            
+            alt Wrong Merchant
+                API-->>Client: 403 Forbidden
+            else Correct Merchant
+                API->>Service: Soft Delete Provider
+                Service->>Database: Update Status to "DELETED"
+                Database-->>Service: Provider Soft Deleted
+                Service-->>API: Deleted Provider
+                API-->>Client: 200 OK (Provider with DELETED status)
+            end
+        end
+    end
+```
+
+### Restore Surcharge Provider Workflow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant Service
+    participant Database
+
+    Client->>API: POST /api/v1/merchants/{merchantId}/surcharge-providers/{id}/restore
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Service: Get Provider by ID (include deleted)
+        Service->>Database: Query Provider (include deleted)
+        Database-->>Service: Provider Data
+        
+        alt Provider Not Found
+            Service-->>API: 404 Not Found
+            API-->>Client: 404 Not Found
+        else Provider Found
+            API->>Service: Validate Merchant Ownership
+            Service-->>API: Ownership Result
+            
+            alt Wrong Merchant
+                API-->>Client: 403 Forbidden
+            else Correct Merchant
+                API->>Service: Restore Provider
+                Service->>Database: Update Status to "ACTIVE"
+                Database-->>Service: Provider Restored
+                Service-->>API: Restored Provider
+                API-->>Client: 200 OK (Provider with ACTIVE status)
+            end
+        end
+    end
+```
+
+### Provider Configuration Management Workflow
+```mermaid
+flowchart TD
+    A[Start] --> B{Configuration Provided?}
+    B -->|No| C[Create Provider Only]
+    B -->|Yes| D[Validate Configuration]
+    D --> E{Configuration Valid?}
+    E -->|No| F[Return Validation Errors]
+    E -->|Yes| G[Create Provider]
+    G --> H[Create Configuration]
+    H --> I[Store Credentials]
+    I --> J[Return Provider with Configuration]
+    C --> K[Return Provider Only]
+    F --> L[End with Error]
+    J --> M[End Success]
+    K --> M
+```
+
+### Authentication and Authorization Flow
+```mermaid
+flowchart TD
+    A[API Request] --> B[Extract Headers]
+    B --> C[Validate X-Merchant-ID]
+    C --> D{Merchant ID Valid?}
+    D -->|No| E[403 Forbidden]
+    D -->|Yes| F[Validate API Key]
+    F --> G{API Key Valid?}
+    G -->|No| H[401 Unauthorized]
+    G -->|Yes| I[Validate Signature]
+    I --> J{Signature Valid?}
+    J -->|No| H
+    J -->|Yes| K[Validate Timestamp]
+    K --> L{Timestamp Within Window?}
+    L -->|No| M[401 Unauthorized - Expired]
+    L -->|Yes| N[Validate Nonce]
+    N --> O{Nonce Unique?}
+    O -->|No| P[401 Unauthorized - Replay]
+    O -->|Yes| Q[Process Request]
+    E --> R[End]
+    H --> R
+    M --> R
+    P --> S[End Success]
 ```
 
 ### Error Handling Flow
 ```mermaid
-graph TD
-    A[Request] --> B{Validation}
-    B -->|Invalid| C[400 Bad Request]
-    B -->|Valid| D{Business Rules}
-    D -->|Invalid Provider| E[404 Not Found]
-    D -->|Duplicate| F[409 Conflict]
-    D -->|Success| G[200 OK]
-    D -->|Error| H[500 Internal Error]
+flowchart TD
+    A[Request Received] --> B{Authentication Error?}
+    B -->|Yes| C[401 Unauthorized]
+    B -->|No| D{Authorization Error?}
+    D -->|Yes| E[403 Forbidden]
+    D -->|No| F{Validation Error?}
+    F -->|Yes| G[400 Bad Request]
+    F -->|No| H{Resource Not Found?}
+    H -->|Yes| I[404 Not Found]
+    H -->|No| J{Conflict Error?}
+    J -->|Yes| K[409 Conflict]
+    J -->|No| L{Server Error?}
+    L -->|Yes| M[500 Internal Server Error]
+    L -->|No| N[200 Success]
+    
+    C --> O[Return Error Response]
+    E --> O
+    G --> O
+    I --> O
+    K --> O
+    M --> O
+    N --> P[Return Success Response]
+    O --> Q[End]
+    P --> Q
 ```
 
-## Best Practices
-
-1. **Security**:
-   - Always use HTTPS
-   - Implement proper authentication
-   - Encrypt sensitive data
-   - Monitor access patterns
-   - Regular security audits
-
-2. **Error Handling**:
-   - Return meaningful errors
-   - Log all errors
-   - Handle edge cases
-   - Maintain audit trail
-   - Validate input data
-
-3. **Performance**:
-   - Cache provider data
-   - Optimize queries
-   - Monitor response times
-   - Use proper indexing
-   - Implement rate limiting
-
-4. **Maintenance**:
-   - Keep documentation updated
-   - Monitor API usage
-   - Track error rates
-   - Regular backups
-   - Version control
-   - Update provider configurations
-   - Monitor provider health 
+### Data Flow Architecture
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        A[API Client]
+    end
+    
+    subgraph "API Gateway"
+        B[Authentication Middleware]
+        C[Rate Limiting]
+        D[Request Validation]
+    end
+    
+    subgraph "Application Layer"
+        E[SurchargeProviderController]
+        F[SurchargeProviderService]
+        G[CredentialValidationService]
+    end
+    
+    subgraph "Data Layer"
+        H[SurchargeProviderRepository]
+        I[SurchargeProviderConfigRepository]
+        J[Database]
+        K[AWS Secrets Manager]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    E --> G
+    F --> H
+    F --> I
+    H --> J
+    I --> J
+    F --> K
+    I --> K
+``` 

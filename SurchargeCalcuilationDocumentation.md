@@ -15,16 +15,31 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
 /api/v1/cancel/batch
 ```
 
-### Surcharge Fee Endpoints
+### Surcharge Endpoints (DEPRECATED - New endpoints coming soon)
+
+**DEPRECATED ENDPOINTS:**
 ```
 /api/v1/surchargefee/calculate
 /api/v1/surchargefee/calculate-batch
 ```
 
+**NEW ENDPOINTS (Coming Soon):**
+```
+/api/v1/surcharge/auth
+/api/v1/surcharge/refund
+/api/v1/surcharge/void
+/api/v1/surcharge/split-shipment
+/api/v1/surcharge/transactions/{id}
+/api/v1/surcharge/transactions
+```
+
+**Note:** The old surcharge fee endpoints have been deprecated and will be replaced with workflow-based endpoints that integrate directly with surcharge providers (like Interpayments) and store transaction records in the database.
+
 ### Surcharge Provider Endpoints
 ```
-/api/v1/surcharge/providers
-/api/v1/surcharge/providers/{id}
+/api/v1/merchants/{merchantId}/surcharge-providers
+/api/v1/merchants/{merchantId}/surcharge-providers/{id}
+/api/v1/merchants/{merchantId}/surcharge-providers/{id}/restore
 ```
 
 ### Onboarding Endpoints
@@ -48,9 +63,10 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
 /api/v1/onboarding/apikey/rotate
 ```
 
-### Health Check Endpoint
+### Health Check Endpoints
 ```
 /api/v1/ping
+/api/ping
 ```
 
 Note: When creating an API key, you can use wildcards in the paths (e.g., `/api/v1/sales/*`) to allow all endpoints under a specific path.
@@ -1289,16 +1305,24 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 ### Surcharge Provider Endpoints (v1)
 
 #### 1. Create Surcharge Provider
-- **Endpoint**: `POST /api/v1/surcharge-providers`
+- **Endpoint**: `POST /api/v1/merchants/{merchantId}/surcharge-providers`
 - **Description**: Creates a new surcharge provider configuration
-- **Authentication**: Required (X-API-Key header)
+- **Authentication**: Required (X-API-Key header + X-Merchant-ID header)
+- **Path Parameters**:
+  - `merchantId`: string (required)
+- **Required Headers**:
+  - `X-Merchant-ID`: Merchant ID (must match URL parameter)
+  - `X-Timestamp`: Current UTC timestamp
+  - `X-Nonce`: Unique string for request
+  - `X-API-Key`: Valid API key for authentication
+  - `X-Signature`: HMAC-SHA256 signature of the request
 - **Request Body**:
   ```json
   {
     "name": "string",                // Required, max 100 chars
-    "code": "string",                // Required, max 20 chars
-    "description": "string",         // Optional
-    "baseUrl": "string",            // Required, max 255 chars
+    "code": "string",                // Required, max 50 chars, unique per merchant
+    "description": "string",         // Optional, max 500 chars
+    "baseUrl": "string",            // Required, max 200 chars
     "authenticationType": "string",  // Required, max 50 chars
     "credentialsSchema": {           // Required
         "required_fields": [
@@ -1307,9 +1331,28 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
                 "type": "string",
                 "description": "string"
             }
+        ],
+        "optional_fields": [
+            {
+                "name": "string",
+                "type": "string",
+                "description": "string"
+            }
         ]
     },
-    "status": "string"              // Required, max 20 chars
+    "statusCode": "string",         // Optional, defaults to "ACTIVE"
+    "configuration": {              // Optional
+        "ConfigName": "string",     // Required if configuration provided
+        "credentials": {            // Required if configuration provided
+            "field_name": "value"
+        },
+        "timeout": 30,              // Optional, 1-300 seconds
+        "retryCount": 3,            // Optional, 0-10
+        "retryDelay": 5,            // Optional, 1-60 seconds
+        "rateLimit": 1000,          // Optional, 1-10000
+        "rateLimitPeriod": 3600,    // Optional, 1-3600 seconds
+        "metadata": {}              // Optional, JSON object
+    }
   }
   ```
 - **Response**:
@@ -1322,54 +1365,147 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
     "baseUrl": "string",
     "authenticationType": "string",
     "credentialsSchema": {
-        "required_fields": [
-            {
-                "name": "string",
-                "type": "string",
-                "description": "string"
-            }
-        ]
+        "required_fields": [...],
+        "optional_fields": [...]
     },
     "status": "string",
     "createdAt": "datetime",
-    "updatedAt": "datetime"
+    "updatedAt": "datetime",
+    "createdBy": "string",
+    "updatedBy": "string",
+    "configuration": {
+        "id": "guid",
+        "configName": "string",
+        "isActive": true,
+        "isPrimary": true,
+        "credentials": {
+            "field_name": "value"
+        },
+        "timeout": 30,
+        "retryCount": 3,
+        "retryDelay": 5,
+        "rateLimit": 1000,
+        "rateLimitPeriod": 3600,
+        "metadata": {},
+        "createdAt": "datetime",
+        "updatedAt": "datetime",
+        "lastUsedAt": "datetime",
+        "lastSuccessAt": "datetime",
+        "lastErrorAt": "datetime",
+        "lastErrorMessage": "string",
+        "successCount": 0,
+        "errorCount": 0,
+        "averageResponseTime": 150.5
+    }
   }
   ```
 
 #### 2. Get All Surcharge Providers
-- **Endpoint**: `GET /api/v1/surcharge-providers`
-- **Description**: Retrieves all configured surcharge providers
-- **Authentication**: Required (X-API-Key header)
-- **Response**: Array of surcharge provider objects
+- **Endpoint**: `GET /api/v1/merchants/{merchantId}/surcharge-providers`
+- **Description**: Retrieves all surcharge providers created by the specified merchant
+- **Authentication**: Required (X-API-Key header + X-Merchant-ID header)
+- **Path Parameters**:
+  - `merchantId`: string (required)
+- **Required Headers**:
+  - `X-Merchant-ID`: Merchant ID (must match URL parameter)
+  - `X-Timestamp`: Current UTC timestamp
+  - `X-Nonce`: Unique string for request
+  - `X-API-Key`: Valid API key for authentication
+  - `X-Signature`: HMAC-SHA256 signature of the request
+- **Response**: Array of surcharge provider objects with configurations
 
 #### 3. Get Surcharge Provider by ID
-- **Endpoint**: `GET /api/v1/surcharge-providers/{providerId}`
-- **Description**: Retrieves a specific surcharge provider
-- **Authentication**: Required (X-API-Key header)
+- **Endpoint**: `GET /api/v1/merchants/{merchantId}/surcharge-providers/{id}`
+- **Description**: Retrieves a specific surcharge provider by ID. Only returns providers created by the specified merchant.
+- **Authentication**: Required (X-API-Key header + X-Merchant-ID header)
 - **Path Parameters**:
-  - `providerId`: Guid (required)
-- **Response**: Surcharge provider object
+  - `merchantId`: string (required)
+  - `id`: Guid (required)
+- **Required Headers**:
+  - `X-Merchant-ID`: Merchant ID (must match URL parameter)
+  - `X-Timestamp`: Current UTC timestamp
+  - `X-Nonce`: Unique string for request
+  - `X-API-Key`: Valid API key for authentication
+  - `X-Signature`: HMAC-SHA256 signature of the request
+- **Response**: Surcharge provider object with configuration
 
 #### 4. Update Surcharge Provider
-- **Endpoint**: `PUT /api/v1/surcharge-providers/{providerId}`
-- **Description**: Updates an existing surcharge provider
-- **Authentication**: Required (X-API-Key header)
+- **Endpoint**: `PUT /api/v1/merchants/{merchantId}/surcharge-providers/{id}`
+- **Description**: Updates an existing surcharge provider. Only allows updates to providers created by the specified merchant.
+- **Authentication**: Required (X-API-Key header + X-Merchant-ID header)
 - **Path Parameters**:
-  - `providerId`: Guid (required)
+  - `merchantId`: string (required)
+  - `id`: Guid (required)
+- **Required Headers**:
+  - `X-Merchant-ID`: Merchant ID (must match URL parameter)
+  - `X-Timestamp`: Current UTC timestamp
+  - `X-Nonce`: Unique string for request
+  - `X-API-Key`: Valid API key for authentication
+  - `X-Signature`: HMAC-SHA256 signature of the request
 - **Request Body**: Same as Create Surcharge Provider
-- **Response**: Updated surcharge provider object
+- **Response**: Updated surcharge provider object with configuration
 
-#### 5. Delete Surcharge Provider
-- **Endpoint**: `DELETE /api/v1/surcharge-providers/{providerId}`
-- **Description**: Deletes a surcharge provider
-- **Authentication**: Required (X-API-Key header)
+#### 5. Delete Surcharge Provider (Soft Delete)
+- **Endpoint**: `DELETE /api/v1/merchants/{merchantId}/surcharge-providers/{id}`
+- **Description**: Soft deletes a surcharge provider by setting its status to "DELETED". Only allows deletion of providers created by the specified merchant.
+- **Authentication**: Required (X-API-Key header + X-Merchant-ID header)
 - **Path Parameters**:
-  - `providerId`: Guid (required)
+  - `merchantId`: string (required)
+  - `id`: Guid (required)
+- **Required Headers**:
+  - `X-Merchant-ID`: Merchant ID (must match URL parameter)
+  - `X-Timestamp`: Current UTC timestamp
+  - `X-Nonce`: Unique string for request
+  - `X-API-Key`: Valid API key for authentication
+  - `X-Signature`: HMAC-SHA256 signature of the request
 - **Response**:
   ```json
   {
-    "success": true,
-    "message": "Provider deleted successfully"
+    "id": "guid",
+    "name": "string",
+    "code": "string",
+    "description": "string",
+    "baseUrl": "string",
+    "authenticationType": "string",
+    "credentialsSchema": {...},
+    "status": "DELETED",
+    "createdAt": "datetime",
+    "updatedAt": "datetime",
+    "createdBy": "string",
+    "updatedBy": "string",
+    "configuration": {...}
+  }
+  ```
+
+#### 6. Restore Surcharge Provider
+- **Endpoint**: `POST /api/v1/merchants/{merchantId}/surcharge-providers/{id}/restore`
+- **Description**: Restores a soft-deleted surcharge provider by setting its status back to "ACTIVE". Only allows restoration of providers created by the specified merchant.
+- **Authentication**: Required (X-API-Key header + X-Merchant-ID header)
+- **Path Parameters**:
+  - `merchantId`: string (required)
+  - `id`: Guid (required)
+- **Required Headers**:
+  - `X-Merchant-ID`: Merchant ID (must match URL parameter)
+  - `X-Timestamp`: Current UTC timestamp
+  - `X-Nonce`: Unique string for request
+  - `X-API-Key`: Valid API key for authentication
+  - `X-Signature`: HMAC-SHA256 signature of the request
+- **Response**:
+  ```json
+  {
+    "id": "guid",
+    "name": "string",
+    "code": "string",
+    "description": "string",
+    "baseUrl": "string",
+    "authenticationType": "string",
+    "credentialsSchema": {...},
+    "status": "ACTIVE",
+    "createdAt": "datetime",
+    "updatedAt": "datetime",
+    "createdBy": "string",
+    "updatedBy": "string",
+    "configuration": {...}
   }
   ```
 
@@ -1379,7 +1515,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 {
     "name": "Interpayments",
     "code": "INTERPAY",
-    "description": "Interpayments Surcharge Provider",
+    "description": "Interpayments Surcharge Provider for payment processing",
     "baseUrl": "https://api.interpayments.com/v1",
     "authenticationType": "JWT",
     "credentialsSchema": {
@@ -1387,28 +1523,95 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
             {
                 "name": "client_id",
                 "type": "string",
-                "description": "Interpayments Client ID"
+                "description": "Interpayments Client ID for OAuth2 authentication"
             },
             {
                 "name": "client_secret",
                 "type": "string",
-                "description": "Interpayments Client Secret"
+                "description": "Interpayments Client Secret for OAuth2 authentication"
             },
             {
                 "name": "audience",
                 "type": "string",
-                "description": "JWT Audience"
+                "description": "JWT Audience claim for token validation"
             },
             {
                 "name": "issuer",
                 "type": "string",
-                "description": "JWT Issuer"
+                "description": "JWT Issuer claim for token validation"
+            }
+        ],
+        "optional_fields": [
+            {
+                "name": "scope",
+                "type": "string",
+                "description": "OAuth2 scope for API access"
+            },
+            {
+                "name": "token_endpoint",
+                "type": "string",
+                "description": "Custom OAuth2 token endpoint URL"
             }
         ]
     },
-    "status": "active"
+    "configuration": {
+        "ConfigName": "Interpayments Production",
+        "credentials": {
+            "client_id": "your-client-id",
+            "client_secret": "your-client-secret",
+            "audience": "https://api.interpayments.com",
+            "issuer": "https://interpayments.auth0.com",
+            "scope": "read:transactions write:transactions"
+        },
+        "timeout": 30,
+        "retryCount": 3,
+        "retryDelay": 5,
+        "rateLimit": 1000,
+        "rateLimitPeriod": 3600,
+        "metadata": {
+            "environment": "production",
+            "version": "1.0"
+        }
+    }
 }
 ```
+
+### Credentials Schema Validation
+
+The service includes comprehensive validation for credentials schema and configuration:
+
+1. **Field Validation**
+   - Required fields must be present in configuration
+   - Field types are validated (string, email, url, jwt, api_key, etc.)
+   - Field length limits are enforced
+   - Custom validation rules for specific field types
+
+2. **Configuration Validation**
+   - Timeout: 1-300 seconds
+   - Retry count: 0-10 attempts
+   - Retry delay: 1-60 seconds
+   - Rate limit: 1-10,000 requests
+   - Rate limit period: 1-3,600 seconds
+
+3. **Supported Authentication Types**
+   - JWT: JSON Web Token authentication
+   - API_KEY: API key-based authentication
+   - OAUTH2: OAuth 2.0 authentication
+   - BASIC_AUTH: Basic authentication
+   - CUSTOM: Custom authentication schemes
+
+4. **Field Type Validation**
+   - JWT: Validates JWT token format
+   - API_KEY: Validates API key format
+   - EMAIL: Validates email address format
+   - URL: Validates URL format
+   - CERTIFICATE: Validates certificate format
+   - BASE64: Validates base64 encoding
+   - JSON: Validates JSON format
+
+### Provider Code Uniqueness
+
+Provider codes are unique per merchant, allowing different merchants to use the same provider code (e.g., "INTERPAY") without conflicts. The system enforces this through a composite unique constraint on (code, created_by).
 
 ## Security Features
 
@@ -1430,7 +1633,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 2. **Request Signing**
    - HMAC-based request signing using SHA-256
    - Required headers:
-     - X-Merchant-ID: Merchant identifier
+     - X-Merchant-ID: Merchant identifier (must match URL parameter for merchant-specific endpoints)
      - X-API-Key: API key value
      - X-Timestamp: Current UTC timestamp
      - X-Nonce: Unique request identifier
@@ -1444,9 +1647,10 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
 
 3. **Authentication & Authorization**
    - API key authentication via `ApiKeyAuthHandler`
+   - Merchant-specific access control via X-Merchant-ID header
    - Role-based access control
    - Endpoint-level authorization
-   - Merchant-specific access restrictions
+   - Merchant ownership validation for surcharge providers
    - Admin role requirements for sensitive operations
    - Usage count tracking for billing and monitoring
    - Response time monitoring for performance analysis
@@ -1464,6 +1668,16 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
    - Onboarding metadata tracking
    - Key rotation history
    - Usage patterns analysis
+   - Merchant-specific audit trails
+
+5. **Data Protection**
+   - Soft delete for surcharge providers (status-based deletion)
+   - Merchant isolation for provider data
+   - Encrypted credential storage
+   - Secure configuration management
+   - Validation of all input data
+   - Protection against SQL injection
+   - XSS prevention through proper encoding
 
 ## Integration Guide
 
@@ -1639,7 +1853,7 @@ The service implements a secure request signing mechanism for all API requests (
 
 1. **Timestamp**: Current UTC time in ISO 8601 format
 2. **Nonce**: A unique random string for each request
-3. **MerchantId**: Your merchant ID
+3. **MerchantId**: Your merchant ID (must match X-Merchant-ID header and URL parameter for merchant-specific endpoints)
 4. **ApiKey**: Your API key
 5. **Secret**: The API key secret (not the API key itself)
 
@@ -1649,7 +1863,7 @@ The service implements a secure request signing mechanism for all API requests (
 3. Base64 encode the hash
 
 ## Required Headers
-- `X-Merchant-ID`: Your merchant ID
+- `X-Merchant-ID`: Your merchant ID (required for merchant-specific endpoints)
 - `X-API-Key`: Your API key
 - `X-Timestamp`: Current UTC time in ISO 8601 format
 - `X-Nonce`: Unique random string
@@ -1680,3 +1894,5 @@ headers.add('X-Signature', signature);
 2. **Nonce Tracking**: Prevents request replay attacks
 3. **HMAC-SHA256**: Strong cryptographic signing
 4. **Base64 Encoding**: Standard encoding for signature transmission
+5. **Merchant ID Validation**: X-Merchant-ID header must match URL parameter for merchant-specific endpoints
+6. **Request Body Validation**: Signature includes request body for POST/PUT requests

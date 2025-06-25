@@ -32,6 +32,8 @@ namespace FeeNominalService.Data
         public DbSet<SurchargeProviderStatus> SurchargeProviderStatuses { get; set; } = null!;
         public DbSet<ApiKeySecret> ApiKeySecrets { get; set; }
         public DbSet<MerchantAuditTrail> MerchantAuditTrail { get; set; } = null!;
+        public DbSet<SupportedProvider> SupportedProviders { get; set; } = null!;
+        public DbSet<SurchargeTransaction> SurchargeTransactions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -192,6 +194,9 @@ namespace FeeNominalService.Data
                 entity.Property(e => e.Endpoint).IsRequired().HasMaxLength(255);
                 entity.Property(e => e.IpAddress).IsRequired().HasMaxLength(45).HasColumnName("ip_address");
                 entity.Property(e => e.Timestamp).IsRequired();
+                entity.Property(e => e.HttpMethod).IsRequired().HasMaxLength(10).HasColumnName("http_method");
+                entity.Property(e => e.StatusCode).IsRequired().HasColumnName("status_code");
+                entity.Property(e => e.ResponseTimeMs).IsRequired().HasColumnName("response_time_ms");
                 entity.Property(e => e.ApiKeyId).HasColumnName("api_key_id");
                 entity.HasOne(e => e.ApiKey)
                     .WithMany(e => e.UsageRecords)
@@ -350,7 +355,18 @@ namespace FeeNominalService.Data
                     .HasForeignKey(e => e.StatusId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasIndex(e => e.Code).IsUnique();
+                // Configure the reverse relationship to prevent shadow properties
+                entity.HasMany(e => e.Configurations)
+                    .WithOne(c => c.Provider)
+                    .HasForeignKey(c => c.ProviderId)
+                    .HasPrincipalKey(e => e.Id)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Create composite unique index on code and created_by (merchant)
+                entity.HasIndex(e => new { e.Code, e.CreatedBy }).IsUnique();
+                
+                // Also create a regular index on code for performance
+                entity.HasIndex(e => e.Code);
             });
 
             // Configure SurchargeProviderConfig
@@ -358,42 +374,45 @@ namespace FeeNominalService.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id).HasColumnName("surcharge_provider_config_id");
-                entity.Property(e => e.MerchantId).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.ProviderId).IsRequired();
-                entity.Property(e => e.ConfigName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.MerchantId).IsRequired().HasMaxLength(50).HasColumnName("merchant_id");
+                entity.Property(e => e.ProviderId).IsRequired().HasColumnName("surcharge_provider_id");
+                entity.Property(e => e.ConfigName).IsRequired().HasMaxLength(100).HasColumnName("config_name");
                 entity.Property(e => e.Credentials)
                     .IsRequired()
+                    .HasColumnName("credentials")
                     .HasColumnType("jsonb")
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                         v => JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())!
                     );
-                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-                entity.Property(e => e.IsPrimary).IsRequired();
-                entity.Property(e => e.RateLimit);
-                entity.Property(e => e.RateLimitPeriod);
-                entity.Property(e => e.Timeout);
-                entity.Property(e => e.RetryCount);
-                entity.Property(e => e.RetryDelay);
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true).HasColumnName("is_active");
+                entity.Property(e => e.IsPrimary).IsRequired().HasColumnName("is_primary");
+                entity.Property(e => e.RateLimit).HasColumnName("rate_limit");
+                entity.Property(e => e.RateLimitPeriod).HasColumnName("rate_limit_period");
+                entity.Property(e => e.Timeout).HasColumnName("timeout");
+                entity.Property(e => e.RetryCount).HasColumnName("retry_count");
+                entity.Property(e => e.RetryDelay).HasColumnName("retry_delay");
                 entity.Property(e => e.Metadata)
+                    .HasColumnName("metadata")
                     .HasColumnType("jsonb")
                     .HasConversion(
                         v => v == null ? null : JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                         v => v == null ? null : JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())
                     );
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UpdatedAt).IsRequired();
-                entity.Property(e => e.LastUsedAt);
-                entity.Property(e => e.LastSuccessAt);
-                entity.Property(e => e.LastErrorAt);
-                entity.Property(e => e.LastErrorMessage);
-                entity.Property(e => e.SuccessCount);
-                entity.Property(e => e.ErrorCount);
-                entity.Property(e => e.AverageResponseTime);
-                entity.HasOne(e => e.Provider)
-                    .WithMany()
-                    .HasForeignKey(e => e.ProviderId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(e => e.CreatedAt).IsRequired().HasColumnName("created_at");
+                entity.Property(e => e.UpdatedAt).IsRequired().HasColumnName("updated_at");
+                entity.Property(e => e.LastUsedAt).HasColumnName("last_used_at");
+                entity.Property(e => e.LastSuccessAt).HasColumnName("last_success_at");
+                entity.Property(e => e.LastErrorAt).HasColumnName("last_error_at");
+                entity.Property(e => e.LastErrorMessage).HasColumnName("last_error_message");
+                entity.Property(e => e.SuccessCount).HasColumnName("success_count");
+                entity.Property(e => e.ErrorCount).HasColumnName("error_count");
+                entity.Property(e => e.AverageResponseTime).HasColumnName("average_response_time");
+                
+                // Explicitly ignore any shadow properties that might be created
+                entity.Ignore("SurchargeProviderId");
+                entity.Ignore("SurchargeProviderId1");
+                    
                 entity.HasIndex(e => new { e.MerchantId, e.ProviderId, e.IsPrimary }).IsUnique();
             });
 
@@ -446,6 +465,111 @@ namespace FeeNominalService.Data
 
                 entity.HasIndex(e => e.ApiKey).IsUnique();
                 entity.HasIndex(e => e.MerchantId);
+            });
+
+            // Configure SupportedProvider
+            modelBuilder.Entity<SupportedProvider>(entity =>
+            {
+                entity.ToTable("supported_providers", _schema);
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id)
+                    .HasColumnName("supported_provider_id")
+                    .ValueGeneratedOnAdd();
+                entity.Property(e => e.ProviderCode)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                entity.Property(e => e.ProviderName)
+                    .IsRequired()
+                    .HasMaxLength(100);
+                entity.Property(e => e.Description);
+                entity.Property(e => e.IsActive)
+                    .IsRequired()
+                    .HasDefaultValue(true);
+                entity.Property(e => e.IntegrationType)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                entity.Property(e => e.BaseUrlTemplate)
+                    .HasMaxLength(255);
+                entity.Property(e => e.AuthenticationType)
+                    .IsRequired()
+                    .HasMaxLength(50);
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired()
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt)
+                    .IsRequired()
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(e => e.ProviderCode).IsUnique();
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.IntegrationType);
+            });
+
+            // Configure SurchargeTransaction
+            modelBuilder.Entity<SurchargeTransaction>(entity =>
+            {
+                entity.ToTable("surcharge_trans", _schema);
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id)
+                    .HasColumnName("surcharge_transaction_id")
+                    .HasColumnType("uuid")
+                    .HasDefaultValueSql("gen_random_uuid()");
+                entity.Property(e => e.MerchantId)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnName("merchant_id");
+                entity.Property(e => e.ProviderConfigId)
+                    .IsRequired()
+                    .HasColumnName("provider_config_id");
+                entity.Property(e => e.OperationType)
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnName("operation_type");
+                entity.Property(e => e.Status)
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnName("status");
+                entity.Property(e => e.Amount)
+                    .IsRequired()
+                    .HasColumnName("amount");
+                entity.Property(e => e.Currency)
+                    .IsRequired()
+                    .HasMaxLength(3)
+                    .HasColumnName("currency");
+                entity.Property(e => e.SourceTransactionId)
+                    .HasMaxLength(100)
+                    .HasColumnName("source_transaction_id");
+                entity.Property(e => e.ProviderTransactionId)
+                    .HasMaxLength(100)
+                    .HasColumnName("provider_transaction_id");
+                entity.Property(e => e.RequestPayload)
+                    .HasColumnType("jsonb")
+                    .HasColumnName("request_payload");
+                entity.Property(e => e.ResponsePayload)
+                    .HasColumnType("jsonb")
+                    .HasColumnName("response_payload");
+                entity.Property(e => e.ErrorMessage)
+                    .HasColumnName("error_message");
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired()
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt)
+                    .IsRequired()
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.ProcessedAt)
+                    .HasColumnName("processed_at");
+
+                entity.HasIndex(e => e.MerchantId);
+                entity.HasIndex(e => e.ProviderConfigId);
+                entity.HasIndex(e => e.OperationType);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.SourceTransactionId);
+                entity.HasIndex(e => e.ProviderTransactionId);
             });
         }
     }

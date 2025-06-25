@@ -419,9 +419,14 @@ X-Signature: calculated-signature-here
 
 ### Surcharge Provider Endpoints
 
-### Create Surcharge Provider
-POST {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers
+# Note: All surcharge provider endpoints require X-Merchant-ID header which must match the merchantId in the URL.
+# The X-Merchant-ID is used in signature calculation: timestamp|nonce|merchantId|apiKey
+# The merchantId in the URL must match the authenticated merchant from the API key.
+
+### Create Surcharge Provider (with Configuration)
+POST {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers
 Content-Type: application/json
+X-Merchant-ID: {{merchantId}}
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
@@ -430,7 +435,7 @@ X-Signature: calculated-signature-here
 {
     "name": "Interpayments",
     "code": "INTERPAY",
-    "description": "Interpayments Surcharge Provider",
+    "description": "Interpayments Surcharge Provider for payment processing",
     "baseUrl": "https://api.interpayments.com/v1",
     "authenticationType": "JWT",
     "credentialsSchema": {
@@ -438,26 +443,56 @@ X-Signature: calculated-signature-here
             {
                 "name": "client_id",
                 "type": "string",
-                "description": "Interpayments Client ID"
+                "description": "Interpayments Client ID for OAuth2 authentication"
             },
             {
                 "name": "client_secret",
                 "type": "string",
-                "description": "Interpayments Client Secret"
+                "description": "Interpayments Client Secret for OAuth2 authentication"
             },
             {
                 "name": "audience",
                 "type": "string",
-                "description": "JWT Audience"
+                "description": "JWT Audience claim for token validation"
             },
             {
                 "name": "issuer",
                 "type": "string",
-                "description": "JWT Issuer"
+                "description": "JWT Issuer claim for token validation"
+            }
+        ],
+        "optional_fields": [
+            {
+                "name": "scope",
+                "type": "string",
+                "description": "OAuth2 scope for API access"
+            },
+            {
+                "name": "token_endpoint",
+                "type": "string",
+                "description": "Custom OAuth2 token endpoint URL"
             }
         ]
     },
-    "status": "active"
+    "configuration": {
+        "ConfigName": "Interpayments Production",
+        "credentials": {
+            "client_id": "your-client-id",
+            "client_secret": "your-client-secret",
+            "audience": "https://api.interpayments.com",
+            "issuer": "https://interpayments.auth0.com",
+            "scope": "read:transactions write:transactions"
+        },
+        "timeout": 30,
+        "retryCount": 3,
+        "retryDelay": 5,
+        "rateLimit": 1000,
+        "rateLimitPeriod": 3600,
+        "metadata": {
+            "environment": "production",
+            "version": "1.0"
+        }
+    }
 }
 
 ### Response Example:
@@ -465,44 +500,88 @@ X-Signature: calculated-signature-here
 #   "id": "123e4567-e89b-12d3-a456-426614174000",
 #   "name": "Interpayments",
 #   "code": "INTERPAY",
-#   "description": "Interpayments Surcharge Provider",
+#   "description": "Interpayments Surcharge Provider for payment processing",
 #   "baseUrl": "https://api.interpayments.com/v1",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
-#       "required_fields": [
-#           {
-#               "name": "client_id",
-#               "type": "string",
-#               "description": "Interpayments Client ID"
-#           },
-#           {
-#               "name": "client_secret",
-#               "type": "string",
-#               "description": "Interpayments Client Secret"
-#           },
-#           {
-#               "name": "audience",
-#               "type": "string",
-#               "description": "JWT Audience"
-#           },
-#           {
-#               "name": "issuer",
-#               "type": "string",
-#               "description": "JWT Issuer"
-#           }
-#       ]
+#       "required_fields": [...],
+#       "optional_fields": [...]
 #   },
-#   "status": "active",
+#   "status": "ACTIVE",
 #   "createdAt": "2024-03-20T10:30:00Z",
-#   "updatedAt": "2024-03-20T10:30:00Z"
+#   "updatedAt": "2024-03-20T10:30:00Z",
+#   "createdBy": "merchant123",
+#   "updatedBy": "merchant123",
+#   "configuration": {
+#       "id": "456e7890-e89b-12d3-a456-426614174001",
+#       "configName": "Interpayments Production",
+#       "isActive": true,
+#       "isPrimary": true,
+#       "credentials": {
+#           "client_id": "your-client-id",
+#           "client_secret": "your-client-secret",
+#           "audience": "https://api.interpayments.com",
+#           "issuer": "https://interpayments.auth0.com",
+#           "scope": "read:transactions write:transactions"
+#       },
+#       "timeout": 30,
+#       "retryCount": 3,
+#       "retryDelay": 5,
+#       "rateLimit": 1000,
+#       "rateLimitPeriod": 3600,
+#       "metadata": {
+#           "environment": "production",
+#           "version": "1.0"
+#       },
+#       "createdAt": "2024-03-20T10:30:00Z",
+#       "updatedAt": "2024-03-20T10:30:00Z",
+#       "lastUsedAt": null,
+#       "lastSuccessAt": null,
+#       "lastErrorAt": null,
+#       "lastErrorMessage": null,
+#       "successCount": 0,
+#       "errorCount": 0,
+#       "averageResponseTime": 0
+#   }
 # }
 
-### Get All Surcharge Providers
-GET {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers
+### Create Surcharge Provider (without Configuration)
+POST {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers
+Content-Type: application/json
+X-Merchant-ID: {{merchantId}}
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
+
+{
+    "name": "Test Provider",
+    "code": "TESTPROV",
+    "description": "Test provider without configuration",
+    "baseUrl": "https://api.testprovider.com/v1",
+    "authenticationType": "API_KEY",
+    "credentialsSchema": {
+        "required_fields": [
+            {
+                "name": "api_key",
+                "type": "api_key",
+                "description": "API Key for authentication"
+            }
+        ]
+    }
+}
+
+### Get All Surcharge Providers Created by Merchant
+GET {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers
+X-Merchant-ID: {{merchantId}}
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+# Note: This endpoint returns all surcharge providers created by the current merchant.
+# If the merchant has not created any providers, the response will be an empty array.
+# The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
 
 ### Response Example:
 # [
@@ -510,86 +589,55 @@ X-Signature: calculated-signature-here
 #     "id": "123e4567-e89b-12d3-a456-426614174000",
 #     "name": "Interpayments",
 #     "code": "INTERPAY",
-#     "description": "Interpayments Surcharge Provider",
+#     "description": "Interpayments Surcharge Provider for payment processing",
 #     "baseUrl": "https://api.interpayments.com/v1",
 #     "authenticationType": "JWT",
-#     "credentialsSchema": {
-#         "required_fields": [
-#             {
-#                 "name": "client_id",
-#                 "type": "string",
-#                 "description": "Interpayments Client ID"
-#             },
-#             {
-#                 "name": "client_secret",
-#                 "type": "string",
-#                 "description": "Interpayments Client Secret"
-#             },
-#             {
-#                 "name": "audience",
-#                 "type": "string",
-#                 "description": "JWT Audience"
-#             },
-#             {
-#                 "name": "issuer",
-#                 "type": "string",
-#                 "description": "JWT Issuer"
-#             }
-#         ]
-#     },
-#     "status": "active",
+#     "credentialsSchema": { ... },
+#     "status": "ACTIVE",
 #     "createdAt": "2024-03-20T10:30:00Z",
-#     "updatedAt": "2024-03-20T10:30:00Z"
+#     "updatedAt": "2024-03-20T10:30:00Z",
+#     "createdBy": "merchant123",
+#     "updatedBy": "merchant123",
+#     "configuration": { ... }
 #   }
 # ]
+# (If the merchant has not created any providers, the response will be: [])
 
 ### Get Surcharge Provider by ID
-GET {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+GET {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+X-Merchant-ID: {{merchantId}}
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
+
+# Note: The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
+# The merchant must have created this provider to access it.
 
 ### Response Example:
 # {
 #   "id": "123e4567-e89b-12d3-a456-426614174000",
 #   "name": "Interpayments",
 #   "code": "INTERPAY",
-#   "description": "Interpayments Surcharge Provider",
+#   "description": "Interpayments Surcharge Provider for payment processing",
 #   "baseUrl": "https://api.interpayments.com/v1",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
-#       "required_fields": [
-#           {
-#               "name": "client_id",
-#               "type": "string",
-#               "description": "Interpayments Client ID"
-#           },
-#           {
-#               "name": "client_secret",
-#               "type": "string",
-#               "description": "Interpayments Client Secret"
-#           },
-#           {
-#               "name": "audience",
-#               "type": "string",
-#               "description": "JWT Audience"
-#           },
-#           {
-#               "name": "issuer",
-#               "type": "string",
-#               "description": "JWT Issuer"
-#           }
-#       ]
+#       "required_fields": [...],
+#       "optional_fields": [...]
 #   },
-#   "status": "active",
+#   "status": "ACTIVE",
 #   "createdAt": "2024-03-20T10:30:00Z",
-#   "updatedAt": "2024-03-20T10:30:00Z"
+#   "updatedAt": "2024-03-20T10:30:00Z",
+#   "createdBy": "merchant123",
+#   "updatedBy": "merchant123",
+#   "configuration": { ... }
 # }
 
 ### Update Surcharge Provider
-PUT {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+PUT {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
 Content-Type: application/json
+X-Merchant-ID: {{merchantId}}
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
@@ -621,16 +669,20 @@ X-Signature: calculated-signature-here
                 "name": "issuer",
                 "type": "string",
                 "description": "JWT Issuer"
-            },
+            }
+        ],
+        "optional_fields": [
             {
                 "name": "token_endpoint",
                 "type": "string",
                 "description": "JWT Token Endpoint"
             }
         ]
-    },
-    "status": "active"
+    }
 }
+
+# Note: The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
+# The merchant must have created this provider to update it.
 
 ### Response Example:
 # {
@@ -641,48 +693,78 @@ X-Signature: calculated-signature-here
 #   "baseUrl": "https://api.interpayments.com/v2",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
-#       "required_fields": [
-#           {
-#               "name": "client_id",
-#               "type": "string",
-#               "description": "Interpayments Client ID"
-#           },
-#           {
-#               "name": "client_secret",
-#               "type": "string",
-#               "description": "Interpayments Client Secret"
-#           },
-#           {
-#               "name": "audience",
-#               "type": "string",
-#               "description": "JWT Audience"
-#           },
-#           {
-#               "name": "issuer",
-#               "type": "string",
-#               "description": "JWT Issuer"
-#           },
-#           {
-#               "name": "token_endpoint",
-#               "type": "string",
-#               "description": "JWT Token Endpoint"
-#           }
-#       ]
+#       "required_fields": [...],
+#       "optional_fields": [...]
 #   },
-#   "status": "active",
+#   "status": "ACTIVE",
 #   "createdAt": "2024-03-20T10:30:00Z",
-#   "updatedAt": "2024-03-20T10:35:00Z"
+#   "updatedAt": "2024-03-20T10:35:00Z",
+#   "createdBy": "merchant123",
+#   "updatedBy": "merchant123",
+#   "configuration": { ... }
 # }
 
-### Delete Surcharge Provider
-DELETE {{FeeNominalService_HostAddress}}/api/v1/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+### Delete Surcharge Provider (Soft Delete)
+DELETE {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers/123e4567-e89b-12d3-a456-426614174000
+X-Merchant-ID: {{merchantId}}
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
 
+# Note: The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
+# The merchant must have created this provider to delete it.
+# This endpoint performs a soft delete - the provider is marked as DELETED status but not removed from the database.
+# Deleted providers are excluded from all queries by default but can be restored if needed.
+
 ### Response Example:
 # {
-#   "success": true,
-#   "message": "Provider deleted successfully"
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments",
+#   "code": "INTERPAY",
+#   "description": "Interpayments Surcharge Provider for payment processing",
+#   "baseUrl": "https://api.interpayments.com/v1",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [...],
+#       "optional_fields": [...]
+#   },
+#   "status": "DELETED",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:35:00Z",
+#   "createdBy": "merchant123",
+#   "updatedBy": "merchant123",
+#   "configuration": { ... }
+# }
+
+### Restore Surcharge Provider
+POST {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers/123e4567-e89b-12d3-a456-426614174000/restore
+X-Merchant-ID: {{merchantId}}
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+# Note: The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
+# The merchant must have created this provider to restore it.
+# This endpoint restores a soft-deleted provider by changing its status back to ACTIVE.
+
+### Response Example:
+# {
+#   "id": "123e4567-e89b-12d3-a456-426614174000",
+#   "name": "Interpayments",
+#   "code": "INTERPAY",
+#   "description": "Interpayments Surcharge Provider for payment processing",
+#   "baseUrl": "https://api.interpayments.com/v1",
+#   "authenticationType": "JWT",
+#   "credentialsSchema": {
+#       "required_fields": [...],
+#       "optional_fields": [...]
+#   },
+#   "status": "ACTIVE",
+#   "createdAt": "2024-03-20T10:30:00Z",
+#   "updatedAt": "2024-03-20T10:40:00Z",
+#   "createdBy": "merchant123",
+#   "updatedBy": "merchant123",
+#   "configuration": { ... }
 # }

@@ -6,12 +6,45 @@ This directory contains the database migration scripts for version 1.0.0 of the 
 
 ```
 1.0.0/
+├── setup/                       # Initial database setup migrations
+│   ├── M1_0_0_001__enable_dblink.sql
+│   └── M1_0_0_002__initial_setup.sql
 ├── Rollback/                    # Rollback scripts for each migration
 │   ├── U1_0_0_101__create_schema_rollback.sql
 │   ├── U1_0_0_102__create_merchant_tables_rollback.sql
 │   └── ...
 └── README.md                    # This file
 ```
+
+## Setup Strategy
+
+The `setup` directory contains initial database setup migrations that must be run before the main application migrations. These scripts handle the foundational database infrastructure:
+
+### Setup Migrations
+
+1. **M1_0_0_001__enable_dblink.sql** - Enables the dblink extension to allow cross-database operations for automated database creation
+2. **M1_0_0_002__initial_setup.sql** - Creates the database, roles, schema, and service users with appropriate privileges
+
+### Running Setup
+
+Setup migrations must be run manually before any application migrations. These are foundational database setup scripts that establish the infrastructure:
+
+```bash
+# Run setup migrations manually (not through Evolve)
+psql -h <host> -U <user> -d <database> -f Data/Evolve/1.0.0/setup/M1_0_0_001__enable_dblink.sql
+psql -h <host> -U <user> -d <database> -f Data/Evolve/1.0.0/setup/M1_0_0_002__initial_setup.sql
+
+# Then run application migrations through Evolve
+evolve migrate --location=Data/Evolve/1.0.0
+```
+
+### Setup Configuration
+
+The setup scripts use configurable parameters for different environments. Key configurations include:
+- Database name and schema
+- Service user accounts (deployment and API users)
+- Role-based access control
+- Environment-specific settings
 
 ## Migration Strategy
 

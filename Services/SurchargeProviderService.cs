@@ -13,13 +13,16 @@ namespace FeeNominalService.Services
     public class SurchargeProviderService : ISurchargeProviderService
     {
         private readonly ISurchargeProviderRepository _repository;
+        private readonly ISurchargeProviderConfigService _configService;
         private readonly ILogger<SurchargeProviderService> _logger;
 
         public SurchargeProviderService(
             ISurchargeProviderRepository repository,
+            ISurchargeProviderConfigService configService,
             ILogger<SurchargeProviderService> logger)
         {
             _repository = repository;
+            _configService = configService;
             _logger = logger;
         }
 
@@ -27,12 +30,26 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting provider by ID {ProviderId}", id);
+                _logger.LogInformation("Getting provider by ID: {ProviderId}", id);
                 return await _repository.GetByIdAsync(id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by ID {ProviderId}", id);
+                _logger.LogError(ex, "Error getting provider by ID: {ProviderId}", id);
+                throw;
+            }
+        }
+
+        public async Task<SurchargeProvider?> GetByIdAsync(Guid id, bool includeDeleted)
+        {
+            try
+            {
+                _logger.LogInformation("Getting provider by ID: {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
+                return await _repository.GetByIdAsync(id, includeDeleted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting provider by ID: {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
                 throw;
             }
         }
@@ -65,6 +82,48 @@ namespace FeeNominalService.Services
             }
         }
 
+        public async Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId)
+        {
+            try
+            {
+                _logger.LogInformation("Getting providers for merchant {MerchantId}", merchantId);
+                return await _repository.GetByMerchantIdAsync(merchantId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId}", merchantId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<SurchargeProvider>> GetConfiguredProvidersByMerchantIdAsync(string merchantId)
+        {
+            try
+            {
+                _logger.LogInformation("Getting configured providers for merchant {MerchantId}", merchantId);
+                return await _repository.GetConfiguredProvidersByMerchantIdAsync(merchantId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting configured providers for merchant {MerchantId}", merchantId);
+                throw;
+            }
+        }
+
+        public async Task<bool> HasConfigurationAsync(string merchantId, Guid providerId)
+        {
+            try
+            {
+                _logger.LogInformation("Checking if merchant {MerchantId} has configuration for provider {ProviderId}", merchantId, providerId);
+                return await _repository.HasConfigurationAsync(merchantId, providerId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking configuration for merchant {MerchantId} and provider {ProviderId}", merchantId, providerId);
+                throw;
+            }
+        }
+
         public async Task<IEnumerable<SurchargeProvider>> GetActiveAsync()
         {
             try
@@ -83,12 +142,25 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Creating provider {ProviderName}", provider.Name);
+                _logger.LogInformation("Creating provider {ProviderName} for merchant {MerchantId}", provider.Name, provider.CreatedBy);
 
-                // Validate provider code uniqueness
-                if (await _repository.ExistsByCodeAsync(provider.Code))
+                // Validate provider code uniqueness for this merchant only
+                if (await _repository.ExistsByCodeAndMerchantAsync(provider.Code, provider.CreatedBy))
                 {
-                    throw new InvalidOperationException($"Provider with code {provider.Code} already exists");
+                    throw new InvalidOperationException($"Provider with code {provider.Code} already exists for this merchant");
+                }
+
+                // Validate credentials schema
+                if (provider.CredentialsSchema == null || string.IsNullOrEmpty(provider.CredentialsSchema.RootElement.GetRawText()))
+                {
+                    throw new InvalidOperationException("Credentials schema is required and cannot be empty");
+                }
+
+                // Validate the schema structure
+                var schemaValidation = ValidateCredentialsSchemaStructure(provider.CredentialsSchema);
+                if (!schemaValidation.IsValid)
+                {
+                    throw new InvalidOperationException($"Invalid credentials schema: {string.Join(", ", schemaValidation.Errors)}");
                 }
 
                 // Set timestamps
@@ -108,7 +180,53 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating provider {ProviderName}", provider.Name);
+                _logger.LogError(ex, "Error creating provider {ProviderName} for merchant {MerchantId}", provider.Name, provider.CreatedBy);
+                throw;
+            }
+        }
+
+        public async Task<SurchargeProvider> CreateWithConfigurationAsync(SurchargeProvider provider, ProviderConfigurationRequest configuration, string merchantId)
+        {
+            try
+            {
+                _logger.LogInformation("Creating provider {ProviderName} with configuration for merchant {MerchantId}", provider.Name, merchantId);
+
+                // First, create the provider
+                var createdProvider = await CreateAsync(provider);
+
+                // Then create the configuration
+                var config = new SurchargeProviderConfig
+                {
+                    MerchantId = Guid.Parse(merchantId),
+                    ProviderId = createdProvider.Id,
+                    ConfigName = configuration.ConfigName,
+                    Credentials = JsonSerializer.SerializeToDocument(configuration.Credentials),
+                    IsActive = true,
+                    IsPrimary = configuration.IsPrimary,
+                    Timeout = configuration.Timeout,
+                    RetryCount = configuration.RetryCount,
+                    RetryDelay = configuration.RetryDelay,
+                    RateLimit = configuration.RateLimit,
+                    RateLimitPeriod = configuration.RateLimitPeriod,
+                    Metadata = configuration.Metadata != null ? JsonSerializer.SerializeToDocument(configuration.Metadata) : null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                // Save the configuration to the database
+                var savedConfig = await _configService.CreateAsync(config);
+
+                // Add the configuration to the provider for the response
+                createdProvider.Configurations = new List<SurchargeProviderConfig> { savedConfig };
+
+                _logger.LogInformation("Successfully created provider {ProviderId} with configuration {ConfigId} for merchant {MerchantId}", 
+                    createdProvider.Id, savedConfig.Id, merchantId);
+
+                return createdProvider;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating provider with configuration for merchant {MerchantId}", merchantId);
                 throw;
             }
         }
@@ -117,7 +235,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Updating provider {ProviderId}", provider.Id);
+                _logger.LogInformation("Updating provider {ProviderId} for merchant {MerchantId}", provider.Id, provider.UpdatedBy);
 
                 // Check if provider exists
                 var existingProvider = await _repository.GetByIdAsync(provider.Id);
@@ -126,10 +244,10 @@ namespace FeeNominalService.Services
                     throw new KeyNotFoundException($"Provider with ID {provider.Id} not found");
                 }
 
-                // Validate provider code uniqueness if changed
-                if (provider.Code != existingProvider.Code && await _repository.ExistsByCodeAsync(provider.Code))
+                // Validate provider code uniqueness for this merchant only if changed
+                if (provider.Code != existingProvider.Code && await _repository.ExistsByCodeAndMerchantAsync(provider.Code, provider.UpdatedBy))
                 {
-                    throw new InvalidOperationException($"Provider with code {provider.Code} already exists");
+                    throw new InvalidOperationException($"Provider with code {provider.Code} already exists for this merchant");
                 }
 
                 // Update timestamp
@@ -139,7 +257,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating provider {ProviderId}", provider.Id);
+                _logger.LogError(ex, "Error updating provider {ProviderId} for merchant {MerchantId}", provider.Id, provider.UpdatedBy);
                 throw;
             }
         }
@@ -148,19 +266,44 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Deleting provider {ProviderId}", id);
-
-                // Check if provider exists
-                if (!await _repository.ExistsAsync(id))
-                {
-                    return false;
-                }
-
-                return await _repository.DeleteAsync(id);
+                _logger.LogInformation("Soft deleting provider {ProviderId}", id);
+                
+                // Use soft delete instead of hard delete
+                return await _repository.SoftDeleteAsync(id, "system");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting provider {ProviderId}", id);
+                _logger.LogError(ex, "Error soft deleting provider {ProviderId}", id);
+                throw;
+            }
+        }
+
+        public async Task<bool> SoftDeleteAsync(Guid id, string deletedBy)
+        {
+            try
+            {
+                _logger.LogInformation("Soft deleting provider {ProviderId} by {DeletedBy}", id, deletedBy);
+                
+                return await _repository.SoftDeleteAsync(id, deletedBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error soft deleting provider {ProviderId} by {DeletedBy}", id, deletedBy);
+                throw;
+            }
+        }
+
+        public async Task<bool> RestoreAsync(Guid id, string restoredBy)
+        {
+            try
+            {
+                _logger.LogInformation("Restoring provider {ProviderId} by {RestoredBy}", id, restoredBy);
+                
+                return await _repository.RestoreAsync(id, restoredBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error restoring provider {ProviderId} by {RestoredBy}", id, restoredBy);
                 throw;
             }
         }
@@ -254,7 +397,14 @@ namespace FeeNominalService.Services
                         },
                         ""required"": [""username"", ""password""]
                     }",
-
+                    "api_key" => @"{
+                        ""type"": ""object"",
+                        ""properties"": {
+                            ""api_key"": { ""type"": ""string"", ""minLength"": 1 },
+                            ""header_name"": { ""type"": ""string"", ""default"": ""X-API-Key"" }
+                        },
+                        ""required"": [""api_key""]
+                    }",
                     "oauth2" => @"{
                         ""type"": ""object"",
                         ""properties"": {
@@ -264,30 +414,158 @@ namespace FeeNominalService.Services
                         },
                         ""required"": [""client_id"", ""client_secret"", ""token_url""]
                     }",
-
-                    "api_key" => @"{
+                    "jwt" => @"{
                         ""type"": ""object"",
                         ""properties"": {
-                            ""api_key"": { ""type"": ""string"", ""minLength"": 1 },
-                            ""api_key_header"": { ""type"": ""string"", ""minLength"": 1 }
+                            ""jwt_token"": { ""type"": ""string"", ""minLength"": 1 },
+                            ""token_type"": { ""type"": ""string"", ""default"": ""Bearer"" }
                         },
-                        ""required"": [""api_key"", ""api_key_header""]
+                        ""required"": [""jwt_token""]
                     }",
-
-                    "custom" => @"{
+                    _ => @"{
                         ""type"": ""object"",
-                        ""additionalProperties"": true
-                    }",
-
-                    _ => throw new ArgumentException($"Unsupported provider type: {providerType}")
+                        ""properties"": {
+                            ""custom_field"": { ""type"": ""string"", ""minLength"": 1 }
+                        },
+                        ""required"": [""custom_field""]
+                    }"
                 };
 
                 return schemaJson;
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Error generating schema for provider type {providerType}", ex);
+                throw new InvalidOperationException($"Error generating schema for provider type {providerType}: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Validates the structure of a credentials schema
+        /// </summary>
+        private (bool IsValid, List<string> Errors) ValidateCredentialsSchemaStructure(JsonDocument schema)
+        {
+            var errors = new List<string>();
+
+            try
+            {
+                var root = schema.RootElement;
+
+                // Check if it's an object
+                if (root.ValueKind != JsonValueKind.Object)
+                {
+                    errors.Add("Credentials schema must be a JSON object");
+                    return (false, errors);
+                }
+
+                // Validate required top-level properties
+                if (!root.TryGetProperty("name", out var nameElement) || string.IsNullOrWhiteSpace(nameElement.GetString()))
+                    errors.Add("Credentials schema must have a 'name' property");
+
+                if (!root.TryGetProperty("description", out var descElement) || string.IsNullOrWhiteSpace(descElement.GetString()))
+                    errors.Add("Credentials schema must have a 'description' property");
+
+                if (!root.TryGetProperty("required_fields", out var requiredFieldsElement))
+                    errors.Add("Credentials schema must have a 'required_fields' property");
+
+                // Validate required_fields array
+                if (requiredFieldsElement.ValueKind == JsonValueKind.Array)
+                {
+                    var requiredFields = requiredFieldsElement.EnumerateArray();
+                    if (!requiredFields.Any())
+                    {
+                        errors.Add("At least one required field must be defined");
+                    }
+                    else
+                    {
+                        int fieldIndex = 0;
+                        foreach (var field in requiredFields)
+                        {
+                            var fieldErrors = ValidateCredentialField(field, $"required_fields[{fieldIndex}]");
+                            errors.AddRange(fieldErrors);
+                            fieldIndex++;
+                        }
+                    }
+                }
+                else
+                {
+                    errors.Add("'required_fields' must be an array");
+                }
+
+                // Validate optional_fields array if present
+                if (root.TryGetProperty("optional_fields", out var optionalFieldsElement))
+                {
+                    if (optionalFieldsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        int fieldIndex = 0;
+                        foreach (var field in optionalFieldsElement.EnumerateArray())
+                        {
+                            var fieldErrors = ValidateCredentialField(field, $"optional_fields[{fieldIndex}]");
+                            errors.AddRange(fieldErrors);
+                            fieldIndex++;
+                        }
+                    }
+                    else
+                    {
+                        errors.Add("'optional_fields' must be an array");
+                    }
+                }
+            }
+            catch (JsonException ex)
+            {
+                errors.Add($"Invalid JSON format: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Validation error: {ex.Message}");
+            }
+
+            return (errors.Count == 0, errors);
+        }
+
+        private List<string> ValidateCredentialField(JsonElement field, string fieldPath)
+        {
+            var errors = new List<string>();
+
+            // Validate field is an object
+            if (field.ValueKind != JsonValueKind.Object)
+            {
+                errors.Add($"{fieldPath} must be an object");
+                return errors;
+            }
+
+            // Validate required field properties
+            if (!field.TryGetProperty("name", out var nameElement) || string.IsNullOrWhiteSpace(nameElement.GetString()))
+                errors.Add($"{fieldPath}.name is required");
+
+            if (!field.TryGetProperty("type", out var typeElement) || string.IsNullOrWhiteSpace(typeElement.GetString()))
+                errors.Add($"{fieldPath}.type is required");
+
+            if (!field.TryGetProperty("description", out var descElement) || string.IsNullOrWhiteSpace(descElement.GetString()))
+                errors.Add($"{fieldPath}.description is required");
+
+            // Validate field type if present
+            if (typeElement.ValueKind == JsonValueKind.String)
+            {
+                var type = typeElement.GetString()?.ToLowerInvariant();
+                var validTypes = new[]
+                {
+                    "string", "number", "integer", "boolean", "email", "url", "password",
+                    "jwt", "api_key", "client_id", "client_secret", "access_token", "refresh_token",
+                    "username", "certificate", "private_key", "public_key", "base64", "json"
+                };
+
+                if (!validTypes.Contains(type))
+                    errors.Add($"{fieldPath}.type '{type}' is not a valid field type");
+            }
+
+            // Validate string length constraints
+            if (nameElement.ValueKind == JsonValueKind.String && nameElement.GetString()?.Length > 100)
+                errors.Add($"{fieldPath}.name cannot exceed 100 characters");
+
+            if (descElement.ValueKind == JsonValueKind.String && descElement.GetString()?.Length > 500)
+                errors.Add($"{fieldPath}.description cannot exceed 500 characters");
+
+            return errors;
         }
 
         public async Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code)

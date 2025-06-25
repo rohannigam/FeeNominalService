@@ -27,6 +27,9 @@ namespace FeeNominalService.Repositories
             try
             {
                 return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .Where(p => p.Status.Code != "DELETED")
                     .FirstOrDefaultAsync(p => p.Id == id);
             }
             catch (Exception ex)
@@ -36,11 +39,41 @@ namespace FeeNominalService.Repositories
             }
         }
 
+        public async Task<SurchargeProvider?> GetByIdAsync(Guid id, bool includeDeleted)
+        {
+            try
+            {
+                if (includeDeleted)
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Include(p => p.Configurations)
+                        .FirstOrDefaultAsync(p => p.Id == id);
+                }
+                else
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Include(p => p.Configurations)
+                        .Where(p => p.Status.Code != "DELETED")
+                        .FirstOrDefaultAsync(p => p.Id == id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting provider by ID {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
+                throw;
+            }
+        }
+
         public async Task<SurchargeProvider?> GetByCodeAsync(string code)
         {
             try
             {
                 return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .Where(p => p.Status.Code != "DELETED")
                     .FirstOrDefaultAsync(p => p.Code == code);
             }
             catch (Exception ex)
@@ -55,12 +88,140 @@ namespace FeeNominalService.Repositories
             try
             {
                 return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .Where(p => p.Status.Code != "DELETED")
                     .OrderBy(p => p.Name)
                     .ToListAsync();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting all providers");
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<SurchargeProvider>> GetAllAsync(bool includeDeleted)
+        {
+            try
+            {
+                if (includeDeleted)
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Include(p => p.Configurations)
+                        .OrderBy(p => p.Name)
+                        .ToListAsync();
+                }
+                else
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Include(p => p.Configurations)
+                        .Where(p => p.Status.Code != "DELETED")
+                        .OrderBy(p => p.Name)
+                        .ToListAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all providers (includeDeleted: {IncludeDeleted})", includeDeleted);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId)
+        {
+            try
+            {
+                return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .Where(p => p.CreatedBy == merchantId && p.Status.Code != "DELETED")
+                    .OrderBy(p => p.Name)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId}", merchantId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId, bool includeDeleted)
+        {
+            try
+            {
+                if (includeDeleted)
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Include(p => p.Configurations)
+                        .Where(p => p.CreatedBy == merchantId)
+                        .OrderBy(p => p.Name)
+                        .ToListAsync();
+                }
+                else
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Include(p => p.Configurations)
+                        .Where(p => p.CreatedBy == merchantId && p.Status.Code != "DELETED")
+                        .OrderBy(p => p.Name)
+                        .ToListAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<SurchargeProvider>> GetConfiguredProvidersByMerchantIdAsync(string merchantId)
+        {
+            try
+            {
+                // Convert string merchantId to Guid for database comparison
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return Enumerable.Empty<SurchargeProvider>();
+                }
+
+                // Get providers that the merchant has configured via surcharge_provider_configs table
+                return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .Where(p => _context.SurchargeProviderConfigs
+                        .Any(c => c.MerchantId == merchantGuid && c.ProviderId == p.Id))
+                    .OrderBy(p => p.Name)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting configured providers for merchant {MerchantId}", merchantId);
+                throw;
+            }
+        }
+
+        public async Task<bool> HasConfigurationAsync(string merchantId, Guid providerId)
+        {
+            try
+            {
+                // Convert string merchantId to Guid for database comparison
+                if (!Guid.TryParse(merchantId, out Guid merchantGuid))
+                {
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    return false;
+                }
+
+                return await _context.SurchargeProviderConfigs
+                    .AnyAsync(c => c.MerchantId == merchantGuid && c.ProviderId == providerId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking configuration for merchant {MerchantId} and provider {ProviderId}", merchantId, providerId);
                 throw;
             }
         }
@@ -79,6 +240,8 @@ namespace FeeNominalService.Repositories
                 }
 
                 return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
                     .Where(p => p.StatusId == activeStatus.StatusId)
                     .OrderBy(p => p.Name)
                     .ToListAsync();
@@ -100,7 +263,11 @@ namespace FeeNominalService.Repositories
                 _context.SurchargeProviders.Add(provider);
                 await _context.SaveChangesAsync();
 
-                return provider;
+                // Reload the entity with Status and Configurations included
+                return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .FirstOrDefaultAsync(p => p.Id == provider.Id) ?? provider;
             }
             catch (Exception ex)
             {
@@ -118,7 +285,11 @@ namespace FeeNominalService.Repositories
                 _context.SurchargeProviders.Update(provider);
                 await _context.SaveChangesAsync();
 
-                return provider;
+                // Reload the entity with Status and Configurations included
+                return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Include(p => p.Configurations)
+                    .FirstOrDefaultAsync(p => p.Id == provider.Id) ?? provider;
             }
             catch (Exception ex)
             {
@@ -152,11 +323,38 @@ namespace FeeNominalService.Repositories
             try
             {
                 return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Where(p => p.Status.Code != "DELETED")
                     .AnyAsync(p => p.Id == id);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error checking provider existence {ProviderId}", id);
+                throw;
+            }
+        }
+
+        public async Task<bool> ExistsAsync(Guid id, bool includeDeleted)
+        {
+            try
+            {
+                if (includeDeleted)
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .AnyAsync(p => p.Id == id);
+                }
+                else
+                {
+                    return await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Where(p => p.Status.Code != "DELETED")
+                        .AnyAsync(p => p.Id == id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking provider existence {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
                 throw;
             }
         }
@@ -175,9 +373,117 @@ namespace FeeNominalService.Repositories
             }
         }
 
+        public async Task<bool> ExistsByCodeAndMerchantAsync(string code, string merchantId)
+        {
+            try
+            {
+                return await _context.SurchargeProviders
+                    .AnyAsync(p => p.Code == code && p.CreatedBy == merchantId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode} for merchant {MerchantId}", code, merchantId);
+                throw;
+            }
+        }
+
         public async Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code)
         {
             return await _context.SurchargeProviderStatuses.FirstOrDefaultAsync(s => s.Code == code);
+        }
+
+        public async Task<bool> SoftDeleteAsync(Guid id, string deletedBy)
+        {
+            try
+            {
+                var provider = await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if (provider == null)
+                {
+                    _logger.LogWarning("Provider not found for soft delete: {ProviderId}", id);
+                    return false;
+                }
+
+                // Check if already deleted
+                if (provider.Status.Code == "DELETED")
+                {
+                    _logger.LogWarning("Provider is already deleted: {ProviderId}", id);
+                    return false;
+                }
+
+                // Get the DELETED status
+                var deletedStatus = await _context.SurchargeProviderStatuses
+                    .FirstOrDefaultAsync(s => s.Code == "DELETED");
+
+                if (deletedStatus == null)
+                {
+                    throw new InvalidOperationException("DELETED status not found in the database");
+                }
+
+                // Update the provider to DELETED status
+                provider.StatusId = deletedStatus.StatusId;
+                provider.UpdatedAt = DateTime.UtcNow;
+                provider.UpdatedBy = deletedBy;
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Provider {ProviderId} soft deleted by {DeletedBy}", id, deletedBy);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error soft deleting provider {ProviderId}", id);
+                throw;
+            }
+        }
+
+        public async Task<bool> RestoreAsync(Guid id, string restoredBy)
+        {
+            try
+            {
+                var provider = await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if (provider == null)
+                {
+                    _logger.LogWarning("Provider not found for restore: {ProviderId}", id);
+                    return false;
+                }
+
+                // Check if currently deleted
+                if (provider.Status.Code != "DELETED")
+                {
+                    _logger.LogWarning("Provider is not deleted: {ProviderId}", id);
+                    return false;
+                }
+
+                // Get the ACTIVE status (default for restoration)
+                var activeStatus = await _context.SurchargeProviderStatuses
+                    .FirstOrDefaultAsync(s => s.Code == "ACTIVE");
+
+                if (activeStatus == null)
+                {
+                    throw new InvalidOperationException("ACTIVE status not found in the database");
+                }
+
+                // Update the provider to ACTIVE status
+                provider.StatusId = activeStatus.StatusId;
+                provider.UpdatedAt = DateTime.UtcNow;
+                provider.UpdatedBy = restoredBy;
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Provider {ProviderId} restored by {RestoredBy}", id, restoredBy);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error restoring provider {ProviderId}", id);
+                throw;
+            }
         }
     }
 } 
