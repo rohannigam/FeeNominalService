@@ -17,8 +17,8 @@ BEGIN
     PERFORM set_config('app.environment', 'dev', false);
     
     -- User Configuration
-    PERFORM set_config('app.deploy_username', 'svc_feenominal_dev_deploy', false);
-    PERFORM set_config('app.api_username', 'svc_feenominal_dev_api', false);
+    PERFORM set_config('app.deploy_username', 'svc_feenominal_deploy', false);
+    PERFORM set_config('app.api_username', 'svc_feenominal_api', false);
     
     -- Password Configuration (in production, these should come from environment variables or secrets)
     PERFORM set_config('app.deploy_password', 'deploy_default_password', false);
@@ -157,14 +157,19 @@ DECLARE
 BEGIN
     EXECUTE format('GRANT %I TO %I', readwrite_role, deploy_username);
     EXECUTE format('GRANT USAGE, CREATE ON SCHEMA %I TO %I', schema_name, deploy_username);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA %I TO %I', schema_name, deploy_username);
+    EXECUTE format('GRANT ALL ON ALL TABLES IN SCHEMA %I TO %I', schema_name, deploy_username);
     EXECUTE format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA %I TO %I', schema_name, deploy_username);
     EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO %I', schema_name, deploy_username);
 
     -- Set default privileges for future objects created by deployment user
-    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLES TO %I', schema_name, deploy_username);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT ALL ON TABLES TO %I', schema_name, deploy_username);
     EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', schema_name, deploy_username);
     EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', schema_name, deploy_username);
+
+    -- Set default ownership for future objects created in this schema
+    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA %I GRANT ALL ON TABLES TO %I', schema_name, deploy_username);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', schema_name, deploy_username);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', schema_name, deploy_username);
 
     RAISE NOTICE 'All privileges granted to deployment user %', deploy_username;
 END$$;
