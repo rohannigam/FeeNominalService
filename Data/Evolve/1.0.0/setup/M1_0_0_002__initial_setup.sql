@@ -134,6 +134,28 @@ BEGIN
     RAISE NOTICE 'Schema % created or already exists', schema_name;
 END$$;
 
+-- 4.5. Transfer schema ownership to deployment user for Evolve compatibility
+DO $$
+DECLARE
+    schema_name TEXT := current_setting('app.schema_name');
+    deploy_username TEXT := current_setting('app.deploy_username');
+BEGIN
+    -- Transfer ownership of the schema to the deployment user
+    EXECUTE format('ALTER SCHEMA %I OWNER TO %I', schema_name, deploy_username);
+    RAISE NOTICE 'Schema % ownership transferred to deployment user %', schema_name, deploy_username;
+END$$;
+
+-- 4.6. Grant CREATE privilege on database to deployment user for schema operations
+DO $$
+DECLARE
+    db_name TEXT := current_setting('app.db_name');
+    deploy_username TEXT := current_setting('app.deploy_username');
+BEGIN
+    -- Grant CREATE privilege on the database to allow schema creation
+    EXECUTE format('GRANT CREATE ON DATABASE %I TO %I', db_name, deploy_username);
+    RAISE NOTICE 'CREATE privilege on database % granted to deployment user %', db_name, deploy_username;
+END$$;
+
 -- 5. Create deployment user if it does not exist
 DO $$
 DECLARE
@@ -171,6 +193,15 @@ BEGIN
     EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', schema_name, deploy_username);
     EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', schema_name, deploy_username);
 
+    -- 6.5. Grant public schema permissions for Evolve changelog table (fallback)
+    EXECUTE format('GRANT USAGE, CREATE ON SCHEMA public TO %I', deploy_username);
+    EXECUTE format('GRANT ALL ON ALL TABLES IN SCHEMA public TO %I', deploy_username);
+    EXECUTE format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO %I', deploy_username);
+    
+    -- Set default privileges for future objects in public schema
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO %I', deploy_username);
+    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', deploy_username);
+    
     RAISE NOTICE 'All privileges granted to deployment user %', deploy_username;
 END$$;
 
@@ -207,6 +238,23 @@ BEGIN
     EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', schema_name, api_username);
 
     RAISE NOTICE 'All privileges granted to API user %', api_username;
+END$$;
+
+-- 8.5. Grant privileges on all existing tables to API user
+DO $$
+DECLARE
+    api_username TEXT := current_setting('app.api_username');
+    schema_name TEXT := current_setting('app.schema_name');
+    table_record RECORD;
+BEGIN
+    FOR table_record IN 
+        SELECT tablename 
+        FROM pg_tables 
+        WHERE schemaname = schema_name
+    LOOP
+        EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I.%I TO %I', schema_name, table_record.tablename, api_username);
+    END LOOP;
+    RAISE NOTICE 'Granted privileges on all tables in schema % to API user %', schema_name, api_username;
 END$$;
 
 -- 9. Grant readonly role to both users for possible future use
