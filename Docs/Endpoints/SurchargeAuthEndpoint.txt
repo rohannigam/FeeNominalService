@@ -1,0 +1,283 @@
+# Surcharge Auth Endpoint
+
+## Overview
+This document describes the `/api/v1/surcharge/auth` endpoint for processing surcharge authorization transactions. It covers both initial and follow-up auths (where a `providerTransactionId` is provided), request/response formats, security, and workflow details. This is the single source of truth for onboarding, QA, and internal users.
+
+---
+
+## Base Endpoint
+`/api/v1/surcharge/auth`
+
+---
+
+## Security Considerations
+- Requires valid API key authentication
+- Request must include valid timestamp and nonce
+- Rate limiting applies per merchant
+- All sensitive data is encrypted at rest
+- Access is logged in audit trail
+
+---
+
+## Common Request Headers (Required)
+- `X-Merchant-ID`: Merchant ID
+- `X-Timestamp`: Current UTC timestamp (e.g., "2025-06-27T10:30:00Z")
+- `X-Nonce`: Unique string for request (e.g., GUID)
+- `X-API-Key`: Valid API key
+- `X-Signature`: HMAC-SHA256 signature of the request
+
+---
+
+## Request Body
+```json
+{
+  "binValue": "string",                 // Required, Bank Identification Number (BIN) value
+  "surchargeProcessor": "string",       // Required, Surcharge processor configuration identifier
+  "amount": 100.00,                     // Required, Transaction amount (must be > 0.01)
+  "totalAmount": 110.00,                // Optional, Total with surcharge
+  "country": "USA",                     // Required, 2-3 letter country code (e.g., USA, CAN, US, CA)
+  "postalCode": "94105",                // Optional, Postal code (US ZIP, Canadian Postal, etc.)
+  "campaign": ["SUMMER2025"],           // Optional, Campaign identifiers
+  "data": ["extra1", "extra2"],         // Optional, Additional data points
+  "correlationId": "string",            // Required, Correlation ID for linking transactions
+  "merchantTransactionId": "string",    // Optional, Merchant transaction ID
+  "cardToken": "string",                // Optional, Tokenized card info
+  "entryMethod": "Chip",                // Optional, Card entry method
+  "nonSurchargableAmount": 0.00,        // Optional, Non-surchargable amount
+  "providerTransactionId": "string",    // Optional, For follow-up auths
+  "providerCode": "string"              // Required, Provider code for the surcharge provider
+}
+```
+
+---
+
+## Response Body
+```json
+{
+  "surchargeTransactionId": "guid",    // Unique transaction ID
+  "correlationId": "string",           // Correlation ID
+  "merchantTransactionId": "string",   // Merchant transaction ID
+  "originalAmount": 100.00,             // Original amount
+  "surchargeAmount": 10.00,             // Surcharge calculated (0 if validation failed)
+  "totalAmount": 110.00,                // Total with surcharge
+  "status": "Completed",               // Transaction status (Failed if validation error)
+  "provider": "INTERPAYMENTS",         // Provider used
+  "processedAt": "2025-06-27T10:31:00Z", // Processing timestamp
+  "errorMessage": "Postal code must be a valid US ZIP code (5 digits or 5+4 with dash)", // Error message if failed
+  "surchargeFeePercent": 3.5           // Percent fee charged by provider (optional)
+}
+```
+
+---
+
+## Field Descriptions
+- **Required:** `binValue`, `surchargeProcessor`, `amount`, `country`, `correlationId`, `providerCode`
+- **Optional/Nullable:** `totalAmount`, `postalCode`, `campaign`, `data`, `merchantTransactionId`, `cardToken`, `entryMethod`, `nonSurchargableAmount`, `providerTransactionId`
+- **Validation Rules:**
+  - `amount`: Must be greater than 0.01
+  - `country`: Must be 2-3 characters (prefer 3-letter ISO codes like USA, CAN)
+  - `nonSurchargableAmount`: Cannot exceed `amount` if provided
+- Only provided optional fields are included in the request to the provider.
+- **Note:** The `postalCode` field is mapped to the `region` field in the outgoing InterPayments request.
+- **Validation Errors:** ALL validation errors (request validation, provider configuration, provider-specific validation) are returned in the response with `ErrorMessage` populated and `Status` set to "Failed".
+
+---
+
+## Error Responses
+### 400 Bad Request
+```json
+{
+  "message": "Invalid request",
+  "errors": ["Field 'binValue' is required"]
+}
+```
+### 401 Unauthorized
+```json
+{
+  "message": "Invalid API key or signature"
+}
+```
+### 404 Not Found
+```json
+{
+  "message": "Provider configuration not found"
+}
+```
+### 409 Conflict
+```json
+{
+  "message": "Duplicate transaction detected"
+}
+```
+### 500 Internal Server Error
+```json
+{
+  "message": "An error occurred while processing the surcharge auth"
+}
+```
+- All error responses include a structured error code (see SurchargeErrorCodes).
+- **ALL validation errors** (request validation, provider configuration, provider-specific validation) are returned as successful HTTP 200 responses with `ErrorMessage` populated and `Status` set to "Failed".
+
+---
+
+## Validation Error Examples
+
+### Postal Code Format Error
+```json
+{
+  "surchargeTransactionId": "123e4567-e89b-12d3-a456-426614174000",
+  "correlationId": "1183061097",
+  "merchantTransactionId": "mtxn_1183061097",
+  "originalAmount": 100.00,
+  "surchargeAmount": 0,
+  "totalAmount": 100.00,
+  "status": "Failed",
+  "provider": "InterPayments",
+  "processedAt": "2025-07-08T17:05:43.123Z",
+  "errorMessage": "Postal code must be a valid US ZIP code (5 digits or 5+4 with dash)",
+  "surchargeFeePercent": null
+}
+```
+
+### Provider Configuration Error
+```json
+{
+  "surchargeTransactionId": "123e4567-e89b-12d3-a456-426614174000",
+  "correlationId": "1183061098",
+  "merchantTransactionId": "mtxn_1183061098",
+  "originalAmount": 100.00,
+  "surchargeAmount": 0,
+  "totalAmount": 100.00,
+  "status": "Failed",
+  "provider": "Unknown",
+  "processedAt": "2025-07-08T17:05:43.123Z",
+  "errorMessage": "Provider configuration not found for code: INTERPAYMENTS_INVALID",
+  "surchargeFeePercent": null
+}
+```
+
+### Request Validation Error
+```json
+{
+  "surchargeTransactionId": "123e4567-e89b-12d3-a456-426614174000",
+  "correlationId": "1183061099",
+  "merchantTransactionId": "mtxn_1183061099",
+  "originalAmount": 0,
+  "surchargeAmount": 0,
+  "totalAmount": 0,
+  "status": "Failed",
+  "provider": "Unknown",
+  "processedAt": "2025-07-08T17:05:43.123Z",
+  "errorMessage": "Amount must be greater than 0.01",
+  "surchargeFeePercent": null
+}
+```
+
+---
+
+## Workflow Diagrams
+
+### Initial Auth Workflow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant Validation
+    participant Service
+    participant Provider
+    participant Database
+
+    Client->>API: POST /api/v1/surcharge/auth
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Validation: Validate Request
+        Validation-->>API: Validation Result
+        alt Validation Failed
+            API-->>Client: 400 Bad Request
+        else Validation Success
+            API->>Service: Process Auth
+            Service->>Database: Create Pending Transaction
+            Service->>Service: Validate Request (duplicates, amounts, etc.)
+            alt Request Validation Failed
+                Service->>Database: Update Transaction (Failed)
+                Service-->>API: SurchargeAuthResponse (Status: Failed, ErrorMessage: populated)
+                API-->>Client: 200 OK (with error details)
+            else Request Validation Success
+                Service->>Service: Validate Provider Configuration
+                alt Provider Config Validation Failed
+                    Service->>Database: Update Transaction (Failed)
+                    Service-->>API: SurchargeAuthResponse (Status: Failed, ErrorMessage: populated)
+                    API-->>Client: 200 OK (with error details)
+                else Provider Config Validation Success
+                    Service->>Provider: Validate Provider-Specific Rules
+                    alt Provider Validation Failed
+                        Provider-->>Service: Validation Error
+                        Service->>Database: Update Transaction (Failed)
+                        Service-->>API: SurchargeAuthResponse (Status: Failed, ErrorMessage: populated)
+                        API-->>Client: 200 OK (with error details)
+                    else Provider Validation Success
+                        Service->>Provider: Call Provider API
+                        Provider-->>Service: Provider Response
+                        Service->>Database: Update Transaction (Completed)
+                        Service-->>API: SurchargeAuthResponse (Status: Completed)
+                        API-->>Client: 200 OK
+                    end
+                end
+            end
+        end
+    end
+```
+
+### Follow-Up Auth Workflow (providerTransactionId Provided)
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Auth
+    participant Validation
+    participant Service
+    participant Provider
+    participant Database
+
+    Client->>API: POST /api/v1/surcharge/auth (with providerTransactionId)
+    API->>Auth: Validate API Key & Signature
+    Auth-->>API: Authentication Result
+    alt Authentication Failed
+        API-->>Client: 401 Unauthorized
+    else Authentication Success
+        API->>Validation: Validate Request
+        Validation-->>API: Validation Result
+        alt Validation Failed
+            API-->>Client: 400 Bad Request
+        else Validation Success
+            API->>Service: Process Follow-Up Auth
+            Service->>Database: Lookup Transaction by providerTransactionId
+            Service->>Provider: Call Provider API (if needed)
+            Provider-->>Service: Provider Response
+            Service->>Database: Update Transaction Status
+            Service-->>API: SurchargeAuthResponse
+            API-->>Client: 200 OK
+        end
+    end
+```
+
+---
+
+## Follow-Up Auths
+- If `providerTransactionId` is provided in the request, the service treats the request as a follow-up auth.
+- The service will attempt to look up the existing transaction by `providerTransactionId` and process accordingly.
+- This enables idempotency and supports provider-driven workflows (e.g., retries, status checks).
+- Only fields provided in the request are sent to the provider; missing/optional fields are omitted.
+
+---
+
+## Notes for Onboarding/QA/Internal Users
+- This document is the single source of truth for the `/api/v1/surcharge/auth` endpoint.
+- All validation, error handling, and workflow details are up-to-date as of 2025-06-27.
+- For schema/validation rules, see CredentialsSchemaDocumentation.md.
+- For schema changes, see migration scripts in `/Data/Evolve/1.0.0/`.
+- Deprecated endpoints should not be used for new integrations. 

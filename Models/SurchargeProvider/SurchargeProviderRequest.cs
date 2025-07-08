@@ -16,7 +16,7 @@ namespace FeeNominalService.Models.SurchargeProvider
         public string Name { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(50)]
+        [StringLength(100)]
         public string Code { get; set; } = string.Empty;
 
         [StringLength(500)]

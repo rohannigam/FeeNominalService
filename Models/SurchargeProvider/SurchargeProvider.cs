@@ -22,7 +22,7 @@ namespace FeeNominalService.Models.SurchargeProvider
 
         [Required]
         [Column("code")]
-        [MaxLength(20)]
+        [MaxLength(100)]
         public required string Code { get; set; }
 
         [Column("description")]
@@ -66,6 +66,11 @@ namespace FeeNominalService.Models.SurchargeProvider
         [Column("updated_by")]
         [MaxLength(50)]
         public required string UpdatedBy { get; set; }
+
+        [Required]
+        [Column("provider_type")]
+        [MaxLength(50)]
+        public string ProviderType { get; set; } = "INTERPAYMENTS";
 
         // Navigation properties
         public virtual ICollection<SurchargeProviderConfig>? Configurations { get; set; }

@@ -11,14 +11,19 @@ public class SurchargeAuthResponse
     public required Guid SurchargeTransactionId { get; set; }
 
     /// <summary>
-    /// System transaction identifier
+    /// Correlation identifier for linking related transactions
     /// </summary>
-    public required string SystemTransactionId { get; set; }
+    public required string CorrelationId { get; set; }
 
     /// <summary>
     /// Merchant transaction identifier
     /// </summary>
     public string? MerchantTransactionId { get; set; }
+
+    /// <summary>
+    /// Provider transaction identifier (e.g., Interpayments sTxId)
+    /// </summary>
+    public string? ProviderTransactionId { get; set; }
 
     /// <summary>
     /// Original transaction amount before surcharge
@@ -34,11 +39,6 @@ public class SurchargeAuthResponse
     /// Total amount including surcharge
     /// </summary>
     public required decimal TotalAmount { get; set; }
-
-    /// <summary>
-    /// Currency code
-    /// </summary>
-    public required string Currency { get; set; }
 
     /// <summary>
     /// Status of the surcharge transaction
@@ -59,4 +59,9 @@ public class SurchargeAuthResponse
     /// Error message if the operation failed
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Percent fee charged by the provider (if available)
+    /// </summary>
+    public decimal? SurchargeFeePercent { get; set; }
 }

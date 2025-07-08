@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Repositories;
 using Microsoft.Extensions.Logging;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {

@@ -66,48 +66,59 @@ namespace FeeNominalService.Swagger
                     });
             }
 
-            // Add security definitions
-            options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+            // Add security definitions for each required header
+            options.AddSecurityDefinition("X-Merchant-ID", new OpenApiSecurityScheme
             {
-                Description = @"API Key Authentication with Request Signing.
-                
-                Required Headers:
-                - X-Merchant-ID: Your merchant ID
-                - X-API-Key: Your API key
-                - X-Timestamp: Current UTC time in ISO 8601 format
-                - X-Nonce: Unique random string
-                - X-Signature: HMAC signature (timestamp|nonce|merchantId|apiKey)
-                
-                Signature Calculation:
-                1. Concatenate: timestamp|nonce|merchantId|apiKey (using pipe separator)
-                2. Create HMAC-SHA256 hash using the secret key
-                3. Base64 encode the hash",
-                Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
+                Description = "Your merchant ID (required for all authenticated requests)",
+                Type = SecuritySchemeType.ApiKey,
                 In = ParameterLocation.Header,
-                Name = "Authorization"
+                Name = "X-Merchant-ID"
+            });
+            options.AddSecurityDefinition("X-API-Key", new OpenApiSecurityScheme
+            {
+                Description = "Your API key (required for all authenticated requests)",
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
+                Name = "X-API-Key"
+            });
+            options.AddSecurityDefinition("X-Timestamp", new OpenApiSecurityScheme
+            {
+                Description = "Current UTC time in ISO 8601 format (required for request signing)",
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
+                Name = "X-Timestamp"
+            });
+            options.AddSecurityDefinition("X-Nonce", new OpenApiSecurityScheme
+            {
+                Description = "Unique random string for each request (required for request signing)",
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
+                Name = "X-Nonce"
+            });
+            options.AddSecurityDefinition("X-Signature", new OpenApiSecurityScheme
+            {
+                Description = "HMAC-SHA256 signature of (timestamp|nonce|merchantId|apiKey), base64 encoded (required)",
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
+                Name = "X-Signature"
             });
 
             options.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "ApiKey"
-                        }
-                    },
-                    new[]
-                    {
-                        "X-Merchant-ID",
-                        "X-API-Key",
-                        "X-Timestamp",
-                        "X-Nonce",
-                        "X-Signature"
-                    }
+                    new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Merchant-ID" } }, new string[] { }
+                },
+                {
+                    new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-API-Key" } }, new string[] { }
+                },
+                {
+                    new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Timestamp" } }, new string[] { }
+                },
+                {
+                    new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Nonce" } }, new string[] { }
+                },
+                {
+                    new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Signature" } }, new string[] { }
                 }
             });
 

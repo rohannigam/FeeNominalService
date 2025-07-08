@@ -26,26 +26,31 @@ namespace FeeNominalService.Swagger
             {
                 new OpenApiSecurityRequirement
                 {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "ApiKey"
-                            }
-                        },
-                        new[]
-                        {
-                            "X-Merchant-ID",
-                            "X-API-Key",
-                            "X-Timestamp",
-                            "X-Nonce",
-                            "X-Signature"
-                        }
-                    }
+                    { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Merchant-ID" } }, new string[] { } },
+                    { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-API-Key" } }, new string[] { } },
+                    { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Timestamp" } }, new string[] { } },
+                    { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Nonce" } }, new string[] { } },
+                    { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "X-Signature" } }, new string[] { } }
                 }
             };
+
+            // Document required headers for secured endpoints
+            operation.Parameters ??= new List<OpenApiParameter>();
+            var requiredHeaders = new[] { "X-Merchant-ID", "X-API-Key", "X-Timestamp", "X-Nonce", "X-Signature" };
+            foreach (var header in requiredHeaders)
+            {
+                if (!operation.Parameters.Any(p => p.Name == header))
+                {
+                    operation.Parameters.Add(new OpenApiParameter
+                    {
+                        Name = header,
+                        In = ParameterLocation.Header,
+                        Required = true,
+                        Schema = new OpenApiSchema { Type = "string" },
+                        Description = $"{header} (required)"
+                    });
+                }
+            }
 
             // Add request body schema for operations that need it
             if (context.MethodInfo.Name.Contains("Update") || 

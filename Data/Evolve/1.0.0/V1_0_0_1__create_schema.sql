@@ -5,6 +5,7 @@ Dependencies: None (This is the first migration)
 Changes:
 - Creates fee_nominal schema
 - Creates update_updated_at_column() function used by subsequent migrations for automatic timestamp updates
+- Sets up default privileges for API user
 */
 
 DO $$
@@ -45,6 +46,20 @@ DO $$
 BEGIN
     RAISE NOTICE 'Created update_updated_at_column function';
 END $$;
+
+-- Set default privileges for ALL users in the schema to grant permissions to API user
+-- This ensures that ANY object created by ANY user will automatically grant permissions to svc_feenominal_api
+ALTER DEFAULT PRIVILEGES IN SCHEMA fee_nominal GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO svc_feenominal_api;
+ALTER DEFAULT PRIVILEGES IN SCHEMA fee_nominal GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO svc_feenominal_api;
+ALTER DEFAULT PRIVILEGES IN SCHEMA fee_nominal GRANT EXECUTE ON FUNCTIONS TO svc_feenominal_api;
+
+-- Also set default privileges specifically for the deployment user
+ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA fee_nominal GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO svc_feenominal_api;
+ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA fee_nominal GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO svc_feenominal_api;
+ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA fee_nominal GRANT EXECUTE ON FUNCTIONS TO svc_feenominal_api;
+
+-- Grant schema usage to API user
+GRANT USAGE ON SCHEMA fee_nominal TO svc_feenominal_api;
 
 DO $$
 BEGIN

@@ -28,7 +28,8 @@ namespace FeeNominalService.Models.SurchargeProvider
                 CreatedAt = provider.CreatedAt,
                 UpdatedAt = provider.UpdatedAt,
                 CreatedBy = provider.CreatedBy,
-                UpdatedBy = provider.UpdatedBy
+                UpdatedBy = provider.UpdatedBy,
+                ProviderType = provider.ProviderType
             };
 
             // Include configuration if it exists

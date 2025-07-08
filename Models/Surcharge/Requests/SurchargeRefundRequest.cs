@@ -8,10 +8,17 @@ namespace FeeNominalService.Models.Surcharge.Requests;
 public class SurchargeRefundRequest
 {
     /// <summary>
-    /// System transaction identifier for the refund
+    /// Transaction amount to refund
     /// </summary>
-    [Required(ErrorMessage = "System transaction ID is required")]
-    public required string SystemTransactionId { get; set; }
+    [Required(ErrorMessage = "Amount is required")]
+    [Range(0.01, double.MaxValue, ErrorMessage = "Amount must be greater than 0")]
+    public decimal Amount { get; set; }
+
+    /// <summary>
+    /// Correlation identifier for linking related transactions
+    /// </summary>
+    [Required(ErrorMessage = "Correlation ID is required")]
+    public required string CorrelationId { get; set; }
 
     /// <summary>
     /// Merchant transaction identifier for the refund
@@ -23,20 +30,6 @@ public class SurchargeRefundRequest
     /// </summary>
     [Required(ErrorMessage = "Original transaction ID is required")]
     public required string OriginalTransactionId { get; set; }
-
-    /// <summary>
-    /// Refund amount
-    /// </summary>
-    [Required(ErrorMessage = "Amount is required")]
-    [Range(0.01, double.MaxValue, ErrorMessage = "Amount must be greater than 0")]
-    public decimal Amount { get; set; }
-
-    /// <summary>
-    /// Currency code for the refund
-    /// </summary>
-    [Required(ErrorMessage = "Currency is required")]
-    [StringLength(3, MinimumLength = 3, ErrorMessage = "Currency must be a 3-letter code")]
-    public string Currency { get; set; } = "USD";
 
     /// <summary>
     /// Reason for the refund

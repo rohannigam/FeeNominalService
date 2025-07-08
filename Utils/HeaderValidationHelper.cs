@@ -66,4 +66,15 @@ namespace FeeNominalService.Utils
             return (true, guidValue, null);
         }
     }
+
+    public static class Masker
+    {
+        public static string MaskSecret(string? secret, int showStart = 4, int showEnd = 6)
+        {
+            if (string.IsNullOrEmpty(secret)) return "<null>";
+            if (secret.Length <= showStart + showEnd)
+                return new string('*', secret.Length);
+            return secret.Substring(0, showStart) + "..." + secret.Substring(secret.Length - showEnd);
+        }
+    }
 } 

@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.IO;
 using Serilog;
 using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 
 namespace FeeNominalService.Middleware;
 
@@ -58,8 +59,25 @@ public class RequestResponseLoggingMiddleware
         if (request.Body.Length > 0)
         {
             request.Body.Position = 0;
-            body = await new StreamReader(request.Body).ReadToEndAsync();
+            body = await new StreamReader(request.Body, leaveOpen: true).ReadToEndAsync();
             request.Body.Position = 0;
+        }
+
+        // Try to format JSON if the content type is JSON
+        if (request.ContentType?.Contains("application/json") == true && !string.IsNullOrEmpty(body))
+        {
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(body);
+                body = JsonSerializer.Serialize(jsonDoc, new JsonSerializerOptions 
+                { 
+                    WriteIndented = true 
+                });
+            }
+            catch
+            {
+                // If JSON parsing fails, use the raw body
+            }
         }
 
         return $"{request.Method} {request.Scheme}://{request.Host}{request.Path}{request.QueryString}\nBody: {body}";
@@ -68,8 +86,25 @@ public class RequestResponseLoggingMiddleware
     private async Task<string> FormatResponse(HttpResponse response)
     {
         response.Body.Seek(0, SeekOrigin.Begin);
-        var text = await new StreamReader(response.Body).ReadToEndAsync();
+        var text = await new StreamReader(response.Body, leaveOpen: true).ReadToEndAsync();
         response.Body.Seek(0, SeekOrigin.Begin);
+
+        // Try to format JSON if the content type is JSON
+        if (response.ContentType?.Contains("application/json") == true && !string.IsNullOrEmpty(text))
+        {
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(text);
+                text = JsonSerializer.Serialize(jsonDoc, new JsonSerializerOptions 
+                { 
+                    WriteIndented = true 
+                });
+            }
+            catch
+            {
+                // If JSON parsing fails, use the raw text
+            }
+        }
 
         return $"Status: {response.StatusCode}\nBody: {text}";
     }

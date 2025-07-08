@@ -185,172 +185,36 @@ CREATE TABLE api_keys (
 */
 
 ************************************************************************
-6/25/2025 - Checkin notes 
+6/20/2025 - Weekly Summary & Major Platform Overhaul
 ************************************************************************
-I'll analyze the conversation history from the past 24 hours and provide a comprehensive summary of all the changes made. Let me review the key modifications and improvements.
 
-Search files...
-Based on my analysis of the conversation history and codebase, here's a comprehensive summary of all the changes made in the past 24 hours:
-
-## Summary of Changes Made in Past 24 Hours
-
-### 🔧 **Major Feature Implementations**
-
-#### 1. **Surcharge Provider Management System Overhaul**
-- **RESTful URL Pattern**: Changed from `/api/v1/surcharge-providers` to `/api/v1/merchants/{merchantId}/surcharge-providers`
-- **Merchant Isolation**: Implemented merchant-specific provider access control
-- **X-Merchant-ID Header**: Added required header for all merchant-specific endpoints
-- **Provider Code Uniqueness**: Changed from global uniqueness to merchant-specific uniqueness
-
-#### 2. **Soft Delete Implementation**
-- **Status-Based Deletion**: Replaced hard delete with soft delete using "DELETED" status
-- **Restore Functionality**: Added restore endpoint to reactivate deleted providers
-- **Database Migration**: Added "DELETED" status to surcharge_provider_statuses table
-- **Repository Methods**: Added `SoftDeleteAsync` and `RestoreAsync` methods
-
-#### 3. **Enhanced Credentials Schema System**
-- **Comprehensive Validation**: Added field type validation (JWT, API_KEY, EMAIL, URL, etc.)
-- **Configurable Settings**: Created `SurchargeProviderValidationSettings` for validation limits
-- **Single API Call**: Implemented provider creation with configuration in one request
-- **Credential Storage**: Enhanced secure credential storage with encryption
-
-#### 4. **Configuration Management**
-- **Provider Configurations**: Added support for multiple configurations per provider
-- **Primary Config**: Implemented primary configuration concept
-- **Usage Tracking**: Added success/error count and response time tracking
-- **Metadata Support**: Added flexible metadata storage for configurations
-
-### 🛡️ **Security Enhancements**
-
-#### 1. **Authentication & Authorization**
-- **Merchant Ownership Validation**: Ensured merchants can only access their own providers
-- **X-Merchant-ID Validation**: Header must match URL parameter for merchant-specific endpoints
-- **Enhanced Request Signing**: Updated signature calculation and validation
-- **Role-Based Access**: Implemented proper authorization policies
-
-#### 2. **Data Protection**
-- **Merchant Isolation**: Complete data separation between merchants
-- **Encrypted Credentials**: Secure storage of sensitive provider credentials
-- **Audit Trail**: Comprehensive logging of all provider operations
-- **Input Validation**: Enhanced validation for all input fields
-
-### 🗄️ **Database & Infrastructure**
-
-#### 1. **Database Schema Updates**
-- **Missing Columns**: Added `average_response_time` and other missing columns
-- **Foreign Key Relationships**: Fixed EF Core shadow property issues
-- **Composite Unique Constraints**: Added (code, created_by) constraint for provider codes
-- **Status Management**: Added "DELETED" status for soft delete functionality
-
-#### 2. **Entity Framework Improvements**
-- **Navigation Properties**: Fixed eager loading of Status and Configurations
-- **Shadow Properties**: Resolved EF Core shadow property conflicts
-- **Query Optimization**: Improved repository query performance
-- **Type Consistency**: Fixed Guid vs string type mismatches
-
-### 📚 **Documentation & Testing**
-
-#### 1. **API Documentation**
-- **Updated Endpoint Documentation**: Comprehensive documentation for all new endpoints
-- **Request/Response Examples**: Added detailed examples for all operations
-- **Authentication Requirements**: Documented X-Merchant-ID header requirements
-- **Error Handling**: Added comprehensive error response documentation
-
-#### 2. **Postman Collection Updates**
-- **New Endpoints**: Added all new surcharge provider endpoints
-- **Environment Variables**: Updated with new provider configuration variables
-- **Authentication Scripts**: Enhanced pre-request scripts for new authentication
-- **Response Examples**: Added comprehensive response examples
-
-### 🔄 **Service Layer Improvements**
-
-#### 1. **Service Architecture**
-- **Circular Dependency Resolution**: Fixed dependency injection issues
-- **Validation Service**: Added `CredentialValidationService` for field validation
-- **Configuration Service**: Enhanced `SurchargeProviderConfigService`
-- **Error Handling**: Improved error handling and logging throughout
-
-#### 2. **Repository Pattern Enhancements**
-- **Include Statements**: Added proper eager loading for related entities
-- **Query Optimization**: Improved database query performance
-- **Type Safety**: Fixed type conversion issues between string and Guid
-- **Error Logging**: Enhanced error logging and exception handling
-
-### 🎯 **Key Technical Achievements**
-
-1. **Scalability**: Merchant-specific provider isolation allows for better scaling
-2. **Security**: Comprehensive authentication and authorization system
-3. **Maintainability**: Clean separation of concerns and proper dependency injection
-4. **Flexibility**: Configurable validation and extensible configuration system
-5. **Reliability**: Soft delete functionality and comprehensive error handling
-6. **Performance**: Optimized database queries and eager loading
-
-### �� **Files Modified/Created**
-
-**Controllers:**
-- `Controllers/V1/SurchargeProviderController.cs` - Complete overhaul
-
-**Services:**
-- `Services/SurchargeProviderService.cs` - Enhanced with new features
-- `Services/SurchargeProviderConfigService.cs` - New service
-- `Services/CredentialValidationService.cs` - New validation service
-
-**Repositories:**
-- `Repositories/SurchargeProviderRepository.cs` - Enhanced with soft delete
-- `Repositories/SurchargeProviderConfigRepository.cs` - New repository
-- `Repositories/ISurchargeProviderRepository.cs` - Updated interface
-- `Repositories/ISurchargeProviderConfigRepository.cs` - New interface
-
-**Models:**
-- `Models/SurchargeProvider/` - Enhanced models with new properties
-- `Models/Configuration/` - New configuration models
-
-**Settings:**
-- `Settings/SurchargeProviderValidationSettings.cs` - New validation settings
-
-**Database:**
-- Multiple migration files for schema updates
-- Rollback scripts for all migrations
-
-**Documentation:**
-- `Docs/Endpoints/SurchargeProviderEndpoints.txt` - Complete rewrite
-- `SurchargeCalcuilationDocumentation.md` - Major updates
-
-**Testing:**
-- `FeeNominalSurchargeCollection.json` - Updated Postman collection
-- `FeeNominalSurcharge_env.json` - Updated environment variables
-
-This represents a significant enhancement to the FeeNominalService, providing a robust, secure, and scalable surcharge provider management system with comprehensive merchant isolation and advanced configuration capabilities.
-
-## 📋 **Weekly Summary: FeeNominalService Changes**
-
-### **1. 🔐 Security & Authentication Overhaul**
+### 1. 🔐 Security & Authentication Overhaul
 - Implemented merchant-specific access control with `X-Merchant-ID` header requirement
 - Enhanced request signing with proper signature calculation (`timestamp|nonce|merchantId|apiKey`)
 - Added merchant ownership validation for all surcharge provider operations
 - Fixed security vulnerability where merchants could access other merchants' providers
 
-### **2. 🏗️ RESTful API Architecture Redesign**
+### 2. 🏗️ RESTful API Architecture Redesign
 - Migrated from `/api/v1/surcharge-providers` to `/api/v1/merchants/{merchantId}/surcharge-providers`
 - Implemented proper resource-based URL patterns for better scalability
 - Added comprehensive merchant isolation ensuring data separation between tenants
 - Updated all endpoints to follow consistent RESTful conventions
 
-### **3. 🗄️ Database & Data Management Enhancements**
+### 3. 🗄️ Database & Data Management Enhancements
 - Implemented soft delete functionality with "DELETED" status instead of hard deletes
 - Added restore capability for reactivating deleted providers
 - Fixed EF Core shadow property issues and type mismatches (Guid vs string)
 - Added missing database columns (`average_response_time`, `SurchargeProviderId`)
 - Created composite unique constraints for provider codes per merchant
 
-### **4. ⚙️ Advanced Configuration & Validation System**
+### 4. ⚙️ Advanced Configuration & Validation System
 - Built comprehensive credentials schema validation with field type checking (JWT, API_KEY, EMAIL, URL)
 - Implemented single API call provider creation with configuration
 - Added configurable validation settings (`SurchargeProviderValidationSettings`)
 - Created primary configuration concept with usage tracking and metadata support
 - Enhanced credential storage with encryption and secure management
 
-### **5. 🔄 Surcharge Model Evolution & Transaction System**
+### 5. 🔄 Surcharge Model Evolution & Transaction System
 - **Deprecated** old `/api/v1/surchargefee/calculate` endpoints in favor of workflow-based approach
 - **Introduced** new surcharge transaction model with `/api/v1/surcharge/auth`, `/api/v1/surcharge/refund`, `/api/v1/surcharge/void` endpoints
 - **Implemented** direct integration with surcharge providers (like Interpayments) instead of simple fee calculation
@@ -359,16 +223,30 @@ This represents a significant enhancement to the FeeNominalService, providing a 
 
 **Impact**: Transformed FeeNominalService from a simple fee calculator into a comprehensive payment processing platform with proper multi-tenancy support, advanced configuration management, and direct provider integrations for real transaction processing.
 
-Final list:
-- SurchargeProvider related overhaul
-	- Migrated from `/api/v1/surcharge-providers` to `/api/v1/merchants/{merchantId}/surcharge-providers`
-	- Added comprehensive merchant isolation ensuring data separation between tenants
-	- Implemented soft delete functionality with "DELETED" status instead of hard deletes
-	- Added restore endpoint to restore a deleted provider
-	- Implemented merchant-specific access control with `X-Merchant-ID` header requirement
-	- Advanced Configuration & Validation System - Built comprehensive credentials schema validation with field type checking (JWT, API_KEY, EMAIL, URL)
+************************************************************************
+6/27/2025 - Weekly Summary & Surcharge Auth Workflow Completion
+************************************************************************
 
-- Initial Changes for Surcharge Model Evolution & Transaction System - MORE COMING SOON
-	- **Deprecated** old `/api/v1/surchargefee/calculate` endpoints in favor of workflow-based approach
-	- **Introduced** new surcharge transaction model with `/api/v1/surcharge/auth`, `/api/v1/surcharge/refund`, `/api/v1/surcharge/void` endpoints
+## 📋 Weekly Summary: FeeNominalService Changes
+
+### 🎯 Key Changes Summary (6 Points):
+
+1. **🔐 Security Enhancements**: Fixed critical merchant isolation vulnerability in transaction lookups, enforced provider config matching for follow-up auths, and enhanced request signing validation.
+
+2. **📝 API Documentation Cleanup**: Removed stale endpoints from HTTP files and Postman collections, updated all request/response examples to match current models, and reorganized endpoint documentation for logical flow.
+
+3. **⚙️ Configuration Cleanup**: Removed unused Interpayments configuration from appsettings files, cleaned up legacy database migration files, and updated Swagger security schemes to reflect actual API key authentication.
+
+4. **🛠️ Code Quality Improvements**: Fixed null reference warnings throughout the codebase, improved error handling to return validation errors in responses instead of throwing exceptions, and enhanced XML documentation for Swagger.
+
+5. **🔄 Surcharge Auth Workflow**: Implemented complete end-to-end support for initial auth and follow-up auth using providerTransactionId, with proper validation, security checks, and error handling.
+
+6. **📊 Database & Migration Management**: Removed legacy transaction tables, cleaned up unused migration files, and ensured database schema reflects current application state.
+
+### 🚦 Surcharge Auth & Follow-Up Workflow: End-to-End Support
+- The `/api/v1/surcharge/auth` endpoint now fully supports both initial and follow-up auth flows.
+- All validation, security, and error handling is robust and consistent with the latest requirements.
+- Merchant isolation and provider config matching are strictly enforced for all auth and follow-up requests.
+- API documentation, Postman collections, and HTTP files are fully up to date and reflect the current contract.
+- End-to-end testing and validation have been completed for all surcharge auth scenarios.
 	

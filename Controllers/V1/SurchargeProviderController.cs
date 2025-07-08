@@ -35,6 +35,12 @@ namespace FeeNominalService.Controllers.V1
             _logger = logger;
         }
 
+        /// <summary>
+        /// Create a new surcharge provider for the specified merchant
+        /// </summary>
+        /// <param name="merchantId">Merchant ID</param>
+        /// <param name="request">Surcharge provider request</param>
+        /// <returns>Created surcharge provider</returns>
         [HttpPost]
         public async Task<IActionResult> CreateProvider(string merchantId, [FromBody] SurchargeProviderRequest request)
         {
@@ -174,6 +180,11 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
+        /// <summary>
+        /// Get all surcharge providers for the specified merchant
+        /// </summary>
+        /// <param name="merchantId">Merchant ID</param>
+        /// <returns>List of surcharge providers</returns>
         [HttpGet]
         public async Task<IActionResult> GetAllProviders(string merchantId)
         {
@@ -206,6 +217,12 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
+        /// <summary>
+        /// Get a surcharge provider by ID for the specified merchant
+        /// </summary>
+        /// <param name="merchantId">Merchant ID</param>
+        /// <param name="id">Provider ID</param>
+        /// <returns>Surcharge provider details</returns>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetProviderById(string merchantId, Guid id)
         {
@@ -251,6 +268,13 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
+        /// <summary>
+        /// Update a surcharge provider for the specified merchant
+        /// </summary>
+        /// <param name="merchantId">Merchant ID</param>
+        /// <param name="id">Provider ID</param>
+        /// <param name="request">Surcharge provider request</param>
+        /// <returns>Updated surcharge provider</returns>
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProvider(string merchantId, Guid id, [FromBody] SurchargeProviderRequest request)
         {
@@ -337,6 +361,12 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
+        /// <summary>
+        /// Delete (soft delete) a surcharge provider for the specified merchant
+        /// </summary>
+        /// <param name="merchantId">Merchant ID</param>
+        /// <param name="id">Provider ID</param>
+        /// <returns>Deleted surcharge provider</returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProvider(string merchantId, Guid id)
         {
@@ -401,6 +431,12 @@ namespace FeeNominalService.Controllers.V1
             }
         }
 
+        /// <summary>
+        /// Restore a soft-deleted surcharge provider for the specified merchant
+        /// </summary>
+        /// <param name="merchantId">Merchant ID</param>
+        /// <param name="id">Provider ID</param>
+        /// <returns>Restored surcharge provider</returns>
         [HttpPost("{id}/restore")]
         public async Task<IActionResult> RestoreProvider(string merchantId, Guid id)
         {

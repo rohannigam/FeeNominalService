@@ -3,6 +3,40 @@
 ## Overview
 This document covers all endpoints related to managing surcharge providers in the system. These endpoints allow for creating, retrieving, updating, and managing surcharge provider configurations with merchant-specific access control.
 
+---
+
+## Provider Code Standardization
+- Provider codes must follow the pattern `{PROVIDER_NAME}_{ENV}_{UNIQUE_ID}` (e.g., `INTERPAYMENTS_PROD_001`).
+- Codes must be uppercase, use underscores, and be unique per merchant.
+- See implementation notes for validation rules.
+
+---
+
+## Validation System & Error Codes
+- All credential schema and configuration validation is now environment-configurable (see appsettings).
+- Validation is stricter in production; limits and rules are documented in CredentialsSchemaDocumentation.md.
+- All error responses include a structured error code and detailed error messages for easier troubleshooting.
+- See CredentialsSchemaDocumentation.md for real-world error/validation examples.
+
+---
+
+## Optional/Nullable Fields
+- All fields in `configuration.credentials` and `credentialsSchema` can be optional/null if not required by the provider.
+- Only provided fields are included in requests to providers (e.g., Interpayments).
+- Unnecessary validation (e.g., TotalAmount > 0) has been removed from the service layer.
+
+---
+
+## Schema Changes Reference
+- For all schema changes, see migration scripts in `/Data/Evolve/1.0.0/`.
+
+---
+
+## Deprecated Endpoints
+- Any endpoints not listed in this document are considered deprecated and should not be used for new integrations.
+
+---
+
 ## Base Endpoint
 `/api/v1/merchants/{merchantId}/surcharge-providers`
 

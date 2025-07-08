@@ -26,6 +26,8 @@ using FeeNominalService.Repositories;
 using FeeNominalService.Middleware;
 using FeeNominalService.Services.AWS;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.Extensions.Logging;
+using FeeNominalService.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,6 +67,7 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.MaxDepth = 64;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 builder.Services.AddMemoryCache();
 
@@ -111,6 +114,7 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ISurchargeProviderService, SurchargeProviderService>();
 builder.Services.AddScoped<ISurchargeProviderConfigService, SurchargeProviderConfigService>();
+builder.Services.AddScoped<ISurchargeTransactionService, SurchargeTransactionService>();
 builder.Services.AddScoped<IApiKeyGenerator, ApiKeyGenerator>();
 builder.Services.AddScoped<IProviderValidationService, ProviderValidationService>();
 builder.Services.AddScoped<ICredentialValidationService, CredentialValidationService>();
@@ -223,6 +227,10 @@ builder.Services.AddCors(options =>
                .AllowAnyHeader();
     });
 });
+
+// Register provider adapters and factory for DI
+builder.Services.AddSingleton<InterPaymentsAdapter>();
+builder.Services.AddSingleton<ISurchargeProviderAdapterFactory, SurchargeProviderAdapterFactory>();
 
 var app = builder.Build();
 

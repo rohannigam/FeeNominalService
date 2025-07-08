@@ -72,6 +72,11 @@ namespace FeeNominalService.Models.SurchargeProvider
         /// Configuration created along with the provider (if provided in request)
         /// </summary>
         public ProviderConfigurationResponse? Configuration { get; set; }
+
+        /// <summary>
+        /// Type of the provider (e.g., INTERPAYMENTS, OTHERPROVIDER)
+        /// </summary>
+        public string ProviderType { get; set; } = string.Empty;
     }
 
     /// <summary>

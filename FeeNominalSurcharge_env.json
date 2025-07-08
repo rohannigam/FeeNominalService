@@ -1,5 +1,5 @@
 {
-	"id": "f6a1d2c7-b07e-4c06-906d-362269c1511f",
+	"id": "812e5d2a-2944-409f-be45-748917d1e8e9",
 	"name": "FeeNominalSurchargeService Environment",
 	"values": [
 		{
@@ -40,7 +40,7 @@
 		},
 		{
 			"key": "apiKeyAllowedEndpoints",
-			"value": "[\"/api/v1/onboarding/apikey/*\", \"/api/v1/onboarding/merchants/*\", \"/api/v1/merchants/*\"]",
+			"value": "[\"/api/v1/onboarding/apikey/*\", \"/api/v1/onboarding/merchants/*\", \"/api/v1/merchants/*\", \"/api/v1/surcharge/*\"]",
 			"type": "default",
 			"enabled": true
 		},
@@ -124,7 +124,7 @@
 		},
 		{
 			"key": "testMetadata",
-			"value": "{\"processor\": \"VISA\", \"country\": \"US\", \"region\": \"CA\", \"campaign\": [\"SUMMER2024\"], \"data\": [\"ECOMMERCE\"]}",
+			"value": "{\"processor\": \"default\", \"country\": \"USA\", \"region\": \"78717\", \"campaign\": [\"SUMMER2024\"], \"data\": [\"ECOMMERCE\"]}",
 			"type": "default",
 			"enabled": true
 		},
@@ -298,13 +298,13 @@
 		},
 		{
 			"key": "providerName",
-			"value": "Test Provider",
+			"value": "InterPaymets Test Provider",
 			"type": "default",
 			"enabled": true
 		},
 		{
 			"key": "providerCode",
-			"value": "TEST",
+			"value": "INTERPAYMENTS_TEST_001",
 			"type": "default",
 			"enabled": true
 		},
@@ -316,7 +316,7 @@
 		},
 		{
 			"key": "providerBaseUrl",
-			"value": "https://api.test-provider.com",
+			"value": "https://api-test.interpayments.com/v1/ch",
 			"type": "default",
 			"enabled": true
 		},
@@ -346,7 +346,7 @@
 		},
 		{
 			"key": "processor",
-			"value": "VISA",
+			"value": "default",
 			"type": "default",
 			"enabled": true
 		},
@@ -364,13 +364,13 @@
 		},
 		{
 			"key": "country",
-			"value": "US",
+			"value": "USA",
 			"type": "default",
 			"enabled": true
 		},
 		{
 			"key": "region",
-			"value": "CA",
+			"value": "78717",
 			"type": "default",
 			"enabled": true
 		},
@@ -412,7 +412,7 @@
 		},
 		{
 			"key": "providerConfigCredentials",
-			"value": "{\"jwt_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJ0ZXN0LXByb3ZpZGVyIiwiaWQiOiI2ajJjeGNnbWo0Z3k2dDIxajZudGhubDZvIiwiZGF0YSI6WyJ0ZXN0LXByb3ZpZGVyIl0sImUiOiJ0ZXN0In0.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs\",\"token_type\":\"Bearer\"}",
+			"value": "{\"jwt_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MzcwNjU3ODAsIm5hbWUiOiJwYXltZXRyaWMtdGVzdCIsImlkIjoiNmoyY3hjZ21qNGd5NnQyMWo2bnRobmw2byIsImRhdGEiOlsicGF5bWV0cmljLXRlc3QiXSwiZSI6InRlc3QifQ.YtftW6Ev0WlMVfjwqJFZLJUWyL0UnCiSdCyqic64qTs\"}",
 			"type": "default",
 			"enabled": true
 		},
@@ -469,9 +469,207 @@
 			"value": "{\"environment\":\"production\",\"version\":\"1.0\",\"features\":[\"surcharge\",\"refund\",\"cancel\"]}",
 			"type": "default",
 			"enabled": true
+		},
+		{
+			"key": "surchargeAmount",
+			"value": "100.00",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeCurrency",
+			"value": "USD",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "merchantTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "cardNumber",
+			"value": "4111111111111111",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "expiryMonth",
+			"value": "12",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "expiryYear",
+			"value": "2025",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "cvv",
+			"value": "123",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingFirstName",
+			"value": "John",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingLastName",
+			"value": "Doe",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingAddress1",
+			"value": "123 Main St",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingCity",
+			"value": "New York",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingState",
+			"value": "NY",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingPostalCode",
+			"value": "10001",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "billingCountry",
+			"value": "US",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "refundReason",
+			"value": "Customer request",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "cancelReason",
+			"value": "Customer request",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeMerchantTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeStatus",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeTotalAmount",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeProcessor",
+			"value": "default",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeFollowupAmount",
+			"value": "120.00",
+			"enabled": true
+		},
+		{
+			"key": "surchargeFollowupTotalAmount",
+			"value": "120.00",
+			"enabled": true
+		},
+		{
+			"key": "surchargeProviderTransactionId",
+			"value": "",
+			"enabled": true
+		},
+		{
+			"key": "surchargeFollowupTransactionId",
+			"value": "",
+			"enabled": true
+		},
+		{
+			"key": "surchargeFollowupMerchantTransactionId",
+			"value": "",
+			"enabled": true
+		},
+		{
+			"key": "surchargeFollowupStatus",
+			"value": "",
+			"enabled": true
+		},
+		{
+			"key": "surchargeCorrelationId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "surchargeBinValue",
+			"value": "411111",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeBinValue1",
+			"value": "411112",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargeBinValue2",
+			"value": "411113",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargePostalCode",
+			"value": "78717",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargePostalCode1",
+			"value": "78718",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "surchargePostalCode2",
+			"value": "78719",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2025-06-25T15:26:40.948Z",
-	"_postman_exported_using": "Postman/11.49.4"
+	"_postman_exported_at": "2025-07-03T17:45:46.522Z",
+	"_postman_exported_using": "Postman/11.52.3"
 }

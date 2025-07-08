@@ -7,6 +7,7 @@ using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Repositories;
 using Microsoft.Extensions.Logging;
 using Json.Schema;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -176,6 +177,12 @@ namespace FeeNominalService.Services
                 provider.StatusId = status.StatusId;
                 provider.Status = status;
 
+                // Set ProviderType if not already set
+                if (string.IsNullOrWhiteSpace(provider.ProviderType))
+                {
+                    provider.ProviderType = "INTERPAYMENTS"; // Or infer from template/logic
+                }
+
                 return await _repository.AddAsync(provider);
             }
             catch (Exception ex)
@@ -210,7 +217,9 @@ namespace FeeNominalService.Services
                     RateLimitPeriod = configuration.RateLimitPeriod,
                     Metadata = configuration.Metadata != null ? JsonSerializer.SerializeToDocument(configuration.Metadata) : null,
                     CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    UpdatedAt = DateTime.UtcNow,
+                    CreatedBy = provider.CreatedBy,
+                    UpdatedBy = provider.CreatedBy
                 };
 
                 // Save the configuration to the database

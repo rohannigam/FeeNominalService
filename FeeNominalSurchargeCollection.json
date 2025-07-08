@@ -1,11 +1,11 @@
 {
 	"info": {
-		"_postman_id": "e5eb3124-6602-48ed-a63b-fd722b264032",
-		"name": "FeeNominal Surcharge API",
-		"description": "Collection for testing the FeeNominal Surcharge API endpoints",
+		"_postman_id": "eaee0bbe-b073-4abe-a43d-7f7b8ef2fcd4",
+		"name": "FeeNominalService API",
+		"description": "Collection for testing the FeeNominalService API endpoints",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "32378011",
-		"_collection_link": "https://earwig.postman.co/workspace/Earwig-Workspace~76662190-f6bb-4fb6-8065-6fed724ace4b/collection/32378011-e5eb3124-6602-48ed-a63b-fd722b264032?action=share&source=collection_link&creator=32378011"
+		"_collection_link": "https://earwig.postman.co/workspace/Earwig-Workspace~76662190-f6bb-4fb6-8065-6fed724ace4b/collection/32378011-eaee0bbe-b073-4abe-a43d-7f7b8ef2fcd4?action=share&source=collection_link&creator=32378011"
 	},
 	"item": [
 		{
@@ -1095,8 +1095,16 @@
 							"listen": "prerequest",
 							"script": {
 								"exec": [
+									"// Generate random 5-digit value for provider code",
+									"const random5DigitValue = Math.floor(10000 + Math.random() * 90000); // Generates 10000-99999",
+									"const randomizedProviderCode = `INTERPAYMENTS_TEST_${random5DigitValue}`;",
+									"",
+									"// Set the randomized provider code in environment",
+									"pm.environment.set('providerCode', randomizedProviderCode);",
+									"",
 									"// Generate timestamp and nonce",
-									"const timestamp = new Date().toISOString();",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
 									"const nonce = Math.random().toString(36).substring(2, 15);",
 									"",
 									"// Get API secret from environment",
@@ -1134,13 +1142,13 @@
 									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
 									"",
 									"// Log values for debugging",
-									"console.log('Using Merchant ID:', merchantId);",
-									"console.log('Using API Key:', apiKey);",
-									"console.log('Generated Timestamp:', timestamp);",
-									"console.log('Generated Nonce:', nonce);",
-									"console.log('Generated Signature:', signature);",
-									"console.log('Data being signed:', dataToSign);",
-									"console.log('Create Provider URL will be:', pm.request.url.toString());"
+									"console.log('Surcharge Providers Request:');",
+									"console.log('Merchant ID:', merchantId);",
+									"console.log('API Key:', apiKey);",
+									"console.log('Randomized Provider Code:', randomizedProviderCode);",
+									"console.log('Timestamp:', timestamp);",
+									"console.log('Nonce:', nonce);",
+									"console.log('Signature:', signature);"
 								],
 								"type": "text/javascript",
 								"packages": {}
@@ -1863,275 +1871,6 @@
 			]
 		},
 		{
-			"name": "Surcharge Fee",
-			"item": [
-				{
-					"name": "Calculate Surcharge Fee",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const now = new Date();",
-									"const timestamp = now.toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    nicn: pm.environment.get('nicn'),",
-									"    processor: pm.environment.get('processor'),",
-									"    amount: parseFloat(pm.environment.get('amount')),",
-									"    totalAmount: parseFloat(pm.environment.get('totalAmount')),",
-									"    country: pm.environment.get('country'),",
-									"    region: pm.environment.get('region'),",
-									"    campaign: JSON.parse(pm.environment.get('campaign')),",
-									"    data: JSON.parse(pm.environment.get('data')),",
-									"    sTxId: pm.environment.get('sTxId'),",
-									"    mTxId: pm.environment.get('mTxId'),",
-									"    cardToken: pm.environment.get('cardToken'),",
-									"    entryMethod: pm.environment.get('entryMethod'),",
-									"    nonSurchargableAmount: parseFloat(pm.environment.get('nonSurchargableAmount'))",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"nicn\": \"{{nicn}}\",\n    \"processor\": \"{{processor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{totalAmount}},\n    \"country\": \"{{country}}\",\n    \"region\": \"{{region}}\",\n    \"campaign\": {{campaign}},\n    \"data\": {{data}},\n    \"sTxId\": \"{{sTxId}}\",\n    \"mTxId\": \"{{mTxId}}\",\n    \"cardToken\": \"{{cardToken}}\",\n    \"entryMethod\": \"{{entryMethod}}\",\n    \"nonSurchargableAmount\": {{nonSurchargableAmount}}\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/surchargefee/calculate",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"surchargefee",
-								"calculate"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Sales",
-			"item": [
-				{
-					"name": "Process Sale",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const now = new Date();",
-									"const timestamp = now.toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    nicn: pm.environment.get('nicn'),",
-									"    processor: pm.environment.get('processor'),",
-									"    amount: parseFloat(pm.environment.get('amount')),",
-									"    totalAmount: parseFloat(pm.environment.get('totalAmount')),",
-									"    country: pm.environment.get('country'),",
-									"    region: pm.environment.get('region'),",
-									"    campaign: JSON.parse(pm.environment.get('campaign')),",
-									"    data: JSON.parse(pm.environment.get('data')),",
-									"    sTxId: pm.environment.get('sTxId'),",
-									"    mTxId: pm.environment.get('mTxId'),",
-									"    cardToken: pm.environment.get('cardToken'),",
-									"    entryMethod: pm.environment.get('entryMethod'),",
-									"    nonSurchargableAmount: parseFloat(pm.environment.get('nonSurchargableAmount'))",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"nicn\": \"{{nicn}}\",\n    \"processor\": \"{{processor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{totalAmount}},\n    \"country\": \"{{country}}\",\n    \"region\": \"{{region}}\",\n    \"campaign\": {{campaign}},\n    \"data\": {{data}},\n    \"sTxId\": \"{{sTxId}}\",\n    \"mTxId\": \"{{mTxId}}\",\n    \"cardToken\": \"{{cardToken}}\",\n    \"entryMethod\": \"{{entryMethod}}\",\n    \"nonSurchargableAmount\": {{nonSurchargableAmount}}\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/sales/process",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"sales",
-								"process"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Process Batch Sales",
-					"event": [
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"// Generate timestamp and nonce",
-									"const now = new Date();",
-									"const timestamp = now.toISOString();",
-									"const nonce = Math.random().toString(36).substring(2, 15);",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    sales: [",
-									"        {",
-									"            nicn: pm.environment.get('nicn1'),",
-									"            processor: 'VISA',",
-									"            amount: 100.00,",
-									"            totalAmount: 100.00,",
-									"            country: 'US',",
-									"            region: 'CA',",
-									"            campaign: ['SUMMER2024'],",
-									"            data: ['ECOMMERCE'],",
-									"            sTxId: pm.environment.get('sTxId1'),",
-									"            mTxId: pm.environment.get('mTxId1'),",
-									"            cardToken: pm.environment.get('cardToken1'),",
-									"            entryMethod: 'DIPPED',",
-									"            nonSurchargableAmount: 0",
-									"        },",
-									"        {",
-									"            nicn: pm.environment.get('nicn2'),",
-									"            processor: 'MASTERCARD',",
-									"            amount: 200.00,",
-									"            totalAmount: 200.00,",
-									"            country: 'US',",
-									"            region: 'NY',",
-									"            campaign: ['SUMMER2024'],",
-									"            data: ['ECOMMERCE'],",
-									"            sTxId: pm.environment.get('sTxId2'),",
-									"            mTxId: pm.environment.get('mTxId2'),",
-									"            cardToken: pm.environment.get('cardToken2'),",
-									"            entryMethod: 'DIPPED',",
-									"            nonSurchargableAmount: 0",
-									"        }",
-									"    ]",
-									"});",
-									"",
-									"// Get secret from environment",
-									"const secret = pm.environment.get('apiSecret');",
-									"console.log('Using secret for signature:', secret);",
-									"",
-									"// Create data string to sign",
-									"const dataToSign = timestamp + nonce + requestBody;",
-									"",
-									"// Generate HMAC-SHA256 signature",
-									"const signature = CryptoJS.HmacSHA256(dataToSign, secret).toString(CryptoJS.enc.Base64);",
-									"",
-									"// Set headers",
-									"pm.request.headers.add({ key: 'X-Merchant-ID', value: pm.environment.get('merchantId') });",
-									"pm.request.headers.add({ key: 'X-API-Key', value: pm.environment.get('apiKey') });",
-									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
-									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"sales\": [\n        {\n            \"nicn\": \"{{nicn1}}\",\n            \"processor\": \"VISA\",\n            \"amount\": 100.00,\n            \"totalAmount\": 100.00,\n            \"country\": \"US\",\n            \"region\": \"CA\",\n            \"campaign\": [\"SUMMER2024\"],\n            \"data\": [\"ECOMMERCE\"],\n            \"sTxId\": \"{{sTxId1}}\",\n            \"mTxId\": \"{{mTxId1}}\",\n            \"cardToken\": \"{{cardToken1}}\",\n            \"entryMethod\": \"DIPPED\",\n            \"nonSurchargableAmount\": 0\n        },\n        {\n            \"nicn\": \"{{nicn2}}\",\n            \"processor\": \"MASTERCARD\",\n            \"amount\": 200.00,\n            \"totalAmount\": 200.00,\n            \"country\": \"US\",\n            \"region\": \"NY\",\n            \"campaign\": [\"SUMMER2024\"],\n            \"data\": [\"ECOMMERCE\"],\n            \"sTxId\": \"{{sTxId2}}\",\n            \"mTxId\": \"{{mTxId2}}\",\n            \"cardToken\": \"{{cardToken2}}\",\n            \"entryMethod\": \"DIPPED\",\n            \"nonSurchargableAmount\": 0\n        }\n    ]\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/sales/process-batch",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"sales",
-								"process-batch"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
 			"name": "Provider Examples",
 			"item": [
 				{
@@ -2369,6 +2108,1092 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Surcharge Operations",
+			"item": [
+				{
+					"name": "Surcharge Auth",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate new random transaction IDs for initial Surcharge Auth",
+									"const generatedCorrelationId = Math.floor(1000000000 + Math.random() * 9000000000).toString(); // 10-digit bigint",
+									"const generatedMerchantTransactionId = `mtxn_${generatedCorrelationId}`; // Use correlation ID instead of GUID",
+									"pm.environment.set('surchargeCorrelationId', generatedCorrelationId);",
+									"pm.environment.set('surchargeMerchantTransactionId', generatedMerchantTransactionId);",
+									"",
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Log values for debugging",
+									"console.log('Surcharge Auth Request:');",
+									"console.log('Merchant ID:', merchantId);",
+									"console.log('API Key:', apiKey);",
+									"console.log('Provider Code:', pm.environment.get('providerCode') || 'INTERPAYMENTS_PROD_001');",
+									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
+									"console.log('SURCHARGE PROCESSOR:', pm.environment.get('surchargeProcessor') || 'default');",
+									"console.log('Amount:', pm.environment.get('surchargeAmount') || '100.00');",
+									"console.log('Correlation ID:', generatedCorrelationId);",
+									"console.log('Merchant Transaction ID:', generatedMerchantTransactionId);",
+									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Fixed the reference to jsonData",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    ",
+									"        ",
+									"    if (jsonData) {",
+									"        pm.expect(jsonData).to.have.property('surchargeTransactionId');",
+									"        pm.expect(jsonData).to.have.property('correlationId');",
+									"        pm.expect(jsonData).to.have.property('merchantTransactionId');",
+									"        pm.expect(jsonData).to.have.property('providerTransactionId');",
+									"        pm.expect(jsonData).to.have.property('status');",
+									"        pm.expect(jsonData).to.have.property('originalAmount');",
+									"        pm.expect(jsonData).to.have.property('surchargeAmount');",
+									"        pm.expect(jsonData).to.have.property('totalAmount');",
+									"        pm.expect(jsonData).to.have.property('provider');        ",
+									"        ",
+									"        // Save transaction data to environment for follow-up requests",
+									"        pm.environment.set('surchargeTransactionId', jsonData.surchargeTransactionId);",
+									"        pm.environment.set('surchargeProviderTransactionId', jsonData.providerTransactionId);",
+									"        pm.environment.set('surchargeMerchantTransactionId', jsonData.merchantTransactionId);",
+									"        pm.environment.set('surchargeStatus', jsonData.status);",
+									"        pm.environment.set('surchargeAmount', jsonData.surchargeAmount);",
+									"        pm.environment.set('surchargeTotalAmount', jsonData.totalAmount);",
+									"        ",
+									"        // Save the original transaction IDs that were sent in the request",
+									"        pm.environment.set('surchargeCorrelationId', pm.environment.get('surchargeCorrelationId'));",
+									"        ",
+									"        console.log('Surcharge Auth Response:');",
+									"        console.log('Surcharge Transaction ID:', jsonData.surchargeTransactionId);",
+									"        console.log('Merchant Transaction ID:', jsonData.merchantTransactionId);",
+									"        console.log('Correlation ID:', pm.environment.get('surchargeCorrelationId'));",
+									"        console.log('Provider Transaction ID:', jsonData.providerTransactionId || 'null');",
+									"        console.log('Status:', jsonData.status);",
+									"        console.log('Surcharge Amount:', jsonData.surchargeAmount);",
+									"        console.log('Total Amount:', jsonData.totalAmount);",
+									"        ",
+									"        // Verify status is PENDING or AUTHORIZED",
+									"        pm.expect(['ok','PENDING', 'AUTHORIZED', 'COMPLETED']).to.include(jsonData.status);",
+									"        ",
+									"        // Verify amounts are positive",
+									"        pm.expect(parseFloat(jsonData.surchargeAmount)).to.be.at.least(0);",
+									"        pm.expect(parseFloat(jsonData.totalAmount)).to.be.at.least(0);",
+									"    }",
+									"});",
+									"",
+									"pm.test('Response structure validation', function () {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    if (jsonData) {",
+									"        // Check for optional fields",
+									"        if (jsonData.providerResponse) {",
+									"            pm.expect(jsonData.providerResponse).to.be.an('object');",
+									"        }",
+									"        ",
+									"        if (jsonData.errorCode) {",
+									"            pm.expect(jsonData.errorCode).to.be.a('string');",
+									"        }",
+									"        ",
+									"        if (jsonData.errorMessage) {",
+									"            pm.expect(jsonData.errorMessage).to.be.a('string');",
+									"        }",
+									"    }",
+									"});",
+									"",
+									"// Log values for debugging",
+									"console.log('Surcharge Auth Response:');",
+									"console.log('Transaction ID:', jsonData.surchargeTransactionId);",
+									"console.log('Merchant Transaction ID:', jsonData.merchantTransactionId);",
+									"console.log('Correlation ID:', pm.environment.get('surchargeCorrelationId'));",
+									"console.log('Provider Transaction ID:', jsonData.providerTransactionId);",
+									"console.log('Status:', jsonData.status);",
+									"console.log('Surcharge Amount:', jsonData.surchargeAmount);",
+									"console.log('Total Amount:', jsonData.totalAmount);",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"providerCode\": \"{{providerCode}}\",\n    \"binValue\": \"{{surchargeBinValue}}\",\n    \"surchargeProcessor\": \"{{surchargeProcessor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{amount}},\n    \"country\": \"{{surchargeCountry}}\",\n    \"postalCode\": \"{{surchargePostalCode}}\",\n    \"campaign\": {{surchargeCampaign}},\n    \"data\": {{surchargeData}},\n    \"correlationId\": \"{{surchargeCorrelationId}}\",\n    \"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n    \"cardToken\": \"{{surchargeCardToken}}\",\n    \"entryMethod\": \"{{surchargeEntryMethod}}\",\n    \"nonSurchargableAmount\": {{surchargeNonSurchargableAmount}}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/auth",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"auth"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Auth Min",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate new random transaction IDs for initial Surcharge Auth",
+									"const generatedCorrelationId = Math.floor(1000000000 + Math.random() * 9000000000).toString(); // 10-digit bigint",
+									"const generatedMerchantTransactionId = `mtxn_${generatedCorrelationId}`; // Use correlation ID instead of GUID",
+									"pm.environment.set('surchargeCorrelationId', generatedCorrelationId);",
+									"pm.environment.set('surchargeMerchantTransactionId', generatedMerchantTransactionId);",
+									"",
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Log values for debugging",
+									"console.log('Surcharge Auth Request:');",
+									"console.log('Merchant ID:', merchantId);",
+									"console.log('API Key:', apiKey);",
+									"console.log('Provider Code:', pm.environment.get('providerCode') || 'INTERPAYMENTS_PROD_001');",
+									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
+									"console.log('SURCHARGE PROCESSOR:', pm.environment.get('surchargeProcessor') || 'default');",
+									"console.log('Amount:', pm.environment.get('surchargeAmount') || '100.00');",
+									"console.log('Correlation ID:', generatedCorrelationId);",
+									"console.log('Merchant Transaction ID:', generatedMerchantTransactionId);",
+									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Fixed the reference to jsonData",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    ",
+									"        ",
+									"    if (jsonData) {",
+									"        pm.expect(jsonData).to.have.property('surchargeTransactionId');",
+									"        pm.expect(jsonData).to.have.property('correlationId');",
+									"        pm.expect(jsonData).to.have.property('merchantTransactionId');",
+									"        pm.expect(jsonData).to.have.property('providerTransactionId');",
+									"        pm.expect(jsonData).to.have.property('status');",
+									"        pm.expect(jsonData).to.have.property('originalAmount');",
+									"        pm.expect(jsonData).to.have.property('surchargeAmount');",
+									"        pm.expect(jsonData).to.have.property('totalAmount');",
+									"        pm.expect(jsonData).to.have.property('provider');        ",
+									"        ",
+									"        // Save transaction data to environment for follow-up requests",
+									"        pm.environment.set('surchargeTransactionId', jsonData.surchargeTransactionId);",
+									"        pm.environment.set('surchargeProviderTransactionId', jsonData.providerTransactionId);",
+									"        pm.environment.set('surchargeMerchantTransactionId', jsonData.merchantTransactionId);",
+									"        pm.environment.set('surchargeStatus', jsonData.status);",
+									"        pm.environment.set('surchargeAmount', jsonData.surchargeAmount);",
+									"        pm.environment.set('surchargeTotalAmount', jsonData.totalAmount);",
+									"        ",
+									"        // Save the original transaction IDs that were sent in the request",
+									"        pm.environment.set('surchargeCorrelationId', pm.environment.get('surchargeCorrelationId'));",
+									"        ",
+									"        console.log('Surcharge Auth Response:');",
+									"        console.log('Surcharge Transaction ID:', jsonData.surchargeTransactionId);",
+									"        console.log('Merchant Transaction ID:', jsonData.merchantTransactionId);",
+									"        console.log('Correlation ID:', pm.environment.get('surchargeCorrelationId'));",
+									"        console.log('Provider Transaction ID:', jsonData.providerTransactionId || 'null');",
+									"        console.log('Status:', jsonData.status);",
+									"        console.log('Surcharge Amount:', jsonData.surchargeAmount);",
+									"        console.log('Total Amount:', jsonData.totalAmount);",
+									"        ",
+									"        // Verify status is PENDING or AUTHORIZED",
+									"        pm.expect(['ok','PENDING', 'AUTHORIZED', 'COMPLETED']).to.include(jsonData.status);",
+									"        ",
+									"        // Verify amounts are positive",
+									"        pm.expect(parseFloat(jsonData.surchargeAmount)).to.be.at.least(0);",
+									"        pm.expect(parseFloat(jsonData.totalAmount)).to.be.at.least(0);",
+									"    }",
+									"});",
+									"",
+									"pm.test('Response structure validation', function () {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    if (jsonData) {",
+									"        // Check for optional fields",
+									"        if (jsonData.providerResponse) {",
+									"            pm.expect(jsonData.providerResponse).to.be.an('object');",
+									"        }",
+									"        ",
+									"        if (jsonData.errorCode) {",
+									"            pm.expect(jsonData.errorCode).to.be.a('string');",
+									"        }",
+									"        ",
+									"        if (jsonData.errorMessage) {",
+									"            pm.expect(jsonData.errorMessage).to.be.a('string');",
+									"        }",
+									"    }",
+									"});",
+									"",
+									"// Log values for debugging",
+									"console.log('Surcharge Auth Response:');",
+									"console.log('Transaction ID:', jsonData.surchargeTransactionId);",
+									"console.log('Merchant Transaction ID:', jsonData.merchantTransactionId);",
+									"console.log('Correlation ID:', pm.environment.get('surchargeCorrelationId'));",
+									"console.log('Provider Transaction ID:', jsonData.providerTransactionId);",
+									"console.log('Status:', jsonData.status);",
+									"console.log('Surcharge Amount:', jsonData.surchargeAmount);",
+									"console.log('Total Amount:', jsonData.totalAmount);",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"providerCode\": \"{{providerCode}}\",\n    \"binValue\": \"{{surchargeBinValue}}\",\n    \"surchargeProcessor\": \"{{surchargeProcessor}}\",\n    \"amount\": {{amount}},\n    \"country\": \"{{surchargeCountry}}\",\n    \"postalCode\": \"{{surchargePostalCode}}\",\n    \"correlationId\": \"{{surchargeCorrelationId}}\",\n    \"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n    \"entryMethod\": \"{{surchargeEntryMethod}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/auth",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"auth"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Auth Followup",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Surcharge Auth Followup: Use values from previous Surcharge Auth response",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Check for required followup variables",
+									"const surchargeFollowupAmount = pm.environment.get('surchargeFollowupAmount');",
+									"if (!surchargeFollowupAmount) {",
+									"    console.error('surchargeFollowupAmount not found in environment. Please set this variable before running followup.');",
+									"    return;",
+									"}",
+									"",
+									"// Get transaction IDs from previous Surcharge Auth response",
+									"const correlationId = pm.environment.get('surchargeCorrelationId');",
+									"const merchantTransactionId = pm.environment.get('surchargeMerchantTransactionId');",
+									"const providerTransactionId = pm.environment.get('surchargeProviderTransactionId');",
+									"",
+									"if (!correlationId || !merchantTransactionId) {",
+									"    console.error('Transaction IDs not found. Please run Surcharge Auth first to get the required transaction IDs.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Log values for debugging",
+									"console.log('Surcharge Auth Followup Request:');",
+									"console.log('Merchant ID:', merchantId);",
+									"console.log('API Key:', apiKey);",
+									"console.log('Provider Code:', pm.environment.get('providerCode') || 'INTERPAYMENTS_PROD_001');",
+									"console.log('Correlation ID:', correlationId);",
+									"console.log('Merchant Transaction ID:', merchantTransactionId);",
+									"console.log('Provider Transaction ID:', providerTransactionId);",
+									"console.log('Followup Amount:', surchargeFollowupAmount);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('surchargeTransactionId');",
+									"        pm.expect(jsonData.data).to.have.property('merchantTransactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('surchargeAmount');",
+									"        pm.expect(jsonData.data).to.have.property('totalAmount');",
+									"        pm.expect(jsonData.data).to.have.property('providerTransactionId');",
+									"        // Save follow-up transaction data to environment",
+									"        pm.environment.set('surchargeFollowupTransactionId', jsonData.data.surchargeTransactionId);",
+									"        pm.environment.set('surchargeFollowupMerchantTransactionId', jsonData.data.merchantTransactionId);",
+									"        pm.environment.set('surchargeFollowupStatus', jsonData.data.status);",
+									"        pm.environment.set('surchargeFollowupAmount', jsonData.data.surchargeAmount);",
+									"        pm.environment.set('surchargeFollowupTotalAmount', jsonData.data.totalAmount);",
+									"        pm.environment.set('surchargeProviderTransactionId', jsonData.data.providerTransactionId);",
+									"        ",
+									"        console.log('Surcharge Auth Followup Response:');",
+									"        console.log('Surcharge Transaction ID:', jsonData.data.surchargeTransactionId);",
+									"        console.log('Merchant Transaction ID:', jsonData.data.merchantTransactionId);",
+									"        console.log('Provider Transaction ID:', jsonData.data.providerTransactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        console.log('Surcharge Amount:', jsonData.data.surchargeAmount);",
+									"        console.log('Total Amount:', jsonData.data.totalAmount);",
+									"        ",
+									"        // Verify status is PENDING or AUTHORIZED",
+									"        pm.expect([ 'ok', 'PENDING', 'AUTHORIZED', 'COMPLETED']).to.include(jsonData.data.status);",
+									"        ",
+									"        // Verify amounts are positive",
+									"        pm.expect(parseFloat(jsonData.data.surchargeAmount)).to.be.at.least(0);",
+									"        pm.expect(parseFloat(jsonData.data.totalAmount)).to.be.at.least(0);",
+									"    }",
+									"});",
+									"",
+									"pm.test('Response structure validation', function () {",
+									"    var jsonData = pm.response.json();",
+									"    ",
+									"    if (jsonData.data) {",
+									"        // Check for optional fields",
+									"        if (jsonData.data.providerResponse) {",
+									"            pm.expect(jsonData.data.providerResponse).to.be.an('object');",
+									"        }",
+									"        ",
+									"        if (jsonData.data.errorCode) {",
+									"            pm.expect(jsonData.data.errorCode).to.be.a('string');",
+									"        }",
+									"        ",
+									"        if (jsonData.data.errorMessage) {",
+									"            pm.expect(jsonData.data.errorMessage).to.be.a('string');",
+									"        }",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"providerCode\": \"{{providerCode}}\",\n    \"binValue\": \"{{surchargeBinValue}}\",\n    \"surchargeProcessor\": \"{{surchargeProcessor}}\",\n    \"amount\": {{surchargeFollowupAmount}},\n    \"totalAmount\": {{surchargeFollowupTotalAmount}},\n    \"country\": \"{{surchargeCountry}}\",\n    \"postalCode\": \"{{surchargePostalCode}}\",\n    \"campaign\": {{surchargeCampaign}},\n    \"data\": {{surchargeData}},\n    \"correlationId\": \"{{surchargeCorrelationId}}\",\n    \"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n    \"providerTransactionId\": \"{{surchargeProviderTransactionId}}\",\n    \"cardToken\": \"{{surchargeCardToken}}\",\n    \"entryMethod\": \"{{surchargeEntryMethod}}\",\n    \"nonSurchargableAmount\": {{surchargeNonSurchargableAmount}}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/auth",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"auth"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Sale",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get transaction ID from previous auth",
+									"const transactionId = pm.environment.get('surchargeTransactionId');",
+									"if (!transactionId) {",
+									"    console.error('Transaction ID not found. Please run Surcharge Auth first.');",
+									"    return;",
+									"}",
+									"",
+									"// Get request body",
+									"const requestBody = JSON.stringify({",
+									"    transactionId: transactionId,",
+									"    amount: parseFloat(pm.environment.get('surchargeAmount') || '100.00'),",
+									"    metadata: {",
+									"        source: 'postman-test',",
+									"        testId: pm.variables.replaceIn('{{$guid}}')",
+									"    }",
+									"});",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Set the request body",
+									"pm.request.body.raw = requestBody;",
+									"",
+									"console.log('Surcharge Sale Request:');",
+									"console.log('Transaction ID:', transactionId);",
+									"console.log('Request Body:', requestBody);",
+									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
+									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('transactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('updatedAt');",
+									"        ",
+									"        console.log('Surcharge Sale Response:');",
+									"        console.log('Transaction ID:', jsonData.data.transactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        ",
+									"        // Verify status is COMPLETED",
+									"        pm.expect(jsonData.data.status).to.equal('COMPLETED');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transactionId\": \"{{surchargeTransactionId}}\",\n    \"amount\": {{surchargeAmount}},\n    \"metadata\": {\n        \"source\": \"postman-test\",\n        \"testId\": \"{{$guid}}\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/sale",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"sale"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Refund",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get transaction ID from previous auth",
+									"const transactionId = pm.environment.get('surchargeTransactionId');",
+									"if (!transactionId) {",
+									"    console.error('Transaction ID not found. Please run Surcharge Auth first.');",
+									"    return;",
+									"}",
+									"",
+									"// Get request body",
+									"const requestBody = JSON.stringify({",
+									"    transactionId: transactionId,",
+									"    amount: parseFloat(pm.environment.get('surchargeAmount') || '100.00'),",
+									"    reason: pm.environment.get('refundReason') || 'Customer request',",
+									"    metadata: {",
+									"        source: 'postman-test',",
+									"        testId: pm.variables.replaceIn('{{$guid}}')",
+									"    }",
+									"});",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Set the request body",
+									"pm.request.body.raw = requestBody;",
+									"",
+									"console.log('Surcharge Refund Request:');",
+									"console.log('Transaction ID:', transactionId);",
+									"console.log('Request Body:', requestBody);",
+									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
+									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('transactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('updatedAt');",
+									"        ",
+									"        console.log('Surcharge Refund Response:');",
+									"        console.log('Transaction ID:', jsonData.data.transactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        ",
+									"        // Verify status is REFUNDED",
+									"        pm.expect(jsonData.data.status).to.equal('REFUNDED');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transactionId\": \"{{surchargeTransactionId}}\",\n    \"amount\": {{surchargeAmount}},\n    \"reason\": \"{{refundReason}}\",\n    \"metadata\": {\n        \"source\": \"postman-test\",\n        \"testId\": \"{{$guid}}\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/refund",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"refund"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Cancel",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get transaction ID from previous auth",
+									"const transactionId = pm.environment.get('surchargeTransactionId');",
+									"if (!transactionId) {",
+									"    console.error('Transaction ID not found. Please run Surcharge Auth first.');",
+									"    return;",
+									"}",
+									"",
+									"// Get request body",
+									"const requestBody = JSON.stringify({",
+									"    transactionId: transactionId,",
+									"    reason: pm.environment.get('cancelReason') || 'Customer request',",
+									"    metadata: {",
+									"        source: 'postman-test',",
+									"        testId: pm.variables.replaceIn('{{$guid}}')",
+									"    }",
+									"});",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"// Set the request body",
+									"pm.request.body.raw = requestBody;",
+									"",
+									"console.log('Surcharge Cancel Request:');",
+									"console.log('Transaction ID:', transactionId);",
+									"console.log('Request Body:', requestBody);",
+									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
+									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('transactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('updatedAt');",
+									"        ",
+									"        console.log('Surcharge Cancel Response:');",
+									"        console.log('Transaction ID:', jsonData.data.transactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        ",
+									"        // Verify status is CANCELLED",
+									"        pm.expect(jsonData.data.status).to.equal('CANCELLED');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transactionId\": \"{{surchargeTransactionId}}\",\n    \"reason\": \"{{cancelReason}}\",\n    \"metadata\": {\n        \"source\": \"postman-test\",\n        \"testId\": \"{{$guid}}\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/cancel",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"cancel"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Surcharge Transaction",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get transaction ID from previous auth",
+									"const transactionId = pm.environment.get('surchargeTransactionId');",
+									"if (!transactionId) {",
+									"    console.error('Transaction ID not found. Please run Surcharge Auth first.');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Get Surcharge Transaction Request:');",
+									"console.log('Transaction ID:', transactionId);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('transactionId');",
+									"        pm.expect(jsonData.data).to.have.property('merchantTransactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('surchargeAmount');",
+									"        pm.expect(jsonData.data).to.have.property('totalAmount');",
+									"        pm.expect(jsonData.data).to.have.property('providerCode');",
+									"        pm.expect(jsonData.data).to.have.property('createdAt');",
+									"        pm.expect(jsonData.data).to.have.property('updatedAt');",
+									"        ",
+									"        console.log('Get Surcharge Transaction Response:');",
+									"        console.log('Transaction ID:', jsonData.data.transactionId);",
+									"        console.log('Merchant Transaction ID:', jsonData.data.merchantTransactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        console.log('Surcharge Amount:', jsonData.data.surchargeAmount);",
+									"        console.log('Total Amount:', jsonData.data.totalAmount);",
+									"        console.log('Provider Code:', jsonData.data.providerCode);",
+									"        console.log('Created At:', jsonData.data.createdAt);",
+									"        console.log('Updated At:', jsonData.data.updatedAt);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/transactions/{{surchargeTransactionId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"transactions",
+								"{{surchargeTransactionId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
 		}
 	],
 	"variable": [
@@ -2424,7 +3249,7 @@
 		},
 		{
 			"key": "processor",
-			"value": "VISA",
+			"value": "default",
 			"type": "string"
 		},
 		{
@@ -2439,12 +3264,12 @@
 		},
 		{
 			"key": "country",
-			"value": "US",
+			"value": "USA",
 			"type": "string"
 		},
 		{
 			"key": "region",
-			"value": "CA",
+			"value": "78717",
 			"type": "string"
 		},
 		{
@@ -2690,6 +3515,126 @@
 		{
 			"key": "providerConfigMetadata",
 			"value": "{\"environment\":\"production\",\"version\":\"1.0\",\"features\":[\"surcharge\",\"refund\",\"cancel\"]}",
+			"type": "string"
+		},
+		{
+			"key": "surchargeProviderCode",
+			"value": "INTERPAYMENTS_PROD_001",
+			"type": "string"
+		},
+		{
+			"key": "surchargeProcessor",
+			"value": "default",
+			"type": "string"
+		},
+		{
+			"key": "surchargeAmount",
+			"value": "100.00",
+			"type": "string"
+		},
+		{
+			"key": "surchargeTotalAmount",
+			"value": "100.00",
+			"type": "string"
+		},
+		{
+			"key": "surchargeCountry",
+			"value": "USA",
+			"type": "string"
+		},
+		{
+			"key": "surchargeCampaign",
+			"value": "[\"SUMMER2024\"]",
+			"type": "string"
+		},
+		{
+			"key": "surchargeData",
+			"value": "[\"ECOMMERCE\"]",
+			"type": "string"
+		},
+		{
+			"key": "surchargeCorrelationId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeMerchantTransactionId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeCardToken",
+			"value": "CARD_TOKEN_123",
+			"type": "string"
+		},
+		{
+			"key": "surchargeEntryMethod",
+			"value": "KEYED",
+			"type": "string"
+		},
+		{
+			"key": "surchargeNonSurchargableAmount",
+			"value": "0.00",
+			"type": "string"
+		},
+		{
+			"key": "surchargeFollowupAmount",
+			"value": "150.00",
+			"type": "string"
+		},
+		{
+			"key": "surchargeFollowupTotalAmount",
+			"value": "150.00",
+			"type": "string"
+		},
+		{
+			"key": "surchargeProviderTransactionId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeTransactionId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeStatus",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeFollowupTransactionId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeFollowupMerchantTransactionId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "surchargeFollowupStatus",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refundReason",
+			"value": "Customer request",
+			"type": "string"
+		},
+		{
+			"key": "cancelReason",
+			"value": "Customer request",
+			"type": "string"
+		},
+		{
+			"key": "surchargeBinValue",
+			"value": "411111",
+			"type": "string"
+		},
+		{
+			"key": "surchargePostalCode",
+			"value": "78717",
 			"type": "string"
 		}
 	]

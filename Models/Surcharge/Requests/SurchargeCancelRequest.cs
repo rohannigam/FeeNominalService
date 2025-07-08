@@ -8,10 +8,10 @@ namespace FeeNominalService.Models.Surcharge.Requests;
 public class SurchargeCancelRequest
 {
     /// <summary>
-    /// System transaction identifier for the cancellation
+    /// Correlation identifier for linking related transactions
     /// </summary>
-    [Required(ErrorMessage = "System transaction ID is required")]
-    public required string SystemTransactionId { get; set; }
+    [Required(ErrorMessage = "Correlation ID is required")]
+    public required string CorrelationId { get; set; }
 
     /// <summary>
     /// Merchant transaction identifier for the cancellation

@@ -69,6 +69,16 @@ namespace FeeNominalService.Models.SurchargeProvider
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; }
 
+        [Required]
+        [Column("created_by")]
+        [MaxLength(50)]
+        public required string CreatedBy { get; set; } = string.Empty;
+
+        [Required]
+        [Column("updated_by")]
+        [MaxLength(50)]
+        public required string UpdatedBy { get; set; } = string.Empty;
+
         [Column("last_used_at")]
         public DateTime? LastUsedAt { get; set; }
 

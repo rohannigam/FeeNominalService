@@ -9,6 +9,7 @@ namespace FeeNominalService.Repositories
     {
         Task<SurchargeProviderConfig?> GetByIdAsync(Guid id);
         Task<SurchargeProviderConfig?> GetPrimaryConfigAsync(Guid merchantId, Guid providerId);
+        Task<SurchargeProviderConfig?> GetByProviderCodeAndMerchantAsync(string providerCode, Guid merchantId);
         Task<IEnumerable<SurchargeProviderConfig>> GetByMerchantIdAsync(Guid merchantId);
         Task<IEnumerable<SurchargeProviderConfig>> GetByProviderIdAsync(Guid providerId);
         Task<IEnumerable<SurchargeProviderConfig>> GetActiveConfigsAsync(Guid merchantId);

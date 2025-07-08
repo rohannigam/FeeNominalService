@@ -15,25 +15,29 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
 /api/v1/cancel/batch
 ```
 
-### Surcharge Endpoints (DEPRECATED - New endpoints coming soon)
+### Surcharge Endpoints
 
-**DEPRECATED ENDPOINTS:**
+**CURRENT ENDPOINTS:**
+```
+/api/v1/surcharge/auth                    // Process surcharge authorization
+/api/v1/surcharge/transactions/{id}       // Get transaction by ID
+/api/v1/surcharge/transactions            // List transactions with pagination
+```
+
+**PLANNED ENDPOINTS (Coming Soon):**
+```
+/api/v1/surcharge/sale                    // Process surcharge sale
+/api/v1/surcharge/refund                  // Process surcharge refund
+/api/v1/surcharge/cancel                  // Process surcharge cancellation
+```
+
+**DEPRECATED ENDPOINTS (No longer supported):**
 ```
 /api/v1/surchargefee/calculate
 /api/v1/surchargefee/calculate-batch
 ```
 
-**NEW ENDPOINTS (Coming Soon):**
-```
-/api/v1/surcharge/auth
-/api/v1/surcharge/refund
-/api/v1/surcharge/void
-/api/v1/surcharge/split-shipment
-/api/v1/surcharge/transactions/{id}
-/api/v1/surcharge/transactions
-```
-
-**Note:** The old surcharge fee endpoints have been deprecated and will be replaced with workflow-based endpoints that integrate directly with surcharge providers (like Interpayments) and store transaction records in the database.
+**Note:** The new surcharge endpoints integrate directly with surcharge providers (like Interpayments) and store transaction records in the database. They provide comprehensive validation, error handling, and audit logging. All validation errors are returned as successful HTTP 200 responses with detailed error messages and status "Failed".
 
 ### Surcharge Provider Endpoints
 ```
@@ -90,19 +94,21 @@ Note: When creating an API key, you can use wildcards in the paths (e.g., `/api/
    - `RequestSigningService`: Implements request signing for security
    - `MerchantService`: Manages merchant information
    - `AuditService`: Handles audit logging
-   - `SurchargeFeeService`: Calculates surcharge fees
+   - `SurchargeTransactionService`: Processes surcharge transactions with provider integration
    - `SurchargeProviderService`: Manages surcharge provider configurations
+   - `SurchargeProviderAdapterFactory`: Creates provider-specific adapters
+   - `InterPaymentsAdapter`: Handles InterPayments API integration
    - `SaleService`: Processes sales
    - `RefundService`: Handles refunds
    - `CancelService`: Manages cancellations
 
 3. **Models**
-   - Transaction-related models (Transaction, BatchTransaction)
-   - API Key models (ApiKey, ApiKeyUsage)
-   - Merchant models (Merchant, MerchantStatus)
-   - Surcharge Provider models (SurchargeProvider, ProviderCredentials)
-   - Request/Response models for each operation
-   - Audit and logging models
+   - Transaction-related models (SurchargeTransaction, SurchargeTransactionStatus)
+   - API Key models (ApiKey, ApiKeyUsage, ApiKeySecret)
+   - Merchant models (Merchant, MerchantStatus, MerchantAuditTrail)
+   - Surcharge Provider models (SurchargeProvider, SurchargeProviderConfig, CredentialsSchema)
+   - Surcharge Request/Response models (SurchargeAuthRequest, SurchargeAuthResponse, etc.)
+   - Audit and logging models (AuditLog, AuthenticationAttempt)
 
 ### Design Patterns
 
@@ -538,6 +544,40 @@ The codebase adheres to SOLID principles:
    - High-level modules don't depend on low-level modules
    - Example: Services depend on interfaces, not concrete implementations
 
+### Current Surcharge Implementation
+
+The service now implements a comprehensive surcharge processing system with the following features:
+
+1. **Provider Integration**
+   - Direct integration with surcharge providers (currently InterPayments)
+   - Provider-specific adapters for different APIs
+   - Configurable provider credentials and settings
+   - Support for multiple providers per merchant
+
+2. **Transaction Processing**
+   - Complete transaction lifecycle management
+   - Database storage of all transactions
+   - Comprehensive audit logging
+   - Support for follow-up operations (using providerTransactionId)
+
+3. **Validation System**
+   - Request validation (amount, country, etc.)
+   - Provider configuration validation
+   - Provider-specific validation rules
+   - All validation errors returned as HTTP 200 responses with detailed error messages
+
+4. **Error Handling**
+   - Graceful handling of provider errors
+   - Detailed error messages in responses
+   - Comprehensive logging for debugging
+   - Transaction status tracking
+
+5. **Security Features**
+   - API key authentication
+   - Request signing validation
+   - Merchant isolation
+   - Encrypted credential storage
+
 ### External Services Integration
 
 1. **AWS Services**
@@ -552,6 +592,10 @@ The codebase adheres to SOLID principles:
    - Custom API key authentication
    - HMAC-based request signing
    - JWT for internal authentication (if configured)
+
+4. **Surcharge Providers**
+   - InterPayments API: Primary surcharge calculation provider
+   - Extensible adapter system for additional providers
 
 ## Database Schema
 
@@ -628,41 +672,26 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
      - `user_agent`: Requester's user agent
    - Usage: Change tracking and compliance
 
-6. **transactions**
-   - Purpose: Records individual transactions
+6. **surcharge_transactions**
+   - Purpose: Records individual surcharge transactions
    - Key Fields:
+     - `id`: Unique transaction identifier (GUID)
      - `merchant_id`: Reference to merchants
-     - `amount`: Transaction amount
-     - `currency`: Transaction currency
-     - `surcharge_amount`: Calculated surcharge
-     - `total_amount`: Total with surcharge
-     - `status`: Transaction status
-   - Usage: Transaction processing and tracking
+     - `provider_config_id`: Reference to surcharge provider configurations
+     - `operation_type`: Type of operation (Auth, Sale, Refund, Cancel)
+     - `status`: Transaction status (Pending, Completed, Failed)
+     - `amount`: Original transaction amount
+     - `correlation_id`: Correlation ID for linking transactions
+     - `provider_transaction_id`: Provider's transaction ID
+     - `request_payload`: Original request (JSONB)
+     - `response_payload`: Provider response (JSONB)
+     - `error_message`: Error message if failed
+     - `processed_at`: Processing timestamp
+     - `created_at`: Creation timestamp
+     - `updated_at`: Last update timestamp
+   - Usage: Surcharge transaction processing and tracking
 
-7. **batch_transactions**
-   - Purpose: Manages batch processing
-   - Key Fields:
-     - `merchant_id`: Reference to merchants
-     - `batch_reference`: Unique batch identifier
-     - `status`: Batch processing status
-     - `total_transactions`: Total transactions in batch
-     - `successful_transactions`: Successful count
-     - `failed_transactions`: Failed count
-     - `completed_at`: Batch completion timestamp
-   - Usage: Batch processing management
-
-8. **authentication_attempts**
-   - Purpose: Tracks authentication attempts
-   - Key Fields:
-     - `api_key_id`: Reference to api_keys
-     - `ip_address`: Attempt source IP
-     - `success`: Whether attempt succeeded
-     - `timestamp`: Attempt timestamp
-   - Usage: Security monitoring and threat detection
-
-### Additional Tables
-
-9. **surcharge_providers**
+7. **surcharge_providers**
    - Purpose: Stores surcharge provider configurations
    - Key Fields:
      - `id`: Unique provider identifier
@@ -677,14 +706,55 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
      - `updated_at`: Last update timestamp
    - Usage: Surcharge provider management
 
-10. **provider_credentials**
-    - Purpose: Stores encrypted provider credentials
-    - Key Fields:
-      - `provider_id`: Reference to surcharge_providers
-      - `credentials`: Encrypted credentials (JSONB)
-      - `created_at`: Creation timestamp
-      - `updated_at`: Last update timestamp
-    - Usage: Secure credential storage
+8. **surcharge_provider_configs**
+   - Purpose: Stores merchant-specific provider configurations
+   - Key Fields:
+     - `id`: Unique configuration identifier
+     - `provider_id`: Reference to surcharge_providers
+     - `merchant_id`: Reference to merchants
+     - `config_name`: Configuration name
+     - `credentials`: Encrypted credentials (JSONB)
+     - `is_active`: Whether configuration is active
+     - `is_primary`: Whether this is the primary configuration
+     - `timeout`: Request timeout in seconds
+     - `retry_count`: Number of retry attempts
+     - `retry_delay`: Delay between retries
+     - `rate_limit`: Rate limit per period
+     - `rate_limit_period`: Rate limit period in seconds
+     - `metadata`: Additional configuration data (JSONB)
+     - `created_at`: Creation timestamp
+     - `updated_at`: Last update timestamp
+     - `last_used_at`: Last usage timestamp
+     - `last_success_at`: Last successful usage
+     - `last_error_at`: Last error timestamp
+     - `last_error_message`: Last error message
+     - `success_count`: Success count
+     - `error_count`: Error count
+     - `average_response_time`: Average response time
+   - Usage: Merchant-specific provider configuration management
+
+8. **authentication_attempts**
+   - Purpose: Tracks authentication attempts
+   - Key Fields:
+     - `api_key_id`: Reference to api_keys
+     - `ip_address`: Attempt source IP
+     - `success`: Whether attempt succeeded
+     - `timestamp`: Attempt timestamp
+   - Usage: Security monitoring and threat detection
+
+### Additional Tables
+
+9. **merchant_audit_trails**
+   - Purpose: Tracks merchant status changes and important events
+   - Key Fields:
+     - `id`: Unique audit trail identifier
+     - `merchant_id`: Reference to merchants
+     - `action`: Action performed (e.g., 'STATUS_CHANGE', 'CONFIGURATION_UPDATE')
+     - `old_values`: Previous state (JSONB)
+     - `new_values`: New state (JSONB)
+     - `updated_by`: User who made the change
+     - `created_at`: Creation timestamp
+   - Usage: Merchant change tracking and compliance
 
 ### Database Features
 
@@ -780,32 +850,36 @@ The database includes test data for development:
    HAVING COUNT(*) > 5;
    ```
 
-3. **Transaction Processing**
+3. **Surcharge Transaction Processing**
    ```sql
-   -- Get transaction summary for a merchant
+   -- Get surcharge transaction summary for a merchant
    SELECT 
-       DATE_TRUNC('day', t.created_at) as transaction_date,
+       DATE_TRUNC('day', st.created_at) as transaction_date,
+       st.operation_type,
+       st.status,
        COUNT(*) as total_transactions,
-       SUM(t.amount) as total_amount,
-       SUM(t.surcharge_amount) as total_surcharge
-   FROM transactions t
-   JOIN merchants m ON t.merchant_id = m.id
+       SUM(st.amount) as total_amount,
+       AVG(st.average_response_time) as avg_response_time
+   FROM surcharge_transactions st
+   JOIN merchants m ON st.merchant_id = m.id
    WHERE m.external_id = 'DEV001'
-   GROUP BY DATE_TRUNC('day', t.created_at)
+   GROUP BY DATE_TRUNC('day', st.created_at), st.operation_type, st.status
    ORDER BY transaction_date DESC;
 
-   -- Get batch transaction status
+   -- Get provider configuration performance
    SELECT 
-       bt.batch_reference,
-       bt.status,
-       bt.total_transactions,
-       bt.successful_transactions,
-       bt.failed_transactions,
-       bt.completed_at
-   FROM batch_transactions bt
-   JOIN merchants m ON bt.merchant_id = m.id
+       spc.config_name,
+       spc.success_count,
+       spc.error_count,
+       spc.average_response_time,
+       spc.last_success_at,
+       spc.last_error_at,
+       spc.last_error_message
+   FROM surcharge_provider_configs spc
+   JOIN merchants m ON spc.merchant_id = m.id
    WHERE m.external_id = 'DEV001'
-   AND bt.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days';
+   AND spc.is_active = true
+   ORDER BY spc.last_used_at DESC;
    ```
 
 4. **Audit and Compliance**
@@ -849,14 +923,22 @@ The database includes test data for development:
    FROM surcharge_providers sp
    WHERE sp.status = 'active';
 
-   -- Get provider credentials (admin only)
+   -- Get merchant provider configurations
    SELECT 
        sp.name,
-       pc.credentials,
-       pc.updated_at
-   FROM surcharge_providers sp
-   JOIN provider_credentials pc ON sp.id = pc.provider_id
-   WHERE sp.code = 'INTERPAY';
+       spc.config_name,
+       spc.is_active,
+       spc.is_primary,
+       spc.success_count,
+       spc.error_count,
+       spc.average_response_time,
+       spc.last_used_at
+   FROM surcharge_provider_configs spc
+   JOIN surcharge_providers sp ON spc.provider_id = sp.id
+   JOIN merchants m ON spc.merchant_id = m.id
+   WHERE m.external_id = 'DEV001'
+   AND spc.is_active = true
+   ORDER BY spc.is_primary DESC, spc.last_used_at DESC;
    ```
 
 ### AWS RDS Deployment
@@ -1170,40 +1252,74 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   ```
 - **Response**: Updated `Merchant` object
 
-### Surcharge Fee Endpoints (v1)
+### Surcharge Endpoints (v1)
 
-#### 1. Calculate Surcharge Fee
-- **Endpoint**: `POST /api/v1/surchargefee/calculate`
-- **Description**: Calculates surcharge fee for a transaction
-- **Authentication**: Required (X-API-Key header)
+#### 1. Process Surcharge Authorization
+- **Endpoint**: `POST /api/v1/surcharge/auth`
+- **Description**: Processes surcharge authorization with provider integration
+- **Authentication**: Required (X-API-Key header + request signing)
 - **Request Body**:
   ```json
   {
-    "amount": "decimal",
-    "sTxId": "string",
-    "mTxId": "string",
-    "country": "string",
-    "region": "string"
+    "binValue": "string",                 // Required, Bank Identification Number (BIN) value
+    "surchargeProcessor": "string",       // Required, Surcharge processor configuration identifier
+    "amount": 100.00,                     // Required, Transaction amount (must be > 0.01)
+    "totalAmount": 110.00,                // Optional, Total with surcharge
+    "country": "USA",                     // Required, 2-3 letter country code
+    "postalCode": "94105",                // Optional, Postal code
+    "campaign": ["SUMMER2025"],           // Optional, Campaign identifiers
+    "data": ["extra1", "extra2"],         // Optional, Additional data points
+    "correlationId": "string",            // Required, Correlation ID for linking transactions
+    "merchantTransactionId": "string",    // Optional, Merchant transaction ID
+    "cardToken": "string",                // Optional, Tokenized card info
+    "entryMethod": "Chip",                // Optional, Card entry method
+    "nonSurchargableAmount": 0.00,        // Optional, Non-surchargable amount
+    "providerTransactionId": "string",    // Optional, For follow-up auths
+    "providerCode": "string"              // Required, Provider code for the surcharge provider
   }
   ```
 - **Response**:
   ```json
   {
-    "surchargeAmount": "decimal",
-    "totalAmount": "decimal",
-    "sTxId": "string",
-    "mTxId": "string",
-    "provider": "string",
-    "calculatedAt": "datetime"
+    "surchargeTransactionId": "guid",     // Unique transaction ID
+    "correlationId": "string",            // Correlation ID
+    "merchantTransactionId": "string",    // Merchant transaction ID
+    "originalAmount": 100.00,             // Original amount
+    "surchargeAmount": 10.00,             // Surcharge calculated
+    "totalAmount": 110.00,                // Total with surcharge
+    "status": "Completed",                // Transaction status (Failed if validation error)
+    "provider": "INTERPAYMENTS",          // Provider used
+    "processedAt": "2025-06-27T10:31:00Z", // Processing timestamp
+    "errorMessage": "string",             // Error message if failed
+    "surchargeFeePercent": 3.5            // Percent fee charged by provider (optional)
   }
   ```
+- **Features**:
+  - Direct integration with surcharge providers (InterPayments)
+  - Comprehensive validation (request, provider config, provider-specific)
+  - All validation errors returned as HTTP 200 with status "Failed"
+  - Support for follow-up auths using providerTransactionId
+  - Complete transaction lifecycle management
+  - Database storage and audit logging
 
-#### 2. Calculate Batch Surcharge Fee
-- **Endpoint**: `POST /api/v1/surchargefee/calculate-batch`
-- **Description**: Calculates surcharge fees for multiple transactions
+#### 2. Get Transaction by ID
+- **Endpoint**: `GET /api/v1/surcharge/transactions/{id}`
+- **Description**: Retrieves a specific surcharge transaction
 - **Authentication**: Required (X-API-Key header)
-- **Request Body**: Array of surcharge fee requests
-- **Response**: Array of surcharge fee responses
+- **Path Parameters**:
+  - `id`: Guid (required)
+- **Response**: Surcharge transaction details
+
+#### 3. List Transactions
+- **Endpoint**: `GET /api/v1/surcharge/transactions`
+- **Description**: Retrieves surcharge transactions with pagination
+- **Authentication**: Required (X-API-Key header)
+- **Query Parameters**:
+  - `page`: int (default: 1)
+  - `pageSize`: int (default: 20)
+  - `operationType`: string (optional)
+  - `status`: string (optional)
+- **Response**: Paginated list of surcharge transactions
 
 ### Sales Endpoints (v1)
 

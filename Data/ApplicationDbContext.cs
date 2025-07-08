@@ -5,6 +5,7 @@ using FeeNominalService.Models;
 using FeeNominalService.Models.SurchargeProvider;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using System;
 
 namespace FeeNominalService.Data
 {
@@ -24,8 +25,6 @@ namespace FeeNominalService.Data
         public DbSet<ApiKeyUsage> ApiKeyUsages { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<AuthenticationAttempt> AuthenticationAttempts { get; set; } = null!;
-        public DbSet<Transaction> Transactions { get; set; }
-        public DbSet<BatchTransaction> BatchTransactions { get; set; }
         public DbSet<SurchargeProvider> SurchargeProviders { get; set; } = null!;
         public DbSet<SurchargeProviderConfig> SurchargeProviderConfigs { get; set; } = null!;
         public DbSet<SurchargeProviderConfigHistory> SurchargeProviderConfigHistory { get; set; } = null!;
@@ -48,8 +47,8 @@ namespace FeeNominalService.Data
             modelBuilder.Entity<ApiKey>().ToTable("api_keys");
             modelBuilder.Entity<ApiKeyUsage>().ToTable("api_key_usage");
             modelBuilder.Entity<AuditLog>().ToTable("audit_logs");
-            modelBuilder.Entity<Transaction>().ToTable("transactions");
-            modelBuilder.Entity<BatchTransaction>().ToTable("batch_transactions");
+            // modelBuilder.Entity<Transaction>().ToTable("transactions"); // Removed legacy transactions table
+            // modelBuilder.Entity<BatchTransaction>().ToTable("batch_transactions"); // Removed legacy batch_transactions table
             modelBuilder.Entity<AuthenticationAttempt>().ToTable("authentication_attempts");
             modelBuilder.Entity<SurchargeProvider>().ToTable("surcharge_providers");
             modelBuilder.Entity<SurchargeProviderConfig>().ToTable("surcharge_provider_configs");
@@ -97,7 +96,7 @@ namespace FeeNominalService.Data
                     .ValueGeneratedNever(); // Since we're using predefined integer values
                 entity.Property(e => e.Code)
                     .IsRequired()
-                    .HasMaxLength(20);
+                    .HasMaxLength(50);
                 entity.Property(e => e.Name)
                     .IsRequired()
                     .HasMaxLength(50);
@@ -120,9 +119,9 @@ namespace FeeNominalService.Data
                 entity.ToTable("merchants", _schema);
                 entity.HasKey(e => e.MerchantId);
                 entity.Property(e => e.MerchantId)
-                    .HasColumnName("merchant_id")
+                    .IsRequired()
                     .HasColumnType("uuid")
-                    .HasDefaultValueSql("gen_random_uuid()");
+                    .HasColumnName("merchant_id");
                 entity.Property(e => e.ExternalMerchantId)
                     .IsRequired()
                     .HasMaxLength(50)
@@ -236,28 +235,6 @@ namespace FeeNominalService.Data
                     );
             });
 
-            // Configure Transaction
-            modelBuilder.Entity<Transaction>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).HasColumnName("transaction_id");
-                entity.Property(e => e.MerchantId).HasColumnName("merchant_id");
-                entity.HasIndex(e => e.MerchantId);
-                entity.HasIndex(e => e.CreatedAt);
-            });
-
-            // Configure BatchTransaction
-            modelBuilder.Entity<BatchTransaction>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).HasColumnName("batch_transaction_id");
-                entity.Property(e => e.BatchId).HasColumnName("batch_reference");
-                entity.Property(e => e.MerchantId).HasColumnName("merchant_id");
-                entity.Property(e => e.CreatedAt).IsRequired().HasColumnName("created_at");
-                entity.Property(e => e.UpdatedAt).IsRequired().HasColumnName("updated_at");
-                entity.HasIndex(e => e.BatchId).IsUnique();
-            });
-
             // Configure AuthenticationAttempt
             modelBuilder.Entity<AuthenticationAttempt>(entity =>
             {
@@ -321,7 +298,7 @@ namespace FeeNominalService.Data
                     .HasMaxLength(100);
                 entity.Property(e => e.Code)
                     .IsRequired()
-                    .HasMaxLength(20);
+                    .HasMaxLength(50);
                 entity.Property(e => e.Description);
                 entity.Property(e => e.BaseUrl)
                     .IsRequired()
@@ -408,6 +385,8 @@ namespace FeeNominalService.Data
                 entity.Property(e => e.SuccessCount).HasColumnName("success_count");
                 entity.Property(e => e.ErrorCount).HasColumnName("error_count");
                 entity.Property(e => e.AverageResponseTime).HasColumnName("average_response_time");
+                entity.Property(e => e.CreatedBy).IsRequired().HasMaxLength(50).HasColumnName("created_by");
+                entity.Property(e => e.UpdatedBy).IsRequired().HasMaxLength(50).HasColumnName("updated_by");
                 
                 // Explicitly ignore any shadow properties that might be created
                 entity.Ignore("SurchargeProviderId");
@@ -477,7 +456,7 @@ namespace FeeNominalService.Data
                     .ValueGeneratedOnAdd();
                 entity.Property(e => e.ProviderCode)
                     .IsRequired()
-                    .HasMaxLength(50);
+                    .HasMaxLength(100);
                 entity.Property(e => e.ProviderName)
                     .IsRequired()
                     .HasMaxLength(100);
@@ -513,38 +492,44 @@ namespace FeeNominalService.Data
                 entity.ToTable("surcharge_trans", _schema);
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id)
-                    .HasColumnName("surcharge_transaction_id")
+                    .HasColumnName("surcharge_trans_id")
                     .HasColumnType("uuid")
                     .HasDefaultValueSql("gen_random_uuid()");
                 entity.Property(e => e.MerchantId)
                     .IsRequired()
-                    .HasMaxLength(50)
+                    .HasColumnType("uuid")
                     .HasColumnName("merchant_id");
                 entity.Property(e => e.ProviderConfigId)
                     .IsRequired()
                     .HasColumnName("provider_config_id");
                 entity.Property(e => e.OperationType)
                     .IsRequired()
-                    .HasMaxLength(20)
-                    .HasColumnName("operation_type");
+                    .HasColumnName("operation_type")
+                    .HasConversion(
+                        v => v.ToString().ToLowerInvariant(),
+                        v => (SurchargeOperationType)Enum.Parse(typeof(SurchargeOperationType), v, true)
+                    )
+                    .HasColumnType("varchar(20)");
                 entity.Property(e => e.Status)
                     .IsRequired()
-                    .HasMaxLength(20)
-                    .HasColumnName("status");
+                    .HasColumnName("status")
+                    .HasConversion(
+                        v => v.ToString().ToLowerInvariant(),
+                        v => (SurchargeTransactionStatus)Enum.Parse(typeof(SurchargeTransactionStatus), v, true)
+                    )
+                    .HasColumnType("varchar(20)");
                 entity.Property(e => e.Amount)
                     .IsRequired()
                     .HasColumnName("amount");
-                entity.Property(e => e.Currency)
+                entity.Property(e => e.CorrelationId)
                     .IsRequired()
-                    .HasMaxLength(3)
-                    .HasColumnName("currency");
-                entity.Property(e => e.SourceTransactionId)
-                    .HasMaxLength(100)
-                    .HasColumnName("source_transaction_id");
+                    .HasMaxLength(255)
+                    .HasColumnName("correlation_id");
                 entity.Property(e => e.ProviderTransactionId)
-                    .HasMaxLength(100)
+                    .HasMaxLength(255)
                     .HasColumnName("provider_transaction_id");
                 entity.Property(e => e.RequestPayload)
+                    .IsRequired()
                     .HasColumnType("jsonb")
                     .HasColumnName("request_payload");
                 entity.Property(e => e.ResponsePayload)
@@ -568,7 +553,7 @@ namespace FeeNominalService.Data
                 entity.HasIndex(e => e.OperationType);
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => e.CreatedAt);
-                entity.HasIndex(e => e.SourceTransactionId);
+                entity.HasIndex(e => e.CorrelationId);
                 entity.HasIndex(e => e.ProviderTransactionId);
             });
         }

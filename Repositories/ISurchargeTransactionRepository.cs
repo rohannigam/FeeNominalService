@@ -19,9 +19,14 @@ public interface ISurchargeTransactionRepository
     Task<SurchargeTransaction?> GetByIdAsync(Guid id);
 
     /// <summary>
-    /// Gets a surcharge transaction by source transaction ID
+    /// Gets a surcharge transaction by its ID with merchant filtering (for secure access)
     /// </summary>
-    Task<SurchargeTransaction?> GetBySourceTransactionIdAsync(string sourceTransactionId);
+    Task<SurchargeTransaction?> GetByIdForMerchantAsync(Guid id, Guid merchantId);
+
+    /// <summary>
+    /// Gets a surcharge transaction by correlation ID
+    /// </summary>
+    Task<SurchargeTransaction?> GetByCorrelationIdAsync(string correlationId);
 
     /// <summary>
     /// Gets surcharge transactions for a merchant with pagination
@@ -59,12 +64,27 @@ public interface ISurchargeTransactionRepository
     Task<bool> UpdateResponseAsync(Guid id, JsonDocument responsePayload, DateTime processedAt);
 
     /// <summary>
-    /// Checks if a source transaction ID already exists
+    /// Checks if a correlation ID already exists
     /// </summary>
-    Task<bool> ExistsBySourceTransactionIdAsync(string sourceTransactionId);
+    Task<bool> ExistsByCorrelationIdAsync(string correlationId);
 
     /// <summary>
     /// Gets transaction statistics for a merchant
     /// </summary>
     Task<object> GetTransactionStatisticsAsync(Guid merchantId, DateTime? fromDate = null, DateTime? toDate = null);
+
+    /// <summary>
+    /// Gets a surcharge transaction by provider transaction ID
+    /// </summary>
+    Task<SurchargeTransaction?> GetByProviderTransactionIdAsync(string providerTransactionId);
+
+    /// <summary>
+    /// Gets a surcharge transaction by provider transaction ID and correlation ID (for follow-up validation)
+    /// </summary>
+    Task<SurchargeTransaction?> GetByProviderTransactionIdAndCorrelationIdAsync(string providerTransactionId, string correlationId);
+
+    /// <summary>
+    /// Gets a surcharge transaction by provider transaction ID and correlation ID with merchant filtering (for secure follow-up validation)
+    /// </summary>
+    Task<SurchargeTransaction?> GetByProviderTransactionIdAndCorrelationIdForMerchantAsync(string providerTransactionId, string correlationId, Guid merchantId);
 }

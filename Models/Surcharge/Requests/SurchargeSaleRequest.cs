@@ -1,26 +1,27 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace FeeNominalService.Models.Surcharge.Requests;
 
 /// <summary>
-/// Request model for sale surcharge operations
+/// Request model for surcharge sale operations
 /// </summary>
 public class SurchargeSaleRequest
 {
     /// <summary>
-    /// Network Interchange Card Number (NICN) for the transaction
+    /// Bank Identification Number (BIN) value for the transaction
     /// </summary>
-    [Required(ErrorMessage = "NICN is required")]
-    public required string Nicn { get; set; }
+    [Required(ErrorMessage = "BIN value is required")]
+    public required string BinValue { get; set; }
 
     /// <summary>
-    /// Processor configuration identifier
+    /// Surcharge processor configuration identifier
     /// </summary>
-    [Required(ErrorMessage = "Processor is required")]
-    public required string Processor { get; set; }
+    [Required(ErrorMessage = "Surcharge processor is required")]
+    public required string SurchargeProcessor { get; set; }
 
     /// <summary>
-    /// Transaction amount before surcharge
+    /// Transaction amount in cents
     /// </summary>
     [Required(ErrorMessage = "Amount is required")]
     [Range(0.01, double.MaxValue, ErrorMessage = "Amount must be greater than 0")]
@@ -29,32 +30,31 @@ public class SurchargeSaleRequest
     /// <summary>
     /// Total transaction amount including surcharge
     /// </summary>
+    [Required(ErrorMessage = "Total amount is required")]
     [Range(0.01, double.MaxValue, ErrorMessage = "Total amount must be greater than 0")]
-    public decimal? TotalAmount { get; set; }
+    public decimal TotalAmount { get; set; }
 
     /// <summary>
-    /// Country code for the transaction
+    /// Country code for the transaction (e.g., USA, CAN)
     /// </summary>
     [Required(ErrorMessage = "Country is required")]
-    [StringLength(2, MinimumLength = 2, ErrorMessage = "Country must be a 2-letter code")]
+    [StringLength(3, MinimumLength = 2, ErrorMessage = "Country must be 2-3 characters")]
     public required string Country { get; set; }
 
     /// <summary>
-    /// Region or state code for the transaction
+    /// Postal code for the transaction (e.g., US ZIP, Canadian Postal, etc.)
     /// </summary>
-    [StringLength(2, MinimumLength = 2, ErrorMessage = "Region must be a 2-letter code")]
-    public string? Region { get; set; }
+    public string? PostalCode { get; set; }
 
     /// <summary>
-    /// System transaction identifier
+    /// Campaign identifiers for surcharge calculation
     /// </summary>
-    [Required(ErrorMessage = "System transaction ID is required")]
-    public required string SystemTransactionId { get; set; }
+    public List<string>? Campaign { get; set; }
 
     /// <summary>
-    /// Merchant transaction identifier
+    /// Additional data for surcharge calculation
     /// </summary>
-    public string? MerchantTransactionId { get; set; }
+    public List<string>? Data { get; set; }
 
     /// <summary>
     /// Tokenized card information
@@ -62,14 +62,35 @@ public class SurchargeSaleRequest
     public string? CardToken { get; set; }
 
     /// <summary>
-    /// Method used to enter the card information
+    /// Entry method for the transaction
     /// </summary>
-    [Required(ErrorMessage = "Entry method is required")]
-    public EntryMethod EntryMethod { get; set; }
+    public string? EntryMethod { get; set; }
 
     /// <summary>
-    /// Authorization transaction ID (for sale operations)
+    /// Non-surchargable amount in cents
     /// </summary>
-    [Required(ErrorMessage = "Authorization transaction ID is required for sale operations")]
-    public required string AuthorizationTransactionId { get; set; }
+    [Range(0, double.MaxValue, ErrorMessage = "Non-surchargable amount cannot be negative")]
+    public decimal? NonSurchargableAmount { get; set; }
+
+    /// <summary>
+    /// Provider transaction ID for follow-up operations
+    /// </summary>
+    public string? ProviderTransactionId { get; set; }
+
+    /// <summary>
+    /// Provider code for the surcharge provider
+    /// </summary>
+    [Required(ErrorMessage = "Provider code is required")]
+    public required string ProviderCode { get; set; }
+
+    /// <summary>
+    /// Correlation identifier for linking related transactions
+    /// </summary>
+    [Required(ErrorMessage = "Correlation ID is required")]
+    public required string CorrelationId { get; set; }
+
+    /// <summary>
+    /// Merchant transaction identifier
+    /// </summary>
+    public string? MerchantTransactionId { get; set; }
 }

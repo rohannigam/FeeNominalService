@@ -1,320 +1,69 @@
-# Credentials Schema Documentation
+# Credentials Schema Documentation (Updated as of 2025-06-27)
 
 ## Overview
+The credentials schema is a required component for all surcharge providers. It defines the structure and validation rules for authentication credentials, ensuring providers cannot be created without proper credential definitions and validation.
 
-The credentials schema is a **required** component for all surcharge providers that defines the structure and validation rules for authentication credentials. This ensures that providers cannot be created without proper credential definitions, and that all credential fields have proper validation.
+## What's New
+- **Configurable Validation:** All validation rules (field length, type, value, etc.) are now environment-specific and configurable.
+- **Single-Call Creation:** Providers and configurations can be created atomically in a single API call.
+- **Detailed Error Handling:** Validation errors return detailed, structured error responses (see examples below).
+- **New Field Types:** Support for JWT, API key, certificate, base64, JSON, and more.
+- **Security/Compliance:** All sensitive fields are encrypted at rest; validation prevents credential stuffing and malformed data.
+- **Internal Audience Note:** This doc is the reference for onboarding, QA, and internal devs. All schema/validation changes are reflected here first.
 
-## Schema Structure
+## Schema Structure (Summary)
+- Top-level: `name`, `description`, `version`, `required_fields` (array)
+- Optional: `optional_fields`, `documentation_url`, `metadata`
+- Each field: `name`, `type`, `description`, plus optional constraints (see below)
 
-### Required Top-Level Properties
+## Field Types (Supported)
+- Basic: string, number, integer, boolean
+- Auth: email, url, password, jwt, api_key, client_id, client_secret, access_token, refresh_token, username
+- Security: certificate, private_key, public_key, base64, json
 
-Every credentials schema must include:
-
-1. **`name`** (string, required): A descriptive name for the authentication method
-2. **`description`** (string, required): Detailed description of the authentication method
-3. **`version`** (string, required): Schema version (e.g., "1.0")
-4. **`required_fields`** (array, required): Array of required credential fields
-
-### Optional Top-Level Properties
-
-- **`optional_fields`** (array, optional): Array of optional credential fields
-- **`documentation_url`** (string, optional): URL to additional documentation
-- **`metadata`** (object, optional): Additional metadata
-
-## Field Structure
-
-Each field in `required_fields` or `optional_fields` must have:
-
-### Required Field Properties
-
-1. **`name`** (string, required): Field identifier (max 100 characters)
-2. **`type`** (string, required): Field type (see valid types below)
-3. **`description`** (string, required): Field description (max 500 characters)
-
-### Optional Field Properties
-
-- **`displayName`** (string, optional): Human-readable display name
-- **`required`** (boolean, default: true): Whether the field is required
-- **`sensitive`** (boolean, default: false): Whether the field contains sensitive data
-- **`defaultValue`** (string, optional): Default value for the field
-- **`pattern`** (string, optional): Regex pattern for validation
-- **`minLength`** (integer, optional): Minimum length constraint
-- **`maxLength`** (integer, optional): Maximum length constraint
-- **`allowedValues`** (array, optional): List of allowed values
-- **`validationMessage`** (string, optional): Custom validation message
-
-## Valid Field Types
-
-The following field types are supported:
-
-### Basic Types
-- `string`: General string value
-- `number`: Numeric value
-- `integer`: Integer value
-- `boolean`: Boolean value
-
-### Authentication-Specific Types
-- `email`: Email address
-- `url`: URL/URI
-- `password`: Password field (automatically marked as sensitive)
-- `jwt`: JSON Web Token
-- `api_key`: API key
-- `client_id`: OAuth client identifier
-- `client_secret`: OAuth client secret
-- `access_token`: OAuth access token
-- `refresh_token`: OAuth refresh token
-- `username`: Username field
-
-### Security Types
-- `certificate`: SSL/TLS certificate
-- `private_key`: Private key
-- `public_key`: Public key
-- `base64`: Base64 encoded data
-- `json`: JSON data
-
-## Validation Rules
-
-### Schema-Level Validation
-- At least one required field must be defined
+## Validation Rules (Summary)
 - All required fields must have valid names, types, and descriptions
-- Field names cannot exceed 100 characters
-- Field descriptions cannot exceed 500 characters
-- Field types must be from the valid types list
+- Field names max 100 chars, descriptions max 500 chars
+- Field types must be from the supported list
+- Length, pattern, allowedValues, etc. are enforced if present
+- At least one required field is mandatory
+- All validation is environment-configurable (see SurchargeProviderValidation section in appsettings)
 
-### Field-Level Validation
-- `minLength` cannot be greater than `maxLength`
-- Length constraints cannot be negative
-- `allowedValues` must be an array of strings
-- `pattern` must be a valid regex string
+## Single-Call Provider+Config Creation
+- You can create a provider and its configuration in a single API call (see API docs for request/response format)
+- Validation is performed on both schema and credential values atomically
 
-## Examples
-
-### API Key Authentication
+## Error Handling & Examples
+- All validation errors return HTTP 400 with a structured error response:
 
 ```json
 {
-  "name": "API Key Authentication",
-  "description": "API key based authentication for surcharge provider",
-  "version": "1.0",
-  "required_fields": [
-    {
-      "name": "api_key",
-      "type": "api_key",
-      "description": "API key for authentication",
-      "displayName": "API Key",
-      "required": true,
-      "sensitive": true,
-      "minLength": 1,
-      "maxLength": 500
-    },
-    {
-      "name": "api_key_header",
-      "type": "string",
-      "description": "HTTP header name for the API key",
-      "displayName": "API Key Header",
-      "required": true,
-      "sensitive": false,
-      "defaultValue": "X-API-Key",
-      "minLength": 1,
-      "maxLength": 100
-    }
-  ],
-  "optional_fields": [
-    {
-      "name": "timeout",
-      "type": "integer",
-      "description": "Request timeout in seconds",
-      "displayName": "Timeout",
-      "required": false,
-      "sensitive": false,
-      "defaultValue": "30",
-      "minLength": 1,
-      "maxLength": 3
-    }
+  "message": "Invalid credentials schema",
+  "errors": [
+    "Schema name cannot exceed 100 characters",
+    "required_fields[0].type 'invalid_type' is not a valid field type"
   ]
 }
 ```
 
-### OAuth 2.0 Authentication
-
+- Credential value errors:
 ```json
 {
-  "name": "OAuth 2.0 Authentication",
-  "description": "OAuth 2.0 client credentials flow",
-  "version": "1.0",
-  "required_fields": [
-    {
-      "name": "client_id",
-      "type": "client_id",
-      "description": "OAuth 2.0 client identifier",
-      "displayName": "Client ID",
-      "required": true,
-      "sensitive": false,
-      "minLength": 1,
-      "maxLength": 255
-    },
-    {
-      "name": "client_secret",
-      "type": "client_secret",
-      "description": "OAuth 2.0 client secret",
-      "displayName": "Client Secret",
-      "required": true,
-      "sensitive": true,
-      "minLength": 1,
-      "maxLength": 255
-    },
-    {
-      "name": "token_url",
-      "type": "url",
-      "description": "OAuth 2.0 token endpoint URL",
-      "displayName": "Token URL",
-      "required": true,
-      "sensitive": false,
-      "pattern": "^https?://.+"
-    }
-  ],
-  "optional_fields": [
-    {
-      "name": "scope",
-      "type": "string",
-      "description": "OAuth 2.0 scope (optional)",
-      "displayName": "Scope",
-      "required": false,
-      "sensitive": false,
-      "maxLength": 500
-    }
+  "message": "Invalid credentials",
+  "errors": [
+    "Credential value 'jwt_token' length (15000) exceeds maximum (10000)",
+    "Invalid JWT token format"
   ]
 }
 ```
 
-### JWT Authentication
+## Security & Compliance
+- Sensitive fields (`sensitive: true`) are encrypted at rest
+- All credential and schema validation is enforced before provider creation
+- All error messages are secure and do not leak sensitive data
+- All validation rules are environment-specific (dev/prod)
 
-```json
-{
-  "name": "JWT Authentication",
-  "description": "JSON Web Token based authentication",
-  "version": "1.0",
-  "required_fields": [
-    {
-      "name": "jwt_token",
-      "type": "jwt",
-      "description": "JSON Web Token for authentication",
-      "displayName": "JWT Token",
-      "required": true,
-      "sensitive": true,
-      "minLength": 1,
-      "maxLength": 2000
-    }
-  ],
-  "optional_fields": [
-    {
-      "name": "token_type",
-      "type": "string",
-      "description": "Token type (e.g., Bearer)",
-      "displayName": "Token Type",
-      "required": false,
-      "sensitive": false,
-      "defaultValue": "Bearer",
-      "allowedValues": ["Bearer", "JWT"]
-    }
-  ]
-}
-```
-
-### Basic Authentication
-
-```json
-{
-  "name": "Basic Authentication",
-  "description": "Username and password authentication",
-  "version": "1.0",
-  "required_fields": [
-    {
-      "name": "username",
-      "type": "string",
-      "description": "Username for authentication",
-      "displayName": "Username",
-      "required": true,
-      "sensitive": false,
-      "minLength": 1,
-      "maxLength": 100
-    },
-    {
-      "name": "password",
-      "type": "password",
-      "description": "Password for authentication",
-      "displayName": "Password",
-      "required": true,
-      "sensitive": true,
-      "minLength": 1,
-      "maxLength": 255
-    }
-  ]
-}
-```
-
-## Error Handling
-
-### Common Validation Errors
-
-1. **Missing Required Properties**
-   ```
-   "Credentials schema must have a 'name' property"
-   "Credentials schema must have a 'description' property"
-   "Credentials schema must have a 'required_fields' property"
-   ```
-
-2. **Invalid Field Structure**
-   ```
-   "required_fields[0].name is required"
-   "required_fields[0].type is required"
-   "required_fields[0].description is required"
-   ```
-
-3. **Invalid Field Types**
-   ```
-   "required_fields[0].type 'invalid_type' is not a valid field type"
-   ```
-
-4. **Length Constraint Violations**
-   ```
-   "required_fields[0].name cannot exceed 100 characters"
-   "required_fields[0].description cannot exceed 500 characters"
-   ```
-
-5. **Empty Required Fields**
-   ```
-   "At least one required field must be defined"
-   ```
-
-## Implementation Notes
-
-### Service Layer Validation
-- The `SurchargeProviderService.CreateAsync()` method validates the schema before creating providers
-- The `SurchargeProviderService.UpdateAsync()` method validates the schema before updating providers
-- Validation errors are returned as `InvalidOperationException` with detailed error messages
-
-### Controller Layer Validation
-- The `SurchargeProviderController` validates schemas in both create and update endpoints
-- Validation errors are returned as HTTP 400 Bad Request with detailed error lists
-
-### Request Model Validation
-- The `SurchargeProviderRequest.ValidateCredentialsSchema()` method provides client-side validation
-- Returns detailed error lists for debugging
-
-## Security Considerations
-
-1. **Sensitive Fields**: Fields marked as `sensitive: true` should be encrypted at rest
-2. **Field Validation**: All fields are validated against their defined constraints
-3. **Type Safety**: Field types ensure proper handling of different credential types
-4. **Required Fields**: Prevents creation of providers with incomplete credential definitions
-
-## Migration from Legacy Schemas
-
-If you have existing providers with legacy credential schemas, you'll need to update them to include:
-
-1. Top-level `name`, `description`, and `version` properties
-2. Proper field structure with `name`, `type`, and `description`
-3. Valid field types from the supported list
-
-The system will reject any provider creation or updates that don't meet these requirements. 
+## For Onboarding/QA/Internal Users
+- Use this doc as the reference for all provider credential schema and validation logic
+- All new features, field types, and validation rules will be reflected here first
+- If you encounter a validation error, refer to the error examples above for troubleshooting 

@@ -61,18 +61,34 @@ public class SurchargeTransactionRepository : ISurchargeTransactionRepository
         }
     }
 
-    public async Task<SurchargeTransaction?> GetBySourceTransactionIdAsync(string sourceTransactionId)
+    public async Task<SurchargeTransaction?> GetByIdForMerchantAsync(Guid id, Guid merchantId)
     {
         try
         {
             return await _context.SurchargeTransactions
                 .Include(t => t.Merchant)
                 .Include(t => t.ProviderConfig)
-                .FirstOrDefaultAsync(t => t.SourceTransactionId == sourceTransactionId);
+                .FirstOrDefaultAsync(t => t.Id == id && t.MerchantId == merchantId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting surcharge transaction by source transaction ID {SourceTransactionId}", sourceTransactionId);
+            _logger.LogError(ex, "Error getting surcharge transaction by ID {TransactionId} for merchant {MerchantId}", id, merchantId);
+            throw;
+        }
+    }
+
+    public async Task<SurchargeTransaction?> GetByCorrelationIdAsync(string correlationId)
+    {
+        try
+        {
+            return await _context.SurchargeTransactions
+                .Include(t => t.Merchant)
+                .Include(t => t.ProviderConfig)
+                .FirstOrDefaultAsync(t => t.CorrelationId == correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting surcharge transaction by correlation ID {CorrelationId}", correlationId);
             throw;
         }
     }
@@ -264,16 +280,16 @@ public class SurchargeTransactionRepository : ISurchargeTransactionRepository
         }
     }
 
-    public async Task<bool> ExistsBySourceTransactionIdAsync(string sourceTransactionId)
+    public async Task<bool> ExistsByCorrelationIdAsync(string correlationId)
     {
         try
         {
             return await _context.SurchargeTransactions
-                .AnyAsync(t => t.SourceTransactionId == sourceTransactionId);
+                .AnyAsync(t => t.CorrelationId == correlationId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking existence of surcharge transaction by source transaction ID {SourceTransactionId}", sourceTransactionId);
+            _logger.LogError(ex, "Error checking existence of surcharge transaction by correlation ID {CorrelationId}", correlationId);
             throw;
         }
     }
@@ -318,6 +334,56 @@ public class SurchargeTransactionRepository : ISurchargeTransactionRepository
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting transaction statistics for merchant {MerchantId}", merchantId);
+            throw;
+        }
+    }
+
+    public async Task<SurchargeTransaction?> GetByProviderTransactionIdAsync(string providerTransactionId)
+    {
+        try
+        {
+            return await _context.SurchargeTransactions
+                .Include(t => t.Merchant)
+                .Include(t => t.ProviderConfig)
+                .FirstOrDefaultAsync(t => t.ProviderTransactionId == providerTransactionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting surcharge transaction by provider transaction ID {ProviderTransactionId}", providerTransactionId);
+            throw;
+        }
+    }
+
+    public async Task<SurchargeTransaction?> GetByProviderTransactionIdAndCorrelationIdAsync(string providerTransactionId, string correlationId)
+    {
+        try
+        {
+            return await _context.SurchargeTransactions
+                .Include(t => t.Merchant)
+                .Include(t => t.ProviderConfig)
+                .FirstOrDefaultAsync(t => t.ProviderTransactionId == providerTransactionId && t.CorrelationId == correlationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting surcharge transaction by provider transaction ID {ProviderTransactionId} and correlation ID {CorrelationId}", providerTransactionId, correlationId);
+            throw;
+        }
+    }
+
+    public async Task<SurchargeTransaction?> GetByProviderTransactionIdAndCorrelationIdForMerchantAsync(string providerTransactionId, string correlationId, Guid merchantId)
+    {
+        try
+        {
+            return await _context.SurchargeTransactions
+                .Include(t => t.Merchant)
+                .Include(t => t.ProviderConfig)
+                .FirstOrDefaultAsync(t => t.ProviderTransactionId == providerTransactionId && 
+                                         t.CorrelationId == correlationId && 
+                                         t.MerchantId == merchantId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting surcharge transaction by provider transaction ID {ProviderTransactionId}, correlation ID {CorrelationId}, and merchant ID {MerchantId}", providerTransactionId, correlationId, merchantId);
             throw;
         }
     }

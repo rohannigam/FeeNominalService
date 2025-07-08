@@ -36,6 +36,9 @@ BEGIN
     RAISE NOTICE 'Dropped surcharge_provider_configs table';
 END $$;
 
+-- Drop provider_type column if exists (for rollback of ProviderType addition)
+ALTER TABLE IF EXISTS fee_nominal.surcharge_providers DROP COLUMN IF EXISTS provider_type;
+
 DROP TABLE IF EXISTS fee_nominal.surcharge_providers CASCADE;
 DO $$
 BEGIN

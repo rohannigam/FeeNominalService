@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS fee_nominal.surcharge_providers (
     authentication_type VARCHAR(50) NOT NULL,
     credentials_schema JSONB NOT NULL,
     status VARCHAR(20) NOT NULL,
+    provider_type VARCHAR(50) NOT NULL DEFAULT 'INTERPAYMENTS',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
