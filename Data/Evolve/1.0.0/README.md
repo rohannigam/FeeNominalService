@@ -6,9 +6,13 @@ This directory contains the database migration scripts for version 1.0.0 of the 
 
 ```
 1.0.0/
-├── setup/                       # Initial database setup migrations
-│   ├── M1_0_0_001__enable_dblink.sql
-│   └── M1_0_0_002__initial_setup.sql
+├── setup/                       # Manual database setup scripts
+│   ├── 01-run-admin-setup.sh
+│   ├── 02-run-deploy-permissions.sh
+│   ├── 03-run-api-permissions.sh
+│   ├── M1_0_0_000__admin_setup.sql
+│   ├── M1_0_0_001__grant_deploy_permissions.sql
+│   └── M1_0_0_002__grant_api_permissions.sql
 ├── Rollback/                    # Rollback scripts for each migration
 │   ├── U1_0_0_101__create_schema_rollback.sql
 │   ├── U1_0_0_102__create_merchant_tables_rollback.sql
@@ -18,21 +22,27 @@ This directory contains the database migration scripts for version 1.0.0 of the 
 
 ## Setup Strategy
 
-The `setup` directory contains initial database setup migrations that must be run before the main application migrations. These scripts handle the foundational database infrastructure:
+The `setup` directory contains manual database setup scripts that must be run before the main application migrations. These scripts handle the foundational database infrastructure and user permissions.
 
-### Setup Migrations
+### Setup Scripts
 
-1. **M1_0_0_001__enable_dblink.sql** - Enables the dblink extension to allow cross-database operations for automated database creation
-2. **M1_0_0_002__initial_setup.sql** - Creates the database, roles, schema, and service users with appropriate privileges
+The setup process is automated through shell scripts that run in sequence:
+
+1. **01-run-admin-setup.sh** - Runs `M1_0_0_000__admin_setup.sql` to create database roles and service users
+2. **02-run-deploy-permissions.sh** - Runs `M1_0_0_001__grant_deploy_permissions.sql` to grant deployment user permissions
+3. **03-run-api-permissions.sh** - Runs `M1_0_0_002__grant_api_permissions.sql` to grant API user permissions
 
 ### Running Setup
 
-Setup migrations must be run manually before any application migrations. These are foundational database setup scripts that establish the infrastructure:
+Setup scripts are designed to run during Docker container initialization. They execute automatically when the PostgreSQL container starts:
 
 ```bash
-# Run setup migrations manually (not through Evolve)
-psql -h <host> -U <user> -d <database> -f Data/Evolve/1.0.0/setup/M1_0_0_001__enable_dblink.sql
-psql -h <host> -U <user> -d <database> -f Data/Evolve/1.0.0/setup/M1_0_0_002__initial_setup.sql
+# The scripts run automatically in Docker environment
+# For manual execution (if needed):
+chmod +x Data/Evolve/1.0.0/setup/*.sh
+./Data/Evolve/1.0.0/setup/01-run-admin-setup.sh
+./Data/Evolve/1.0.0/setup/02-run-deploy-permissions.sh
+./Data/Evolve/1.0.0/setup/03-run-api-permissions.sh
 
 # Then run application migrations through Evolve
 evolve migrate --location=Data/Evolve/1.0.0
@@ -40,13 +50,20 @@ evolve migrate --location=Data/Evolve/1.0.0
 
 ### Setup Configuration
 
-The setup scripts use configurable parameters for different environments. Key configurations include:
-- Database name and schema
-- Service user accounts (deployment and API users)
-- Role-based access control
-- Environment-specific settings
+The setup scripts use environment variables for configuration:
+- `POSTGRES_USER` - PostgreSQL superuser
+- `POSTGRES_DB` - Target database name
+- Service user accounts (deployment and API users) are created with appropriate privileges
+- Role-based access control is established for security
 
 ## Migration Strategy
+
+### Recent Changes
+
+**Version 1.0.0.24+**: Legacy transaction tables have been removed to clean up the database schema:
+- Removed unused legacy transaction tables
+- Cleaned up related indexes and constraints
+- Updated schema to reflect current application state
 
 ### Running Migrations
 
@@ -59,7 +76,7 @@ evolve migrate --location=Data/Evolve/1.0.0
 To apply a specific migration:
 
 ```bash
-evolve migrate --location=Data/Evolve/1.0.0 --version=1.0.0.1
+evolve migrate --location=Data/Evolve/1.0.0 --version=1.0.0.25
 ```
 
 ### Rollback Strategy
@@ -72,7 +89,6 @@ The `Rollback` directory contains scripts to reverse each migration. These scrip
 
 To execute a rollback:
 Please refer to how Jenkins pipeline intends to do this via a script.
-
 
 ## Verification Commands
 
@@ -102,9 +118,9 @@ Example output:
 ```
  version  | description                    | installed_on           | execution_time | success
 ----------|--------------------------------|------------------------|----------------|---------
- 1.0.0.11 | Add updated_by to audit trail  | 2024-03-20 10:15:00   | 00:00:05      | true
- 1.0.0.10 | Alter API key secrets          | 2024-03-20 10:14:00   | 00:00:03      | true
- 1.0.0.9  | Create test data              | 2024-03-20 10:13:00   | 00:00:10      | true
+ 1.0.0.25 | Drop batch transactions table  | 2024-03-20 10:16:00   | 00:00:02      | true
+ 1.0.0.24 | Drop legacy transaction tables | 2024-03-20 10:15:00   | 00:00:03      | true
+ 1.0.0.23 | Remove currency column         | 2024-03-20 10:14:00   | 00:00:01      | true
 ```
 
 ### Validate Migrations
@@ -130,6 +146,8 @@ This checks for:
 
 4. **Documentation**: Update this README when adding new migrations or changing the migration strategy.
 
+5. **Setup Scripts**: Ensure setup scripts have proper permissions and are tested in the target environment.
+
 ## Troubleshooting
 
 If a migration fails:
@@ -139,6 +157,13 @@ If a migration fails:
 3. Execute the rollback script if needed
 4. Fix any issues in the migration script
 5. Retry the migration
+
+If setup scripts fail:
+
+1. Verify environment variables are set correctly
+2. Check PostgreSQL user permissions
+3. Ensure scripts have execute permissions
+4. Review PostgreSQL logs for detailed error messages
 
 ## Support
 

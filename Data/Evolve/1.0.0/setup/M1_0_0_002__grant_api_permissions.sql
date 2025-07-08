@@ -48,7 +48,22 @@ DECLARE
     table_count INTEGER := 0;
     seq_count INTEGER := 0;
     func_count INTEGER := 0;
+    current_user_is_superuser BOOLEAN;
+    current_user_is_schema_owner BOOLEAN;
 BEGIN
+    -- Check current user permissions
+    SELECT rolname = 'postgres' OR rolsuper INTO current_user_is_superuser 
+    FROM pg_roles WHERE rolname = current_user;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM pg_namespace n 
+        WHERE n.nspname = schema_name 
+        AND n.nspowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+    ) INTO current_user_is_schema_owner;
+    
+    RAISE NOTICE 'Current user: %, Superuser: %, Schema owner: %', 
+                current_user, current_user_is_superuser, current_user_is_schema_owner;
+    
     -- Grant basic connect permissions (safe to run multiple times)
     EXECUTE format('GRANT CONNECT ON DATABASE %I TO %I', db_name, api_username);
     
@@ -104,32 +119,50 @@ BEGIN
         END;
     END LOOP;
     
-    -- Set default privileges for future objects created by deployment user (safe to run multiple times)
-    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', 
-                  schema_name, api_username);
-    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', 
-                  schema_name, api_username);
-    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', 
-                  schema_name, api_username);
-    
-    -- Also set default privileges for any user in the schema (safe to run multiple times)
-    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', 
-                  schema_name, api_username);
-    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', 
-                  schema_name, api_username);
-    EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', 
-                  schema_name, api_username);
+    -- Set default privileges only if we have sufficient permissions
+    IF current_user_is_superuser OR current_user_is_schema_owner THEN
+        BEGIN
+            -- Set default privileges for future objects created by deployment user (safe to run multiple times)
+            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', 
+                          schema_name, api_username);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', 
+                          schema_name, api_username);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR USER svc_feenominal_deploy IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', 
+                          schema_name, api_username);
+            
+            -- Also set default privileges for any user in the schema (safe to run multiple times)
+            EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', 
+                          schema_name, api_username);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', 
+                          schema_name, api_username);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', 
+                          schema_name, api_username);
+            
+            RAISE NOTICE 'Default privileges set for future objects created by deployment user';
+            RAISE NOTICE 'Default privileges set for any user in schema';
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Warning: Could not set default privileges: %', SQLERRM;
+            RAISE NOTICE 'This is normal if current user is not schema owner or superuser';
+        END;
+    ELSE
+        RAISE NOTICE 'Skipping default privileges setup - current user lacks sufficient permissions';
+        RAISE NOTICE 'Default privileges will need to be set manually by schema owner or superuser';
+    END IF;
     
     -- Grant permissions on all objects owned by deployment user (comprehensive approach)
-    EXECUTE format('GRANT ALL ON ALL TABLES IN SCHEMA %I TO %I', schema_name, api_username);
-    EXECUTE format('GRANT ALL ON ALL SEQUENCES IN SCHEMA %I TO %I', schema_name, api_username);
-    EXECUTE format('GRANT ALL ON ALL FUNCTIONS IN SCHEMA %I TO %I', schema_name, api_username);
+    BEGIN
+        EXECUTE format('GRANT ALL ON ALL TABLES IN SCHEMA %I TO %I', schema_name, api_username);
+        EXECUTE format('GRANT ALL ON ALL SEQUENCES IN SCHEMA %I TO %I', schema_name, api_username);
+        EXECUTE format('GRANT ALL ON ALL FUNCTIONS IN SCHEMA %I TO %I', schema_name, api_username);
+        RAISE NOTICE 'Comprehensive permissions granted on all objects in schema';
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Warning: Could not grant comprehensive permissions: %', SQLERRM;
+        RAISE NOTICE 'Individual object permissions were granted above';
+    END;
     
     RAISE NOTICE 'Created API user and granted API permissions to %', api_username;
     RAISE NOTICE 'User can now access % tables, % sequences, % functions', 
                 table_count, seq_count, func_count;
-    RAISE NOTICE 'Default privileges set for future objects created by deployment user';
-    RAISE NOTICE 'Comprehensive permissions granted on all objects in schema';
     RAISE NOTICE 'Service should now start without permission errors!';
     RAISE NOTICE 'This script is IDEMPOTENT - safe to run multiple times!';
 END$$; 
