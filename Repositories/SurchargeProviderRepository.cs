@@ -398,6 +398,7 @@ namespace FeeNominalService.Repositories
             {
                 var provider = await _context.SurchargeProviders
                     .Include(p => p.Status)
+                    .Include(p => p.Configurations)
                     .FirstOrDefaultAsync(p => p.Id == id);
 
                 if (provider == null)
@@ -427,9 +428,21 @@ namespace FeeNominalService.Repositories
                 provider.UpdatedAt = DateTime.UtcNow;
                 provider.UpdatedBy = deletedBy;
 
+                // Deactivate all provider configurations and unset primary
+                if (provider.Configurations != null)
+                {
+                    foreach (var config in provider.Configurations)
+                    {
+                        config.IsActive = false;
+                        config.IsPrimary = false;
+                        config.UpdatedAt = DateTime.UtcNow;
+                        config.UpdatedBy = deletedBy;
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Provider {ProviderId} soft deleted by {DeletedBy}", id, deletedBy);
+                _logger.LogInformation("Provider {ProviderId} soft deleted by {DeletedBy} and all configs deactivated/unset primary", id, deletedBy);
                 return true;
             }
             catch (Exception ex)
@@ -482,6 +495,22 @@ namespace FeeNominalService.Repositories
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error restoring provider {ProviderId}", id);
+                throw;
+            }
+        }
+
+        public async Task<int> GetCountByMerchantAsync(string merchantId)
+        {
+            try
+            {
+                return await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .Where(p => p.CreatedBy == merchantId && p.Status.Code != "DELETED")
+                    .CountAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting provider count for merchant {MerchantId}", merchantId);
                 throw;
             }
         }

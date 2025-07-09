@@ -137,20 +137,18 @@ namespace FeeNominalService.Controllers.V1
             catch (KeyNotFoundException ex)
             {
                 _logger.LogWarning(ex, "Merchant not found: {MerchantId}", merchantId);
-                return NotFound(new ApiResponse
-                {
-                    Message = ex.Message,
-                    Success = false
-                });
+                return NotFound(new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
+                    SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
+                ));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving audit trail for merchant {MerchantId}", merchantId);
-                return StatusCode(500, new ApiResponse
-                {
-                    Message = "Failed to retrieve audit trail",
-                    Success = false
-                });
+                return StatusCode(500, new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.AUDIT_TRAIL_FAILED),
+                    SurchargeErrorCodes.Onboarding.AUDIT_TRAIL_FAILED
+                ));
             }
         }
 
@@ -171,11 +169,10 @@ namespace FeeNominalService.Controllers.V1
                 var merchant = await _merchantService.GetByExternalMerchantIdAsync(externalMerchantId);
                 if (merchant == null)
                 {
-                    return NotFound(new ApiResponse
-                    {
-                        Message = $"Merchant not found with external ID {externalMerchantId}",
-                        Success = false
-                    });
+                    return NotFound(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
+                        SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
+                    ));
                 }
 
                 return Ok(new ApiResponse<Merchant>
@@ -188,11 +185,10 @@ namespace FeeNominalService.Controllers.V1
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", externalMerchantId);
-                return StatusCode(500, new ApiResponse
-                {
-                    Message = "Failed to retrieve merchant",
-                    Success = false
-                });
+                return StatusCode(500, new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
+                    SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
+                ));
             }
         }
 
@@ -213,11 +209,10 @@ namespace FeeNominalService.Controllers.V1
                 var merchant = await _merchantService.GetByExternalMerchantGuidAsync(externalMerchantGuid);
                 if (merchant == null)
                 {
-                    return NotFound(new ApiResponse
-                    {
-                        Message = $"Merchant not found with external GUID {externalMerchantGuid}",
-                        Success = false
-                    });
+                    return NotFound(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
+                        SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
+                    ));
                 }
 
                 return Ok(new ApiResponse<Merchant>
@@ -230,11 +225,10 @@ namespace FeeNominalService.Controllers.V1
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", externalMerchantGuid);
-                return StatusCode(500, new ApiResponse
-                {
-                    Message = "Failed to retrieve merchant",
-                    Success = false
-                });
+                return StatusCode(500, new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
+                    SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
+                ));
             }
         }
 
@@ -248,7 +242,10 @@ namespace FeeNominalService.Controllers.V1
         {
             if (User.Identity == null || !User.Identity.IsAuthenticated)
             {
-                return Unauthorized(new ApiResponse { Message = "Authentication failed", Success = false });
+                return Unauthorized(new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.AUTHENTICATION_FAILED),
+                    SurchargeErrorCodes.Onboarding.AUTHENTICATION_FAILED
+                ));
             }
             try
             {
@@ -256,21 +253,30 @@ namespace FeeNominalService.Controllers.V1
                 var (isValidMerchantId, headerMerchantId, merchantIdError) = HeaderValidationHelper.ValidateRequiredGuidHeader(Request.Headers, "X-Merchant-ID");
                 if (!isValidMerchantId || headerMerchantId != request.MerchantId)
                 {
-                    return Unauthorized(new ApiResponse { Message = merchantIdError ?? "Invalid X-Merchant-ID header", Success = false });
+                    return Unauthorized(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.INVALID_MERCHANT_ID_HEADER),
+                        SurchargeErrorCodes.Onboarding.INVALID_MERCHANT_ID_HEADER
+                    ));
                 }
 
                 // Get the API key from the header
                 var (apiKeyHeaderValid, apiKeyHeader, apiKeyHeaderError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-API-Key");
                 if (!apiKeyHeaderValid || string.IsNullOrEmpty(apiKeyHeader))
                 {
-                    return Unauthorized(new ApiResponse { Message = apiKeyHeaderError ?? "Missing X-API-Key header", Success = false });
+                    return Unauthorized(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MISSING_API_KEY_HEADER),
+                        SurchargeErrorCodes.Onboarding.MISSING_API_KEY_HEADER
+                    ));
                 }
 
                 // Fetch the API key entity from the database
                 var apiKeyEntity = await _apiKeyService.GetApiKeyInfoAsync(apiKeyHeader);
                 if (apiKeyEntity == null || apiKeyEntity.Status != "ACTIVE")
                 {
-                    return Unauthorized(new ApiResponse { Message = "Invalid or inactive API key", Success = false });
+                    return Unauthorized(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.INVALID_OR_INACTIVE_API_KEY),
+                        SurchargeErrorCodes.Onboarding.INVALID_OR_INACTIVE_API_KEY
+                    ));
                 }
 
                 // Ensure the API key's merchant matches the request's merchant
@@ -285,7 +291,10 @@ namespace FeeNominalService.Controllers.V1
                 if (merchant == null)
                 {
                     _logger.LogWarning("Merchant not found with ID {MerchantId}", request.MerchantId);
-                    return NotFound(new ApiResponse { Message = "Merchant not found", Success = false });
+                    return NotFound(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND),
+                        SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND
+                    ));
                 }
 
                 // Validate onboarding metadata from request body
@@ -293,7 +302,10 @@ namespace FeeNominalService.Controllers.V1
                     string.IsNullOrEmpty(request.OnboardingMetadata.AdminUserId) || 
                     string.IsNullOrEmpty(request.OnboardingMetadata.OnboardingReference))
                 {
-                    return BadRequest(new ApiResponse { Message = "Invalid onboarding metadata in request body", Success = false });
+                    return BadRequest(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.METADATA_PARSE_FAILED),
+                        SurchargeErrorCodes.Onboarding.METADATA_PARSE_FAILED
+                    ));
                 }
 
                 // Log claims for debugging
@@ -325,7 +337,10 @@ namespace FeeNominalService.Controllers.V1
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", request.MerchantId);
-                return StatusCode(500, new ApiResponse { Message = "An error occurred while generating the API key", Success = false });
+                return StatusCode(500, new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_GENERATE_FAILED),
+                    SurchargeErrorCodes.Onboarding.API_KEY_GENERATE_FAILED
+                ));
             }
         }
 
@@ -348,7 +363,10 @@ namespace FeeNominalService.Controllers.V1
                 if (updatedApiKeyResponse?.ApiKey == null)
                 {
                     _logger.LogWarning("Failed to update API key for merchant {MerchantId}", request.MerchantId);
-                    return BadRequest("Failed to update API key");
+                    return BadRequest(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_UPDATE_FAILED),
+                        SurchargeErrorCodes.Onboarding.API_KEY_UPDATE_FAILED
+                    ));
                 }
 
                 // Fetch old API key info for audit trail
@@ -483,20 +501,18 @@ namespace FeeNominalService.Controllers.V1
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Invalid operation while creating merchant with external ID {ExternalMerchantId}", request.ExternalMerchantId);
-                return BadRequest(new ApiResponse
-                {
-                    Message = ex.Message,
-                    Success = false
-                });
+                return BadRequest(new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED),
+                    SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED
+                ));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating merchant with external ID {ExternalMerchantId}", request.ExternalMerchantId);
-                return StatusCode(500, new ApiResponse
-                {
-                    Message = "Failed to create merchant",
-                    Success = false
-                });
+                return StatusCode(500, new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED),
+                    SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED
+                ));
             }
         }
 
@@ -651,11 +667,10 @@ namespace FeeNominalService.Controllers.V1
                 if (apiKeyInfo == null)
                 {
                     _logger.LogWarning("API key {ApiKey} not found", request.ApiKey);
-                    return NotFound(new ApiResponse
-                    {
-                        Message = $"API key {request.ApiKey} not found",
-                        Success = false
-                    });
+                    return NotFound(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_NOT_FOUND),
+                        SurchargeErrorCodes.Onboarding.API_KEY_NOT_FOUND
+                    ));
                 }
 
                 // Rotate the API key and get the new secret
@@ -663,11 +678,10 @@ namespace FeeNominalService.Controllers.V1
                 if (rotatedApiKeyResponse == null)
                 {
                     _logger.LogWarning("Failed to rotate API key for merchant {MerchantId}", request.MerchantId);
-                    return BadRequest(new ApiResponse
-                    {
-                        Message = "Failed to rotate API key",
-                        Success = false
-                    });
+                    return BadRequest(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED),
+                        SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
+                    ));
                 }
 
                 var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
@@ -694,20 +708,18 @@ namespace FeeNominalService.Controllers.V1
             catch (KeyNotFoundException ex)
             {
                 _logger.LogWarning(ex, "Merchant not found: {MerchantId}", request.MerchantId);
-                return NotFound(new ApiResponse
-                {
-                    Message = $"Merchant not found: {request.MerchantId}",
-                    Success = false
-                });
+                return NotFound(new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND),
+                    SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND
+                ));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error rotating API key for merchant {MerchantId}", request.MerchantId);
-                return StatusCode(500, new ApiResponse
-                {
-                    Message = "An error occurred while rotating the API key",
-                    Success = false
-                });
+                return StatusCode(500, new ApiErrorResponse(
+                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED),
+                    SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
+                ));
             }
         }
 

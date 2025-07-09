@@ -20,6 +20,31 @@ This document covers all endpoints related to managing surcharge providers in th
 
 ---
 
+## Status Code Management
+- **Create Requests**: `statusCode` field is **NOT allowed** in create requests. All new providers are created with `ACTIVE` status by default.
+- **Update Requests**: `statusCode` field is **optional** and supports: `"ACTIVE"`, `"INACTIVE"`, `"DELETED"`, `"SUSPENDED"`.
+- **Status Validation**: Invalid status codes return `400 Bad Request` with specific error message.
+- **Status Transitions**: Currently no restrictions on status transitions (future enhancement planned).
+
+---
+
+## Credentials Schema Validation
+- **Create Requests**: `credentialsSchema` is **REQUIRED** and must be a valid, non-empty JSON object.
+- **Update Requests**: `credentialsSchema` is **OPTIONAL**. If not provided, existing schema is preserved.
+- **Schema Structure**: Must contain `name`, `description`, and `required_fields` properties.
+- **Empty Schema Check**: Empty objects `{}` or `null` values are rejected.
+- **Field Validation**: All fields are validated against configurable limits (see validation settings).
+
+---
+
+## Configuration Validation
+- **Optional**: Configuration is optional for both create and update requests.
+- **Name Required**: If configuration is provided, `configName` is required.
+- **Credentials Validation**: If credentials are provided, they are validated against the schema.
+- **Limits**: All configuration values are validated against configurable limits.
+
+---
+
 ## Optional/Nullable Fields
 - All fields in `configuration.credentials` and `credentialsSchema` can be optional/null if not required by the provider.
 - Only provided fields are included in requests to providers (e.g., Interpayments).
@@ -61,7 +86,39 @@ This document covers all endpoints related to managing surcharge providers in th
 - **Header Validation:** All required headers are validated in a case-insensitive manner
 - **Credential Security:** Provider credentials are stored securely and included in responses
 - **Soft Delete:** Providers are soft deleted (status changed to "DELETED") rather than hard deleted
-- **Status Code:** The `statusCode` field is optional in requests and defaults to "ACTIVE"
+- **Status Code:** The `statusCode` field is **NOT allowed** in create requests, **optional** in update requests
+
+## Validation Limits & Settings
+The following limits are configurable via `SurchargeProviderValidationSettings`:
+
+### Schema Validation Limits
+- **Max Schema Name Length**: 100 characters
+- **Max Schema Description Length**: 500 characters
+- **Max Schema Object Size**: 10,000 characters (JSON string length)
+- **Max Required Fields**: 20 fields
+- **Max Optional Fields**: 10 fields
+
+### Field Validation Limits
+- **Max Field Name Length**: 100 characters
+- **Max Field Description Length**: 500 characters
+- **Max Credential Value Length**: 10,000 characters
+- **Max Credentials Object Size**: 50,000 characters (JSON string length)
+
+### Provider Limits
+- **Max Providers Per Merchant**: 25 providers
+- **Max Configuration Name Length**: 100 characters
+
+### Configuration Limits
+- **Max Timeout**: 300 seconds
+- **Max Retry Count**: 10
+- **Max Retry Delay**: 60 seconds
+- **Max Rate Limit**: 10,000 requests
+- **Max Rate Limit Period**: 3,600 seconds
+
+### Supported Field Types
+- `string`, `number`, `integer`, `boolean`, `email`, `url`, `password`
+- `jwt`, `api_key`, `client_id`, `client_secret`, `access_token`, `refresh_token`
+- `username`, `certificate`, `private_key`, `public_key`, `base64`, `json`
 
 ## Endpoints
 
@@ -76,27 +133,28 @@ This document covers all endpoints related to managing surcharge providers in th
     "description": "string",         // Optional, max 500 chars
     "baseUrl": "string",            // Required, max 200 chars
     "authenticationType": "string",  // Required, max 50 chars
-    "credentialsSchema": {           // Required
-        "required_fields": [
+    "credentialsSchema": {           // Required, must be valid non-empty object
+        "name": "string",           // Required, max 100 chars
+        "description": "string",    // Required, max 500 chars
+        "required_fields": [        // Required, at least 1 field, max 20 fields
             {
-                "name": "string",
-                "type": "string",
-                "description": "string"
+                "name": "string",   // Required, max 100 chars
+                "type": "string",   // Required, must be supported type
+                "description": "string" // Required, max 500 chars
             }
         ],
-        "optional_fields": [
+        "optional_fields": [        // Optional, max 10 fields
             {
-                "name": "string",
-                "type": "string",
-                "description": "string"
+                "name": "string",   // Required, max 100 chars
+                "type": "string",   // Required, must be supported type
+                "description": "string" // Required, max 500 chars
             }
         ]
     },
-    "statusCode": "string",         // Optional, defaults to "ACTIVE"
     "configuration": {              // Optional
-        "ConfigName": "string",     // Required if configuration provided
+        "configName": "string",     // Required if configuration provided, max 100 chars
         "credentials": {            // Required if configuration provided
-            "field_name": "value"
+            "field_name": "value"   // Must match schema, max 10,000 chars per value
         },
         "timeout": 30,              // Optional, 1-300 seconds
         "retryCount": 3,            // Optional, 0-10
@@ -118,10 +176,12 @@ This document covers all endpoints related to managing surcharge providers in th
     "baseUrl": "string",
     "authenticationType": "string",
     "credentialsSchema": {
+        "name": "string",
+        "description": "string",
         "required_fields": [...],
         "optional_fields": [...]
     },
-    "status": "string",
+    "status": "ACTIVE",
     "createdAt": "datetime",
     "updatedAt": "datetime",
     "createdBy": "string",
@@ -169,6 +229,8 @@ curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-
     "baseUrl": "https://api.interpayments.com/v1",
     "authenticationType": "JWT",
     "credentialsSchema": {
+        "name": "Interpayments Credentials",
+        "description": "JWT-based authentication for Interpayments API",
         "required_fields": [
             {
                 "name": "jwt_token",
@@ -183,7 +245,7 @@ curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-
         ]
     },
     "configuration": {
-        "ConfigName": "Production Config",
+        "configName": "Production Config",
         "credentials": {
             "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
             "client_id": "interpayments-client-123"
@@ -257,7 +319,34 @@ curl -X GET "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-p
 Updates an existing surcharge provider. Only allows updates to providers created by the specified merchant.
 
 #### Request Body
-Same format as Create Surcharge Provider request body.
+```json
+{
+    "name": "string",                // Required, max 100 chars
+    "code": "string",                // Required, max 50 chars, unique per merchant
+    "description": "string",         // Optional, max 500 chars
+    "baseUrl": "string",            // Required, max 200 chars
+    "authenticationType": "string",  // Required, max 50 chars
+    "credentialsSchema": {           // Optional - if not provided, existing schema is preserved
+        "name": "string",           // Required if provided, max 100 chars
+        "description": "string",    // Required if provided, max 500 chars
+        "required_fields": [        // Required if provided, at least 1 field, max 20 fields
+            {
+                "name": "string",   // Required, max 100 chars
+                "type": "string",   // Required, must be supported type
+                "description": "string" // Required, max 500 chars
+            }
+        ],
+        "optional_fields": [        // Optional, max 10 fields
+            {
+                "name": "string",   // Required, max 100 chars
+                "type": "string",   // Required, must be supported type
+                "description": "string" // Required, max 500 chars
+            }
+        ]
+    },
+    "statusCode": "string"          // Optional: "ACTIVE", "INACTIVE", "DELETED", "SUSPENDED"
+}
+```
 
 #### Response
 Same format as Create Surcharge Provider response.
@@ -278,6 +367,8 @@ curl -X PUT "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-p
     "baseUrl": "https://api.interpayments.com/v2",
     "authenticationType": "JWT",
     "credentialsSchema": {
+        "name": "Updated Interpayments Credentials",
+        "description": "Updated JWT-based authentication for Interpayments API",
         "required_fields": [
             {
                 "name": "jwt_token",
@@ -285,7 +376,8 @@ curl -X PUT "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-p
                 "description": "JWT token for authentication"
             }
         ]
-    }
+    },
+    "statusCode": "ACTIVE"
   }'
 ```
 
@@ -359,46 +451,75 @@ curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-
 
 ## Error Responses
 
-### 400 Bad Request
+### 400 Bad Request - Validation Errors
 ```json
 {
     "message": "Invalid credentials schema",
-    "errors": ["Field 'name' is required", "Invalid field type 'invalid_type'"]
+    "errorCode": "SURCH_2005",
+    "details": ["Field 'name' is required", "Invalid field type 'invalid_type'"]
+}
+```
+
+### 400 Bad Request - Status Code Error
+```json
+{
+    "message": "Invalid status code: INVALID_STATUS",
+    "errorCode": "SURCH_2003",
+    "details": "Status code must be one of: ACTIVE, INACTIVE, DELETED, SUSPENDED"
+}
+```
+
+### 400 Bad Request - Provider Limit Exceeded
+```json
+{
+    "message": "Provider limit exceeded",
+    "errorCode": "SURCH_2011",
+    "details": "Maximum 25 providers allowed per merchant"
+}
+```
+
+### 400 Bad Request - Provider Code Exists
+```json
+{
+    "message": "Provider with code 'INTERPAY' already exists for this merchant",
+    "errorCode": "SURCH_2003",
+    "details": "Provider codes must be unique per merchant"
 }
 ```
 
 ### 401 Unauthorized
 ```json
 {
-    "message": "Invalid API key or signature"
+    "message": "Invalid API key or signature",
+    "errorCode": "SURCH_1001",
+    "details": "Authentication failed"
 }
 ```
 
 ### 403 Forbidden
 ```json
 {
-    "message": "Merchant ID in URL does not match authenticated merchant"
+    "message": "Merchant ID in URL does not match authenticated merchant",
+    "errorCode": "SURCH_1002",
+    "details": "Access denied"
 }
 ```
 
 ### 404 Not Found
 ```json
 {
-    "message": "Provider with ID 123e4567-e89b-12d3-a456-426614174000 not found"
-}
-```
-
-### 409 Conflict
-```json
-{
-    "message": "Provider with code 'INTERPAY' already exists for this merchant"
+    "message": "Provider with ID 123e4567-e89b-12d3-a456-426614174000 not found",
+    "errorCode": "SURCH_2001",
+    "details": "Provider not found or access denied"
 }
 ```
 
 ### 500 Internal Server Error
 ```json
 {
-    "message": "An error occurred while creating the surcharge provider"
+    "message": "An error occurred while creating the surcharge provider",
+    "errorCode": "SURCH_9001",
+    "details": "Internal server error"
 }
 ```
 

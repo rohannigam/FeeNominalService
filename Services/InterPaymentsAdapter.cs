@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using FeeNominalService.Models.Surcharge.Requests;
 using FeeNominalService.Models.Surcharge.Responses;
+using FeeNominalService.Models.Common;
+using FeeNominalService.Exceptions;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Utils;
 
@@ -24,19 +26,19 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
     public (bool IsValid, string? ErrorMessage) ValidateRequest(SurchargeAuthRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.PostalCode))
-            return (false, "Postal code (ZIP/Postal) is required for InterPayments");
+            return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.POSTAL_CODE_REQUIRED));
 
         switch (request.Country.ToUpperInvariant())
         {
             case "USA":
             case "US":
                 if (!Regex.IsMatch(request.PostalCode, @"^\d{5}$") && !Regex.IsMatch(request.PostalCode, @"^\d{5}-\d{4}$"))
-                    return (false, "Postal code must be a valid US ZIP code (5 digits or 5+4 with dash)");
+                    return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.POSTAL_CODE_INVALID_US));
                 break;
             case "CAN":
             case "CANADA":
                 if (!Regex.IsMatch(request.PostalCode, @"^[A-Za-z]\d[A-Za-z]\d[A-Za-z]\d$"))
-                    return (false, "Postal code must be a valid Canadian postal code (ANANAN, no spaces/dashes)");
+                    return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.POSTAL_CODE_INVALID_CANADA));
                 break;
             default:
                 // Accept as-is for other countries
@@ -52,7 +54,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
 
         // Extract JWT token and token type from credentials
         if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
-            throw new Exception("Missing jwt_token in provider credentials");
+            throw new SurchargeException(SurchargeErrorCodes.InterPayments.MISSING_JWT_TOKEN);
         var jwtToken = jwtTokenProp.GetString();
         var tokenType = "Bearer";
         if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
@@ -110,14 +112,14 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending request to Interpayments");
-            throw new Exception("Failed to send request to Interpayments", ex);
+            throw new SurchargeException(SurchargeErrorCodes.InterPayments.SEND_REQUEST_FAILED, ex.Message, ex);
         }
 
         if (!response.IsSuccessStatusCode)
         {
             var errorContent = await response.Content.ReadAsStringAsync();
             _logger.LogError("Interpayments API returned error: {StatusCode} {Content}", response.StatusCode, errorContent);
-            throw new Exception($"Interpayments API error: {response.StatusCode} {errorContent}");
+            throw new SurchargeException(SurchargeErrorCodes.InterPayments.API_ERROR, errorContent);
         }
 
         var json = await response.Content.ReadAsStringAsync();

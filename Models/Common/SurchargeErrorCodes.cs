@@ -1,4 +1,4 @@
-namespace FeeNominalService.Models.Surcharge;
+namespace FeeNominalService.Models.Common;
 
 /// <summary>
 /// Comprehensive error code system for surcharge operations
@@ -31,6 +31,7 @@ public static class SurchargeErrorCodes
         public const string PROVIDER_AUTHENTICATION_FAILED = "SURCH_2008";
         public const string PROVIDER_NOT_AVAILABLE = "SURCH_2009";
         public const string PROVIDER_RATE_LIMIT_EXCEEDED = "SURCH_2010";
+        public const string PROVIDER_LIMIT_EXCEEDED = "SURCH_2011";
     }
 
     // Request Validation Errors (3000-3999)
@@ -167,6 +168,43 @@ public static class SurchargeErrorCodes
         public const string SURCHARGE_CARD_TOKEN_NOT_SUPPORTED = "SURCH_10016";
     }
 
+    // Onboarding, Merchant, ApiKey Errors (11000-11999)
+    public static class Onboarding
+    {
+        public const string AUDIT_TRAIL_FAILED = "SURCH_11001";
+        public const string MERCHANT_NOT_FOUND = "SURCH_11002";
+        public const string AUTHENTICATION_FAILED = "SURCH_11003";
+        public const string INVALID_MERCHANT_ID_HEADER = "SURCH_11004";
+        public const string MISSING_API_KEY_HEADER = "SURCH_11005";
+        public const string INVALID_OR_INACTIVE_API_KEY = "SURCH_11006";
+        public const string API_KEY_UPDATE_FAILED = "SURCH_11007";
+        public const string MERCHANT_CREATE_FAILED = "SURCH_11008";
+        public const string API_KEY_GENERATE_FAILED = "SURCH_11009";
+        public const string API_KEY_ROTATE_FAILED = "SURCH_11010";
+        public const string METADATA_PARSE_FAILED = "SURCH_11011";
+        public const string MERCHANT_NOT_FOUND_EXTERNAL_ID = "SURCH_11012";
+        public const string API_KEY_GENERIC_ERROR = "SURCH_11013";
+        public const string API_KEY_NOT_FOUND = "SURCH_11014";
+    }
+
+    // Provider Validation Errors (12000-12999)
+    public static class ProviderValidation
+    {
+        public const string PROVIDER_CODE_NULL_OR_EMPTY = "SURCH_12001";
+        public const string PROVIDER_CODE_NOT_SUPPORTED_OR_INACTIVE = "SURCH_12002";
+    }
+
+    // InterPayments/External Provider Specific Errors (13000-13999)
+    public static class InterPayments
+    {
+        public const string SEND_REQUEST_FAILED = "SURCH_13001";
+        public const string API_ERROR = "SURCH_13002";
+        public const string MISSING_JWT_TOKEN = "SURCH_13003";
+        public const string POSTAL_CODE_REQUIRED = "SURCH_13004";
+        public const string POSTAL_CODE_INVALID_US = "SURCH_13005";
+        public const string POSTAL_CODE_INVALID_CANADA = "SURCH_13006";
+    }
+
     /// <summary>
     /// Get error message for a given error code
     /// </summary>
@@ -195,6 +233,7 @@ public static class SurchargeErrorCodes
             Provider.PROVIDER_AUTHENTICATION_FAILED => "Provider authentication failed",
             Provider.PROVIDER_NOT_AVAILABLE => "Provider is not available",
             Provider.PROVIDER_RATE_LIMIT_EXCEEDED => "Provider rate limit exceeded",
+            Provider.PROVIDER_LIMIT_EXCEEDED => "Provider limit exceeded",
 
             // Request Validation
             Validation.INVALID_AMOUNT => "Invalid transaction amount",
@@ -306,6 +345,34 @@ public static class SurchargeErrorCodes
             Business.SURCHARGE_DATA_NOT_SUPPORTED => "Surcharge not supported for this data",
             Business.SURCHARGE_CARD_TOKEN_NOT_SUPPORTED => "Surcharge not supported for this card token",
 
+            // Onboarding
+            Onboarding.AUDIT_TRAIL_FAILED => "Audit trail generation failed",
+            Onboarding.MERCHANT_NOT_FOUND => "Merchant not found during onboarding",
+            Onboarding.AUTHENTICATION_FAILED => "Authentication failed during onboarding",
+            Onboarding.INVALID_MERCHANT_ID_HEADER => "Invalid or missing Merchant-Id header",
+            Onboarding.MISSING_API_KEY_HEADER => "Missing API-Key header",
+            Onboarding.INVALID_OR_INACTIVE_API_KEY => "Invalid or inactive API key",
+            Onboarding.API_KEY_UPDATE_FAILED => "API key update failed",
+            Onboarding.MERCHANT_CREATE_FAILED => "Merchant creation failed",
+            Onboarding.API_KEY_GENERATE_FAILED => "API key generation failed",
+            Onboarding.API_KEY_ROTATE_FAILED => "API key rotation failed",
+            Onboarding.METADATA_PARSE_FAILED => "Merchant metadata parsing failed",
+            Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID => "Merchant not found by external ID",
+            Onboarding.API_KEY_GENERIC_ERROR => "Generic API key error during onboarding",
+            Onboarding.API_KEY_NOT_FOUND => "API key not found",
+
+            // Provider Validation
+            ProviderValidation.PROVIDER_CODE_NULL_OR_EMPTY => "Provider code is null or empty",
+            ProviderValidation.PROVIDER_CODE_NOT_SUPPORTED_OR_INACTIVE => "Provider code is not supported or inactive",
+
+            // InterPayments
+            InterPayments.SEND_REQUEST_FAILED => "Failed to send request to InterPayments",
+            InterPayments.API_ERROR => "InterPayments API returned an error",
+            InterPayments.MISSING_JWT_TOKEN => "JWT token is missing for InterPayments request",
+            InterPayments.POSTAL_CODE_REQUIRED => "Postal code is required for InterPayments",
+            InterPayments.POSTAL_CODE_INVALID_US => "Invalid US postal code format",
+            InterPayments.POSTAL_CODE_INVALID_CANADA => "Invalid Canadian postal code format",
+
             _ => "Unknown error occurred"
         };
     }
@@ -325,6 +392,9 @@ public static class SurchargeErrorCodes
         if (errorCode.StartsWith("SURCH_8")) return "Configuration";
         if (errorCode.StartsWith("SURCH_9")) return "System";
         if (errorCode.StartsWith("SURCH_10")) return "Business";
+        if (errorCode.StartsWith("SURCH_11")) return "Onboarding";
+        if (errorCode.StartsWith("SURCH_12")) return "ProviderValidation";
+        if (errorCode.StartsWith("SURCH_13")) return "InterPayments";
         
         return "Unknown";
     }

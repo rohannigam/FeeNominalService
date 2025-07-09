@@ -70,10 +70,29 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
 ### Health Check Endpoints
 ```
 /api/v1/ping
-/api/ping
 ```
 
 Note: When creating an API key, you can use wildcards in the paths (e.g., `/api/v1/sales/*`) to allow all endpoints under a specific path.
+
+## Recent Updates (Last 18 Hours)
+
+### Database Schema Updates
+- **Migration V1_0_0_26**: Added `provider_type` column to `surcharge_providers` table with default value 'INTERPAYMENTS'
+- **Migration V1_0_0_25**: Dropped legacy `batch_transactions` table (cleanup)
+- **Migration V1_0_0_24**: Dropped legacy transaction tables (`transaction_audit_logs`, `transactions`, `transaction_statuses`)
+- **Migration V1_0_0_22**: Renamed `source_transaction_id` to `correlation_id` in `surcharge_trans` table for better semantic clarity
+- **Migration V1_0_0_20**: Added `provider_transaction_id` column to `surcharge_trans` table for storing Interpayments transaction IDs
+
+### Merchant Transaction ID Enhancements
+- **Validation**: Added merchant transaction ID validation for follow-up requests using `providerTransactionId`
+- **Preservation**: Merchant transaction IDs are now preserved in responses and validated against original transactions
+- **API Models**: Added `MerchantTransactionId` property to all surcharge request/response models
+- **Testing**: Enhanced Postman collections with merchant transaction ID generation and validation
+
+### Provider Type Support
+- **Multi-Provider**: Added support for different provider types beyond INTERPAYMENTS
+- **Type Safety**: Enhanced provider creation with explicit provider type classification
+- **Extensibility**: Framework now supports multiple provider types with type-specific validation
 
 ## Architecture
 
@@ -681,7 +700,7 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
      - `operation_type`: Type of operation (Auth, Sale, Refund, Cancel)
      - `status`: Transaction status (Pending, Completed, Failed)
      - `amount`: Original transaction amount
-     - `correlation_id`: Correlation ID for linking transactions
+     - `correlation_id`: Correlation ID for linking transactions (renamed from source_transaction_id)
      - `provider_transaction_id`: Provider's transaction ID
      - `request_payload`: Original request (JSONB)
      - `response_payload`: Provider response (JSONB)
@@ -701,6 +720,7 @@ The service uses PostgreSQL with a dedicated schema `fee_nominal`. The database 
      - `base_url`: Provider API base URL
      - `authentication_type`: Authentication method
      - `credentials_schema`: JSON schema for credentials
+     - `provider_type`: Provider type (e.g., 'INTERPAYMENTS', 'OTHERPROVIDER')
      - `status`: Provider status
      - `created_at`: Creation timestamp
      - `updated_at`: Last update timestamp
@@ -866,6 +886,19 @@ The database includes test data for development:
    GROUP BY DATE_TRUNC('day', st.created_at), st.operation_type, st.status
    ORDER BY transaction_date DESC;
 
+   -- Get transactions with merchant transaction ID validation
+   SELECT 
+       st.correlation_id,
+       st.provider_transaction_id,
+       st.request_payload->>'merchantTransactionId' as merchant_transaction_id,
+       st.status,
+       st.created_at
+   FROM surcharge_transactions st
+   JOIN merchants m ON st.merchant_id = m.id
+   WHERE m.external_id = 'DEV001'
+   AND st.request_payload->>'merchantTransactionId' IS NOT NULL
+   ORDER BY st.created_at DESC;
+
    -- Get provider configuration performance
    SELECT 
        spc.config_name,
@@ -913,19 +946,23 @@ The database includes test data for development:
 
 5. **Surcharge Provider Management**
    ```sql
-   -- Get active surcharge providers
+   -- Get active surcharge providers by type
    SELECT 
        sp.name,
        sp.code,
        sp.base_url,
        sp.authentication_type,
+       sp.provider_type,
        sp.status
    FROM surcharge_providers sp
-   WHERE sp.status = 'active';
+   WHERE sp.status = 'active'
+   AND sp.provider_type = 'INTERPAYMENTS';
 
    -- Get merchant provider configurations
    SELECT 
        sp.name,
+       sp.code,
+       sp.provider_type,
        spc.config_name,
        spc.is_active,
        spc.is_primary,
@@ -1299,8 +1336,10 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
   - Comprehensive validation (request, provider config, provider-specific)
   - All validation errors returned as HTTP 200 with status "Failed"
   - Support for follow-up auths using providerTransactionId
+  - Merchant transaction ID validation for follow-up requests
   - Complete transaction lifecycle management
   - Database storage and audit logging
+  - Provider type support for multi-provider environments
 
 #### 2. Get Transaction by ID
 - **Endpoint**: `GET /api/v1/surcharge/transactions/{id}`
@@ -1456,6 +1495,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
             }
         ]
     },
+    "providerType": "string",       // Optional, defaults to "INTERPAYMENTS"
     "statusCode": "string",         // Optional, defaults to "ACTIVE"
     "configuration": {              // Optional
         "ConfigName": "string",     // Required if configuration provided
@@ -1485,6 +1525,7 @@ The database will be deployed to AWS RDS PostgreSQL instance. Here's the deploym
         "optional_fields": [...]
     },
     "status": "string",
+    "providerType": "string",        // Provider type (e.g., "INTERPAYMENTS")
     "createdAt": "datetime",
     "updatedAt": "datetime",
     "createdBy": "string",
@@ -1794,6 +1835,8 @@ Provider codes are unique per merchant, allowing different merchants to use the 
    - Validation of all input data
    - Protection against SQL injection
    - XSS prevention through proper encoding
+   - Merchant transaction ID validation for follow-up requests
+   - Provider type validation and classification
 
 ## Integration Guide
 

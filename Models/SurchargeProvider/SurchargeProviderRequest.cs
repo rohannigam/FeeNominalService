@@ -31,10 +31,7 @@ namespace FeeNominalService.Models.SurchargeProvider
         public string AuthenticationType { get; set; } = string.Empty;
 
         [Required]
-        public object CredentialsSchema { get; set; } = new();
-
-        [StringLength(50)]
-        public string? StatusCode { get; set; }
+        public object? CredentialsSchema { get; set; }
 
         /// <summary>
         /// Optional configuration to create along with the provider
@@ -49,10 +46,25 @@ namespace FeeNominalService.Models.SurchargeProvider
         {
             errors = new List<string>();
 
+            // Check if credentials schema is provided
+            if (CredentialsSchema == null)
+            {
+                errors.Add("Credentials schema is required");
+                return false;
+            }
+
             try
             {
                 // Convert to JSON to validate structure
                 var jsonString = JsonSerializer.Serialize(CredentialsSchema);
+                
+                // Check if the serialized result is an empty object or invalid
+                if (jsonString == "{}" || jsonString == "null")
+                {
+                    errors.Add("Credentials schema cannot be empty");
+                    return false;
+                }
+
                 var jsonDocument = JsonDocument.Parse(jsonString);
                 var root = jsonDocument.RootElement;
 
@@ -66,6 +78,13 @@ namespace FeeNominalService.Models.SurchargeProvider
                 if (root.ValueKind != JsonValueKind.Object)
                 {
                     errors.Add("Credentials schema must be a JSON object");
+                    return false;
+                }
+
+                // Check if the object has any properties
+                if (!root.EnumerateObject().Any())
+                {
+                    errors.Add("Credentials schema cannot be an empty object");
                     return false;
                 }
 
@@ -258,37 +277,5 @@ namespace FeeNominalService.Models.SurchargeProvider
 
             return errors;
         }
-    }
-
-    /// <summary>
-    /// Request model for provider configuration
-    /// </summary>
-    public class ProviderConfigurationRequest
-    {
-        [Required]
-        [StringLength(100)]
-        public string ConfigName { get; set; } = string.Empty;
-
-        [Required]
-        public object Credentials { get; set; } = new();
-
-        public bool IsPrimary { get; set; } = true;
-
-        [Range(1, 300)]
-        public int? Timeout { get; set; }
-
-        [Range(0, 10)]
-        public int? RetryCount { get; set; }
-
-        [Range(1, 60)]
-        public int? RetryDelay { get; set; }
-
-        [Range(1, 10000)]
-        public int? RateLimit { get; set; }
-
-        [Range(1, 3600)]
-        public int? RateLimitPeriod { get; set; }
-
-        public object? Metadata { get; set; }
     }
 } 

@@ -4,10 +4,12 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FeeNominalService.Models.SurchargeProvider;
+using FeeNominalService.Models.Common;
 using FeeNominalService.Repositories;
 using Microsoft.Extensions.Logging;
 using Json.Schema;
 using FeeNominalService.Utils;
+using FeeNominalService.Settings;
 
 namespace FeeNominalService.Services
 {
@@ -16,15 +18,18 @@ namespace FeeNominalService.Services
         private readonly ISurchargeProviderRepository _repository;
         private readonly ISurchargeProviderConfigService _configService;
         private readonly ILogger<SurchargeProviderService> _logger;
+        private readonly SurchargeProviderValidationSettings _validationSettings;
 
         public SurchargeProviderService(
             ISurchargeProviderRepository repository,
             ISurchargeProviderConfigService configService,
-            ILogger<SurchargeProviderService> logger)
+            ILogger<SurchargeProviderService> logger,
+            SurchargeProviderValidationSettings validationSettings)
         {
             _repository = repository;
             _configService = configService;
             _logger = logger;
+            _validationSettings = validationSettings;
         }
 
         public async Task<SurchargeProvider?> GetByIdAsync(Guid id)
@@ -144,6 +149,13 @@ namespace FeeNominalService.Services
             try
             {
                 _logger.LogInformation("Creating provider {ProviderName} for merchant {MerchantId}", provider.Name, provider.CreatedBy);
+
+                // Check merchant provider limit
+                var currentProviderCount = await _repository.GetCountByMerchantAsync(provider.CreatedBy);
+                if (currentProviderCount >= _validationSettings.MaxProvidersPerMerchant)
+                {
+                    throw new InvalidOperationException($"Merchant has reached the maximum number of providers ({_validationSettings.MaxProvidersPerMerchant}). Current count: {currentProviderCount}. Error code: {SurchargeErrorCodes.Provider.PROVIDER_LIMIT_EXCEEDED}");
+                }
 
                 // Validate provider code uniqueness for this merchant only
                 if (await _repository.ExistsByCodeAndMerchantAsync(provider.Code, provider.CreatedBy))

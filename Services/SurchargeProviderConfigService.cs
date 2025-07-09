@@ -191,10 +191,17 @@ namespace FeeNominalService.Services
             {
                 _logger.LogInformation("Deleting config {ConfigId}", id);
 
-                // Check if config exists
-                if (!await _repository.ExistsAsync(id))
+                // Check if config exists and get its details
+                var config = await _repository.GetByIdAsync(id);
+                if (config == null)
                 {
                     return false;
+                }
+
+                // If deleting a primary config, promote another active config
+                if (config.IsPrimary)
+                {
+                    await PromoteNextPrimaryConfigAsync(config.MerchantId, config.ProviderId, config.Id);
                 }
 
                 return await _repository.DeleteAsync(id);
@@ -202,6 +209,48 @@ namespace FeeNominalService.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting config {ConfigId}", id);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Promotes the next available active config to primary when the current primary is deleted
+        /// </summary>
+        private async Task PromoteNextPrimaryConfigAsync(Guid merchantId, Guid providerId, Guid deletedConfigId)
+        {
+            try
+            {
+                _logger.LogInformation("Promoting next primary config for merchant {MerchantId} and provider {ProviderId} after deleting {DeletedConfigId}", 
+                    merchantId, providerId, deletedConfigId);
+
+                // Get all active configs for this merchant-provider combination
+                var configs = await _repository.GetByMerchantIdAsync(merchantId);
+                var activeConfigs = configs.Where(c => 
+                    c.ProviderId == providerId && 
+                    c.IsActive && 
+                    c.Id != deletedConfigId).ToList();
+
+                // Promote the first active config to primary
+                var nextPrimary = activeConfigs.FirstOrDefault();
+                if (nextPrimary != null)
+                {
+                    _logger.LogInformation("Promoting config {ConfigId} to primary for merchant {MerchantId} and provider {ProviderId}", 
+                        nextPrimary.Id, merchantId, providerId);
+                    
+                    nextPrimary.IsPrimary = true;
+                    nextPrimary.UpdatedAt = DateTime.UtcNow;
+                    await _repository.UpdateAsync(nextPrimary);
+                }
+                else
+                {
+                    _logger.LogWarning("No active configs available to promote to primary for merchant {MerchantId} and provider {ProviderId}", 
+                        merchantId, providerId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error promoting next primary config for merchant {MerchantId} and provider {ProviderId}", 
+                    merchantId, providerId);
                 throw;
             }
         }

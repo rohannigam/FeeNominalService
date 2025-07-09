@@ -19,6 +19,8 @@ namespace FeeNominalService.Services
         Task<Merchant> UpdateMerchantAsync(Guid merchantId, string name, string updatedBy);
         Task<IEnumerable<Merchant>> GetAllMerchantsAsync();
         Task<bool> IsMerchantActiveAsync(Guid id);
+        Task<bool> HasActiveProvidersAsync(Guid merchantId);
+        Task<int> GetActiveProviderCountAsync(Guid merchantId);
         /// <summary>
         /// Generates a new API key for a merchant
         /// </summary>

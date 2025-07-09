@@ -5,6 +5,7 @@ using FeeNominalService.Models.Merchant;
 using FeeNominalService.Data;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Services;
+using System.Linq;
 
 namespace FeeNominalService.Repositories
 {
@@ -146,15 +147,87 @@ namespace FeeNominalService.Repositories
 
         public async Task<bool> DeleteAsync(Guid merchantId)
         {
-            var merchant = await _context.Merchants.FindAsync(merchantId);
-            if (merchant == null)
+            try
             {
-                return false;
-            }
+                var merchant = await _context.Merchants.FindAsync(merchantId);
+                if (merchant == null)
+                {
+                    return false;
+                }
 
-            _context.Merchants.Remove(merchant);
-            await _context.SaveChangesAsync();
-            return true;
+                // Deactivate all providers and their configurations before deleting the merchant
+                await DeactivateAllProvidersForMerchantAsync(merchantId);
+
+                _context.Merchants.Remove(merchant);
+                await _context.SaveChangesAsync();
+                
+                _logger.LogInformation("Successfully deleted merchant {MerchantId} and deactivated all associated providers", merchantId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting merchant {MerchantId}", merchantId);
+                throw;
+            }
+        }
+
+        private async Task DeactivateAllProvidersForMerchantAsync(Guid merchantId)
+        {
+            try
+            {
+                _logger.LogInformation("Deactivating all providers and configurations for merchant {MerchantId} due to merchant deletion", merchantId);
+
+                // Get all providers for this merchant
+                var providers = await _context.SurchargeProviders
+                    .Include(p => p.Configurations)
+                    .Where(p => p.CreatedBy == merchantId.ToString() && p.Status.Code != "DELETED")
+                    .ToListAsync();
+
+                var providerCount = 0;
+
+                foreach (var provider in providers)
+                {
+                    // Get the DELETED status
+                    var deletedStatus = await _context.SurchargeProviderStatuses
+                        .FirstOrDefaultAsync(s => s.Code == "DELETED");
+
+                    if (deletedStatus == null)
+                    {
+                        _logger.LogWarning("DELETED status not found, skipping provider {ProviderId}", provider.Id);
+                        continue;
+                    }
+
+                    // Update the provider to DELETED status
+                    provider.StatusId = deletedStatus.StatusId;
+                    provider.UpdatedAt = DateTime.UtcNow;
+                    provider.UpdatedBy = "SYSTEM";
+
+                    // Deactivate all provider configurations and unset primary
+                    if (provider.Configurations != null)
+                    {
+                        foreach (var config in provider.Configurations)
+                        {
+                            config.IsActive = false;
+                            config.IsPrimary = false;
+                            config.UpdatedAt = DateTime.UtcNow;
+                            config.UpdatedBy = "SYSTEM";
+                        }
+                    }
+
+                    providerCount++;
+                    _logger.LogDebug("Soft deleted provider {ProviderId} for merchant {MerchantId}", provider.Id, merchantId);
+                }
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Successfully deactivated {ProviderCount} providers and their configurations for merchant {MerchantId}", 
+                    providerCount, merchantId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deactivating providers for merchant {MerchantId}", merchantId);
+                // Don't throw - we don't want merchant deletion to fail if provider deactivation fails
+            }
         }
 
         public async Task<MerchantStatus?> GetMerchantStatusAsync(int statusId)

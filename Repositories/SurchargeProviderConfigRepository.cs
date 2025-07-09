@@ -56,6 +56,25 @@ namespace FeeNominalService.Repositories
             }
         }
 
+        public async Task<SurchargeProviderConfig?> GetPrimaryConfigByProviderCodeAsync(string providerCode, Guid merchantId)
+        {
+            try
+            {
+                return await _context.SurchargeProviderConfigs
+                    .Include(c => c.Provider)
+                    .FirstOrDefaultAsync(c => 
+                        c.MerchantId == merchantId && 
+                        c.Provider != null && c.Provider.Code == providerCode && 
+                        c.IsPrimary && c.IsActive);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting primary config by provider code {ProviderCode} for merchant {MerchantId}", 
+                    providerCode, merchantId);
+                throw;
+            }
+        }
+
         public async Task<SurchargeProviderConfig?> GetByProviderCodeAndMerchantAsync(string providerCode, Guid merchantId)
         {
             try

@@ -51,6 +51,11 @@ namespace FeeNominalService.Settings
         public int MaxOptionalFields { get; set; } = 10;
 
         /// <summary>
+        /// Maximum number of providers allowed per merchant
+        /// </summary>
+        public int MaxProvidersPerMerchant { get; set; } = 25;
+
+        /// <summary>
         /// Allowed field types for credential schemas
         /// </summary>
         public string[] AllowedFieldTypes { get; set; } = new[]

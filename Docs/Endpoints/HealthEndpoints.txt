@@ -1,0 +1,137 @@
+# Health Endpoints
+
+## Overview
+This document covers the health endpoints used for service liveness and readiness checks, optimized for Kubernetes deployment.
+
+## Endpoints
+
+### 1. Liveness Probe Endpoint
+**GET** `/api/health/live`
+
+Lightweight liveness check that verifies the application process is running. No external dependencies are checked.
+
+#### Response
+```
+{
+  "status": "Alive",
+  "service": "FeeNominalService"
+}
+```
+
+#### Example Request
+```bash
+curl -X GET "https://api.feenominal.com/api/health/live"
+```
+
+### 2. Readiness Probe Endpoint
+**GET** `/api/health/ready`
+
+Checks if the application is ready to serve traffic by verifying connectivity to the PostgreSQL (RDS) database.
+
+#### Response (Ready)
+```
+{
+  "status": "Ready",
+  "db": "PostgreSQL",
+  "rds": true,
+  "version": "PostgreSQL 13.7 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 10.2.0, 64-bit",
+  "latencyMs": 12
+}
+```
+
+#### Response (Not Ready)
+```
+{
+  "status": "NotReady",
+  "db": "PostgreSQL",
+  "rds": true,
+  "version": null,
+  "latencyMs": 0,
+  "error": "<error message>"
+}
+```
+
+#### Example Request
+```bash
+curl -X GET "https://api.feenominal.com/api/health/ready"
+```
+
+### 3. Legacy Health Endpoint
+**GET** `/api/health`
+
+Backward compatibility endpoint that returns the same response as the liveness probe.
+
+## Kubernetes Probe Configuration
+
+### Recommended Kubernetes YAML Configuration
+
+```yaml
+# Liveness Probe - Lightweight, no dependencies
+livenessProbe:
+  httpGet:
+    path: /api/health/live
+    port: 80
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+# Readiness Probe - Checks dependencies (DB)
+readinessProbe:
+  httpGet:
+    path: /api/health/ready
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+```
+
+### Probe Settings Explanation
+
+| Setting | Liveness | Readiness | Purpose |
+|---------|----------|-----------|---------|
+| `initialDelaySeconds` | 30 | 10 | Wait time before first probe |
+| `periodSeconds` | 10 | 10 | How often to probe |
+| `timeoutSeconds` | 5 | 5 | Max time to wait for response |
+| `failureThreshold` | 3 | 3 | Consecutive failures before marking unhealthy |
+| `successThreshold` | 1 | 1 | Consecutive successes before marking healthy |
+
+### Alternative Configuration for High Availability
+
+For environments with frequent transient DB issues, consider:
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /api/health/ready
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 3
+  failureThreshold: 5
+  successThreshold: 1
+```
+
+This configuration:
+- Increases `periodSeconds` to 15 (less frequent checks)
+- Increases `failureThreshold` to 5 (more tolerant of brief outages)
+- Reduces `timeoutSeconds` to 3 (faster failure detection)
+
+## Use Cases
+
+- **Kubernetes Probes**: Liveness and readiness probes for pod lifecycle management
+- **Load Balancer Health Checks**: Load balancers can use readiness probe to determine traffic routing
+- **Monitoring Systems**: External monitoring tools can check both endpoints
+- **Operational Visibility**: Provides real-time visibility into service and database health
+
+## Notes
+
+- No authentication required
+- Fast response time for health check purposes
+- All endpoints use HTTP GET
+- `/api/health/ready` includes PostgreSQL version and query latency
+- Liveness probe is lightweight and does not check external dependencies
+- Readiness probe checks critical dependencies (database connectivity) 
