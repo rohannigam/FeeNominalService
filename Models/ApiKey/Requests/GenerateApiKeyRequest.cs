@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using FeeNominalService.Models.ApiKey.Converters;
+using FeeNominalService.Models.ApiKey;
 
 namespace FeeNominalService.Models.ApiKey.Requests;
 
@@ -51,24 +52,4 @@ public class GenerateApiKeyRequest
     /// </summary>
     [Required]
     public OnboardingMetadata OnboardingMetadata { get; set; } = new();
-}
-
-public class OnboardingMetadata
-{
-    /// <summary>
-    /// The admin user ID for the API key
-    /// </summary>
-    [Required]
-    public string AdminUserId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The onboarding reference for the API key
-    /// </summary>
-    [Required]
-    public string OnboardingReference { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The onboarding timestamp for the API key
-    /// </summary>
-    public DateTime OnboardingTimestamp { get; set; } = DateTime.UtcNow;
 } 

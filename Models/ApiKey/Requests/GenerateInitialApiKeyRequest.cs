@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using FeeNominalService.Models.ApiKey;
 
 namespace FeeNominalService.Models.ApiKey.Requests;
 

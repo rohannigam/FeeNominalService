@@ -1,5 +1,6 @@
 using System;
 using FeeNominalService.Models.ApiKey.Requests;
+using FeeNominalService.Models.ApiKey;
 
 namespace FeeNominalService.Models.ApiKey.Responses
 {
