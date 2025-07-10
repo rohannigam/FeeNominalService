@@ -170,15 +170,23 @@ namespace FeeNominalService.Models.ApiKey
         public virtual ICollection<ApiKeyUsage> UsageRecords { get; set; } = new List<ApiKeyUsage>();
 
         /// <summary>
-        /// Checks if the API key is active
-        /// </summary>
-        public bool IsActive => Status == ApiKeyStatus.Active.ToString();
-
-        /// <summary>
         /// Purpose of the API key
         /// </summary>
         [StringLength(50)]
         [Column("purpose")]
         public string? Purpose { get; set; }
+
+        /// <summary>
+        /// Whether the API key is active in the database
+        /// </summary>
+        [Required]
+        [Column("is_active")]
+        public bool IsActiveInDb { get; set; } = true;
+
+        /// <summary>
+        /// Checks if the API key is active (computed property for backward compatibility)
+        /// </summary>
+        [NotMapped]
+        public bool IsActive => IsActiveInDb && Status == ApiKeyStatus.Active.ToString();
     }
 } 

@@ -26,6 +26,12 @@ public class GenerateInitialApiKeyRequest
     public string? Purpose { get; set; }
 
     /// <summary>
+    /// Number of days until the API key expires (default: 365)
+    /// </summary>
+    [Range(1, 3650, ErrorMessage = "ExpirationDays must be between 1 and 3650 days")]
+    public int? ExpirationDays { get; set; }
+
+    /// <summary>
     /// Metadata about the onboarding process
     /// </summary>
     [Required]

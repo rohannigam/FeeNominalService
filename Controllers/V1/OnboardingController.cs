@@ -349,7 +349,7 @@ namespace FeeNominalService.Controllers.V1
         /// </summary>
         [HttpPost("apikey/update")]
         [Authorize(Policy = "ApiKeyAccess")]
-        [ProducesResponseType(typeof(ApiKeyInfo), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<ApiKeyInfo>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -358,6 +358,11 @@ namespace FeeNominalService.Controllers.V1
             try
             {
                 _logger.LogInformation("Updating API key for merchant {MerchantId}", request.MerchantId);
+
+                // Fetch old API key info for audit trail (before the update)
+                var oldApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(request.ApiKey);
+                var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
+                var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
 
                 var updatedApiKeyResponse = await _apiKeyService.UpdateApiKeyAsync(request, request.OnboardingMetadata);
                 if (updatedApiKeyResponse?.ApiKey == null)
@@ -368,11 +373,6 @@ namespace FeeNominalService.Controllers.V1
                         SurchargeErrorCodes.Onboarding.API_KEY_UPDATE_FAILED
                     ));
                 }
-
-                // Fetch old API key info for audit trail
-                var oldApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(updatedApiKeyResponse.ApiKey);
-                var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
-                var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
 
                 // Create audit trail entry for API key update
                 await _merchantService.CreateAuditTrailAsync(
@@ -385,7 +385,12 @@ namespace FeeNominalService.Controllers.V1
                 );
 
                 _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", request.MerchantId);
-                return Ok(updatedApiKeyResponse);
+                return Ok(new ApiResponse<ApiKeyInfo>
+                {
+                    Success = true,
+                    Message = "API key updated successfully",
+                    Data = updatedApiKeyResponse
+                });
             }
             catch (KeyNotFoundException ex)
             {
@@ -401,7 +406,7 @@ namespace FeeNominalService.Controllers.V1
 
         [HttpPost("apikey/revoke")]
         [Authorize(Policy = "ApiKeyAccess")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<ApiKeyRevokeResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -420,6 +425,9 @@ namespace FeeNominalService.Controllers.V1
 
                 await _apiKeyService.RevokeApiKeyAsync(request);
 
+                // Fetch the revoked API key info for response
+                var revokedApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(apiKey);
+
                 // Create audit trail entry for API key revocation
                 await _merchantService.CreateAuditTrailAsync(
                     merchantGuid,
@@ -431,7 +439,17 @@ namespace FeeNominalService.Controllers.V1
                 );
 
                 _logger.LogInformation("Successfully revoked API key for merchant {MerchantId}", request.MerchantId);
-                return Ok(new { message = "API key revoked successfully" });
+                return Ok(new ApiResponse<ApiKeyRevokeResponse>
+                {
+                    Success = true,
+                    Message = "API key revoked successfully",
+                    Data = new ApiKeyRevokeResponse
+                    {
+                        ApiKey = apiKey,
+                        RevokedAt = revokedApiKeyInfo?.RevokedAt ?? DateTime.UtcNow,
+                        Status = revokedApiKeyInfo?.Status ?? "REVOKED"
+                    }
+                });
             }
             catch (KeyNotFoundException ex)
             {
@@ -673,8 +691,18 @@ namespace FeeNominalService.Controllers.V1
                     ));
                 }
 
+                // Prevent rotation of revoked key (controller-level check)
+                if (apiKeyInfo.Status == "REVOKED" || apiKeyInfo.IsRevoked)
+                {
+                    _logger.LogWarning("Attempted to rotate a revoked API key: {ApiKey}", request.ApiKey);
+                    return BadRequest(new ApiErrorResponse(
+                        "Cannot rotate a revoked API key.",
+                        SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
+                    ));
+                }
+
                 // Rotate the API key and get the new secret
-                var rotatedApiKeyResponse = await _apiKeyService.RotateApiKeyAsync(request.MerchantId, request.OnboardingMetadata);
+                var rotatedApiKeyResponse = await _apiKeyService.RotateApiKeyAsync(request.MerchantId, request.OnboardingMetadata, request.ApiKey);
                 if (rotatedApiKeyResponse == null)
                 {
                     _logger.LogWarning("Failed to rotate API key for merchant {MerchantId}", request.MerchantId);
@@ -713,6 +741,14 @@ namespace FeeNominalService.Controllers.V1
                     SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND
                 ));
             }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation during API key rotation for merchant {MerchantId}", request.MerchantId);
+                return BadRequest(new ApiErrorResponse(
+                    ex.Message,
+                    SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
+                ));
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error rotating API key for merchant {MerchantId}", request.MerchantId);
@@ -745,5 +781,12 @@ namespace FeeNominalService.Controllers.V1
     public class UpdateMerchantStatusRequest
     {
         public int StatusId { get; set; }
+    }
+
+    public class ApiKeyRevokeResponse
+    {
+        public string ApiKey { get; set; } = string.Empty;
+        public DateTime RevokedAt { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 } 

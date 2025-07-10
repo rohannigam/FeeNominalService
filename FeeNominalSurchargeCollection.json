@@ -40,7 +40,8 @@
 									"const randomMerchantName = `${randomAdjective} ${randomNoun} ${randomMerchantId}`;",
 									"pm.environment.set('merchantName', randomMerchantName);"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						},
 						{
@@ -72,7 +73,8 @@
 									"console.log(\"Saved expiresAt: \" + pm.environment.get(\"expiresAt\"));",
 									"console.log(\"Saved createdAt: \" + pm.environment.get(\"createdAt\"));"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -96,7 +98,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"externalMerchantId\": \"{{externalMerchantId}}\",\n    \"merchantName\": \"{{merchantName}}\",\n    \"description\": \"{{apiKeyDescription}}\",\n    \"rateLimit\": {{apiKeyRateLimit}},\n    \"allowedEndpoints\": {{apiKeyAllowedEndpoints}},\n    \"purpose\": \"{{apiKeyPurpose}}\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{timestamp}}\"\n    }\n}"
+							"raw": "{\n    \"externalMerchantId\": \"{{externalMerchantId}}\",\n    \"merchantName\": \"{{merchantName}}\",\n    \"description\": \"{{apiKeyDescription}}\",\n    \"rateLimit\": {{apiKeyRateLimit}},\n    \"allowedEndpoints\": {{apiKeyAllowedEndpoints}},\n    \"expirationdays\": \"180\",\n    \"purpose\": \"{{apiKeyPurpose}}\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"{{adminUserId}}\",\n        \"onboardingReference\": \"{{onboardingReference}}\",\n        \"onboardingTimestamp\": \"{{timestamp}}\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/initial-generate",
@@ -200,7 +202,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"API Key for testing\",\n    \"rateLimit\": 444,\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/onboarding/apikey/*\"\n    ],\n    \"purpose\": \"TESTING\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"test-admin\",\n        \"onboardingReference\": \"{{$guid}}\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}",
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"description\": \"API Key for testing\",\n    \"rateLimit\": 444,\n    \"allowedEndpoints\": [\n        \"/api/v1/surchargefee/calculate\",\n        \"/api/v1/surchargefee/calculate-batch\",\n        \"/api/v1/onboarding/apikey/*\"\n    ],\n    \"purpose\": \"TESTING\",\n    \"expirationdays\": \"100\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"test-admin\",\n        \"onboardingReference\": \"{{$guid}}\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -318,7 +320,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\"\n}"
+							"raw": "{\n    \"merchantId\": \"{{merchantId}}\",\n    \"apiKey\": \"{{apiKey}}\",\n    \"onboardingMetadata\": {\n        \"adminUserId\": \"test-admin\",\n        \"onboardingReference\": \"{{$guid}}\",\n        \"onboardingTimestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/onboarding/apikey/rotate",

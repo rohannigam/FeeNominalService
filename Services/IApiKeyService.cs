@@ -17,6 +17,6 @@ namespace FeeNominalService.Services
         Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey, string timestamp, string nonce, string signature);
         Task<ApiKeyInfo> GetApiKeyAsync(string merchantId);
         Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request, OnboardingMetadata onboardingMetadata);
-        Task<GenerateApiKeyResponse> RotateApiKeyAsync(string merchantId, OnboardingMetadata onboardingMetadata);
+        Task<GenerateApiKeyResponse> RotateApiKeyAsync(string merchantId, OnboardingMetadata onboardingMetadata, string apiKey);
     }
 } 
