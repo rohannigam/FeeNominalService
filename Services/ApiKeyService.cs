@@ -335,14 +335,14 @@ namespace FeeNominalService.Services
             await _apiKeyRepository.UpdateAsync(apiKeyEntity);
 
             // 5. Update secret in AWS Secrets Manager
-                var secretName = $"feenominal/merchants/{merchant.MerchantId:D}/apikeys/{request.ApiKey}";
-                    var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
-                    if (secret != null)
-                    {
+            var secretName = $"feenominal/merchants/{merchant.MerchantId:D}/apikeys/{request.ApiKey}";
+            var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
+            if (secret != null)
+            {
                 secret.Status = "REVOKED";
-                        secret.IsRevoked = true;
-                        secret.RevokedAt = DateTime.UtcNow;
-                await _secretsManager.StoreSecretAsync(secretName, JsonSerializer.Serialize(secret));
+                secret.IsRevoked = true;
+                secret.RevokedAt = DateTime.UtcNow;
+                await _secretsManager.UpdateSecretAsync(secretName, secret); // <-- Use update, not create
             }
 
             _logger.LogInformation("Successfully revoked API key {ApiKey} for merchant {MerchantId}", request.ApiKey, request.MerchantId);
@@ -640,7 +640,7 @@ namespace FeeNominalService.Services
             }
 
             // Generate new API key
-            var apiKey = new ApiKey
+            var apiKey = new Models.ApiKey.ApiKey
             {
                 Id = Guid.NewGuid(),
                 Key = GenerateApiKey(),
@@ -742,7 +742,7 @@ namespace FeeNominalService.Services
             }
 
             // Generate a new API key with the new secret
-            var newApiKey = new ApiKey
+            var newApiKey = new Models.ApiKey.ApiKey
             {
                 Id = Guid.NewGuid(),
                 Key = GenerateApiKey(),
