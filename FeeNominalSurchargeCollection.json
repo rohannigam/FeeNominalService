@@ -1368,6 +1368,134 @@
 					"response": []
 				},
 				{
+					"name": "Get All (incl Deleted) Surcharge Providers",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Get All Providers URL will be:', pm.request.url.toString());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is an array of providers', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Each provider has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        const provider = jsonData[0];",
+									"        pm.expect(provider).to.have.property('id');",
+									"        pm.expect(provider).to.have.property('name');",
+									"        pm.expect(provider).to.have.property('code');",
+									"        pm.expect(provider).to.have.property('baseUrl');",
+									"        pm.expect(provider).to.have.property('authenticationType');",
+									"        pm.expect(provider).to.have.property('status');",
+									"        pm.expect(provider).to.have.property('createdAt');",
+									"        pm.expect(provider).to.have.property('updatedAt');",
+									"        pm.expect(provider).to.have.property('createdBy');",
+									"        pm.expect(provider).to.have.property('updatedBy');",
+									"        ",
+									"        // Save first provider data to environment variables",
+									"        pm.environment.set('providerId', provider.id);",
+									"        pm.environment.set('providerName', provider.name);",
+									"        pm.environment.set('providerCode', provider.code);",
+									"        pm.environment.set('providerDescription', provider.description || '');",
+									"        pm.environment.set('providerBaseUrl', provider.baseUrl);",
+									"        pm.environment.set('providerAuthType', provider.authenticationType);",
+									"        pm.environment.set('providerStatus', provider.status);",
+									"        ",
+									"        console.log('Saved first provider data to environment:');",
+									"        console.log('Provider ID:', provider.id);",
+									"        console.log('Provider Name:', provider.name);",
+									"        console.log('Provider Status:', provider.status);",
+									"    } else {",
+									"        console.log('No providers found in response');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers?includeDeleted=true",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"merchants",
+								"{{merchantId}}",
+								"surcharge-providers"
+							],
+							"query": [
+								{
+									"key": "includeDeleted",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Get Surcharge Provider by ID",
 					"event": [
 						{

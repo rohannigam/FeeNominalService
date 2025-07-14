@@ -32,14 +32,11 @@ Content-Type: application/json
   "description": "Initial API key for development",
   "rateLimit": 1000,
   "allowedEndpoints": [
-    "/api/v1/surchargefee/calculate",
-    "/api/v1/surchargefee/calculate-batch",
-    "/api/v1/refunds/process",
-    "/api/v1/refunds/process-batch",
-    "/api/v1/sales/process",
-    "/api/v1/sales/process-batch",
-    "/api/v1/cancel",
-    "/api/v1/cancel/batch"
+    "/api/v1/surcharge/auth",
+    "/api/v1/surcharge/sale",
+    "/api/v1/surcharge/refund",
+    "/api/v1/surcharge/cancel",
+    "/api/v1/merchants/{merchantId}/surcharge-providers"
   ],
   "purpose": "GENERAL",
   "merchantName": "Development Merchant",
@@ -49,26 +46,38 @@ Content-Type: application/json
 
 ### Response Example:
 # {
+#   "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+#   "externalMerchantId": "DEV001",
+#   "externalMerchantGuid": null,
+#   "merchantName": "Development Merchant",
+#   "statusId": 1,
+#   "statusCode": "ACTIVE",
+#   "statusName": "Active",
 #   "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#   "apiKeyId": "456e7890-e89b-12d3-a456-426614174001",
 #   "secret": "sk_test_51NxYz...",
 #   "expiresAt": "2026-05-20T04:52:24.803373Z",
+#   "createdAt": "2025-05-20T04:52:24.803373Z",
 #   "rateLimit": 1000,
 #   "allowedEndpoints": [
-#     "/api/v1/surchargefee/calculate",
-#     "/api/v1/surchargefee/calculate-batch",
-#     "/api/v1/refunds/process",
-#     "/api/v1/refunds/process-batch",
-#     "/api/v1/sales/process",
-#     "/api/v1/sales/process-batch",
-#     "/api/v1/cancel",
-#     "/api/v1/cancel/batch"
+#     "/api/v1/surcharge/auth",
+#     "/api/v1/surcharge/sale",
+#     "/api/v1/surcharge/refund",
+#     "/api/v1/surcharge/cancel",
+#     "/api/v1/merchants/{merchantId}/surcharge-providers"
 #   ],
-#   "purpose": "GENERAL"
+#   "description": "Initial API key for development",
+#   "purpose": "GENERAL",
+#   "onboardingMetadata": {
+#     "adminUserId": "admin",
+#     "onboardingReference": "DEV-001"
+#   }
 # }
 
 ### Generate Additional API Key
 POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/generate
 Content-Type: application/json
+X-Merchant-ID: DEV001
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
@@ -79,40 +88,69 @@ X-Signature: calculated-signature-here
   "description": "Additional API key for development",
   "rateLimit": 1000,
   "allowedEndpoints": [
-    "/api/v1/surchargefee/calculate",
-    "/api/v1/surchargefee/calculate-batch",
-    "/api/v1/refunds/process",
-    "/api/v1/refunds/process-batch",
-    "/api/v1/sales/process",
-    "/api/v1/sales/process-batch",
-    "/api/v1/cancel",
-    "/api/v1/cancel/batch"
+    "/api/v1/surcharge/auth",
+    "/api/v1/surcharge/sale",
+    "/api/v1/surcharge/refund",
+    "/api/v1/surcharge/cancel",
+    "/api/v1/merchants/{merchantId}/surcharge-providers"
   ],
   "purpose": "GENERAL",
-  "merchantName": "Development Merchant"
+  "onboardingMetadata": {
+    "adminUserId": "admin",
+    "onboardingReference": "DEV-002"
+  }
 }
 
 ### Response Example:
 # {
-#   "apiKey": "9kurb2PpvevX22Ex1uroWlhe-DCs1g3H",
-#   "secret": "sk_test_51NxYz...",
-#   "expiresAt": "2026-05-20T04:52:24.803373Z",
-#   "rateLimit": 1000,
-#   "allowedEndpoints": [
-#     "/api/v1/surchargefee/calculate",
-#     "/api/v1/surchargefee/calculate-batch",
-#     "/api/v1/refunds/process",
-#     "/api/v1/refunds/process-batch",
-#     "/api/v1/sales/process",
-#     "/api/v1/sales/process-batch",
-#     "/api/v1/cancel",
-#     "/api/v1/cancel/batch"
-#   ],
-#   "purpose": "GENERAL"
+#   "success": true,
+#   "message": "API key generated successfully",
+#   "data": {
+#     "apiKey": "9kurb2PpvevX22Ex1uroWlhe-DCs1g3H",
+#     "secret": "sk_test_51NxYz...",
+#     "expiresAt": "2026-05-20T04:52:24.803373Z",
+#     "createdAt": "2025-05-20T04:52:24.803373Z",
+#     "rateLimit": 1000,
+#     "allowedEndpoints": [...],
+#     "description": "Additional API key for development",
+#     "purpose": "GENERAL"
+#   }
+# }
+
+### Rotate API Key
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/rotate
+Content-Type: application/json
+X-Merchant-ID: DEV001
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "merchantId": "DEV001",
+  "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+  "onboardingMetadata": {
+    "adminUserId": "admin",
+    "onboardingReference": "DEV-001"
+  }
+}
+
+### Response Example:
+# {
+#   "success": true,
+#   "message": "API key rotated successfully",
+#   "data": {
+#     "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#     "secret": "sk_test_51NxYz...",
+#     "expiresAt": "2026-05-20T04:52:24.803373Z",
+#     "createdAt": "2025-05-20T04:52:24.803373Z",
+#     "lastRotatedAt": "2025-05-20T04:52:24.803373Z"
+#   }
 # }
 
 ### List API Keys
 GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/list?merchantId=DEV001
+X-Merchant-ID: DEV001
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
@@ -124,27 +162,18 @@ X-Signature: calculated-signature-here
 #     "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
 #     "description": "Initial API key for development",
 #     "rateLimit": 1000,
-#     "allowedEndpoints": [
-#       "/api/v1/surchargefee/calculate",
-#       "/api/v1/surchargefee/calculate-batch",
-#       "/api/v1/refunds/process",
-#       "/api/v1/refunds/process-batch",
-#       "/api/v1/sales/process",
-#       "/api/v1/sales/process-batch",
-#       "/api/v1/cancel",
-#       "/api/v1/cancel/batch"
-#     ],
+#     "allowedEndpoints": [...],
 #     "status": "ACTIVE",
 #     "createdAt": "2025-05-20T04:52:24.803373Z",
 #     "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
-#     "revokedAt": null,
-#     "secret": "sk_test_51NxYz..."
+#     "revokedAt": null
 #   }
 # ]
 
 ### Update API Key
 POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/update
 Content-Type: application/json
+X-Merchant-ID: DEV001
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
@@ -152,45 +181,42 @@ X-Signature: calculated-signature-here
 
 {
   "merchantId": "DEV001",
+  "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
   "description": "Updated API key description",
   "rateLimit": 2000,
   "allowedEndpoints": [
-    "/api/v1/surchargefee/calculate",
-    "/api/v1/surchargefee/calculate-batch",
-    "/api/v1/refunds/process",
-    "/api/v1/refunds/process-batch",
-    "/api/v1/sales/process",
-    "/api/v1/sales/process-batch",
-    "/api/v1/cancel",
-    "/api/v1/cancel/batch"
-  ]
+    "/api/v1/surcharge/auth",
+    "/api/v1/surcharge/sale",
+    "/api/v1/surcharge/refund",
+    "/api/v1/surcharge/cancel",
+    "/api/v1/merchants/{merchantId}/surcharge-providers"
+  ],
+  "onboardingMetadata": {
+    "adminUserId": "admin",
+    "onboardingReference": "DEV-001"
+  }
 }
 
 ### Response Example:
 # {
-#   "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
-#   "description": "Updated API key description",
-#   "rateLimit": 2000,
-#   "allowedEndpoints": [
-#     "/api/v1/surchargefee/calculate",
-#     "/api/v1/surchargefee/calculate-batch",
-#     "/api/v1/refunds/process",
-#     "/api/v1/refunds/process-batch",
-#     "/api/v1/sales/process",
-#     "/api/v1/sales/process-batch",
-#     "/api/v1/cancel",
-#     "/api/v1/cancel/batch"
-#   ],
-#   "status": "ACTIVE",
-#   "createdAt": "2025-05-20T04:52:24.803373Z",
-#   "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
-#   "revokedAt": null,
-#   "secret": "sk_test_51NxYz..."
+#   "success": true,
+#   "message": "API key updated successfully",
+#   "data": {
+#     "apiKey": "8jurb2PpvevX22Ex1uroWlhe-DCs1g3G",
+#     "description": "Updated API key description",
+#     "rateLimit": 2000,
+#     "allowedEndpoints": [...],
+#     "status": "ACTIVE",
+#     "createdAt": "2025-05-20T04:52:24.803373Z",
+#     "lastRotatedAt": "2025-05-20T04:52:24.803371Z",
+#     "revokedAt": null
+#   }
 # }
 
 ### Revoke API Key
 POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/apikey/revoke
 Content-Type: application/json
+X-Merchant-ID: DEV001
 X-API-Key: your-api-key-here
 X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
@@ -204,8 +230,67 @@ X-Signature: calculated-signature-here
 ### Response Example:
 # {
 #   "success": true,
-#   "message": "API key revoked successfully"
+#   "message": "API key revoked successfully",
+#   "data": {
+#     "apiKey": "api-key-to-revoke",
+#     "revokedAt": "2025-05-20T04:52:24.803373Z",
+#     "status": "REVOKED"
+#   }
 # }
+
+### Create Merchant
+POST {{FeeNominalService_HostAddress}}/api/v1/onboarding/merchants
+Content-Type: application/json
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "merchantId": "DEV001",
+  "merchantName": "Development Merchant",
+  "adminUserId": "admin",
+  "onboardingReference": "DEV-001"
+}
+
+### Response Example:
+# {
+#   "success": true,
+#   "message": "Merchant created successfully",
+#   "data": {
+#     "merchantId": "123e4567-e89b-12d3-a456-426614174000",
+#     "externalMerchantId": "DEV001",
+#     "externalMerchantGuid": null,
+#     "name": "Development Merchant",
+#     "statusId": 1,
+#     "statusCode": "ACTIVE",
+#     "statusName": "Active",
+#     "createdAt": "2025-05-20T04:52:24.803373Z",
+#     "updatedAt": "2025-05-20T04:52:24.803373Z",
+#     "createdBy": "SYSTEM"
+#   }
+# }
+
+### Get Merchant by ID
+GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/merchants/123e4567-e89b-12d3-a456-426614174000
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Get Merchant by External ID
+GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/merchants/external/DEV001
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Get Merchant Audit Trail
+GET {{FeeNominalService_HostAddress}}/api/v1/onboarding/merchants/123e4567-e89b-12d3-a456-426614174000/audit-trail
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
 
 ### Surcharge Provider Endpoints
 
@@ -229,6 +314,8 @@ X-Signature: calculated-signature-here
     "baseUrl": "https://api.interpayments.com/v1",
     "authenticationType": "JWT",
     "credentialsSchema": {
+        "name": "Interpayments Credentials",
+        "description": "JWT-based authentication for Interpayments API",
         "required_fields": [
             {
                 "name": "client_id",
@@ -265,7 +352,8 @@ X-Signature: calculated-signature-here
         ]
     },
     "configuration": {
-        "ConfigName": "Interpayments Production",
+        "configName": "Interpayments Production",
+        "isPrimary": true,
         "credentials": {
             "client_id": "your-client-id",
             "client_secret": "your-client-secret",
@@ -294,6 +382,8 @@ X-Signature: calculated-signature-here
 #   "baseUrl": "https://api.interpayments.com/v1",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
+#       "name": "Interpayments Credentials",
+#       "description": "JWT-based authentication for Interpayments API",
 #       "required_fields": [...],
 #       "optional_fields": [...]
 #   },
@@ -302,37 +392,34 @@ X-Signature: calculated-signature-here
 #   "updatedAt": "2024-03-20T10:30:00Z",
 #   "createdBy": "merchant123",
 #   "updatedBy": "merchant123",
-#   "configuration": {
-#       "id": "456e7890-e89b-12d3-a456-426614174001",
-#       "configName": "Interpayments Production",
-#       "isActive": true,
-#       "isPrimary": true,
-#       "credentials": {
-#           "client_id": "your-client-id",
-#           "client_secret": "your-client-secret",
-#           "audience": "https://api.interpayments.com",
-#           "issuer": "https://interpayments.auth0.com",
-#           "scope": "read:transactions write:transactions"
-#       },
-#       "timeout": 30,
-#       "retryCount": 3,
-#       "retryDelay": 5,
-#       "rateLimit": 1000,
-#       "rateLimitPeriod": 3600,
-#       "metadata": {
-#           "environment": "production",
-#           "version": "1.0"
-#       },
-#       "createdAt": "2024-03-20T10:30:00Z",
-#       "updatedAt": "2024-03-20T10:30:00Z",
-#       "lastUsedAt": null,
-#       "lastSuccessAt": null,
-#       "lastErrorAt": null,
-#       "lastErrorMessage": null,
-#       "successCount": 0,
-#       "errorCount": 0,
-#       "averageResponseTime": 0
-#   }
+#   "configurations": [
+#       {
+#           "id": "456e7890-e89b-12d3-a456-426614174001",
+#           "configName": "Interpayments Production",
+#           "isActive": true,
+#           "isPrimary": true,
+#           "credentials": {
+#               "client_id": "your-client-id",
+#               "client_secret": "your-client-secret",
+#               "audience": "https://api.interpayments.com",
+#               "issuer": "https://interpayments.auth0.com",
+#               "scope": "read:transactions write:transactions"
+#           },
+#           "timeout": 30,
+#           "retryCount": 3,
+#           "retryDelay": 5,
+#           "rateLimit": 1000,
+#           "rateLimitPeriod": 3600,
+#           "metadata": {
+#               "environment": "production",
+#               "version": "1.0"
+#           },
+#           "createdAt": "2024-03-20T10:30:00Z",
+#           "updatedAt": "2024-03-20T10:30:00Z",
+#           "createdBy": "merchant123",
+#           "updatedBy": "merchant123"
+#       }
+#   ]
 # }
 
 ### Create Surcharge Provider (without Configuration)
@@ -351,6 +438,8 @@ X-Signature: calculated-signature-here
     "baseUrl": "https://api.testprovider.com/v1",
     "authenticationType": "API_KEY",
     "credentialsSchema": {
+        "name": "Test Provider Credentials",
+        "description": "API Key authentication for Test Provider",
         "required_fields": [
             {
                 "name": "api_key",
@@ -361,7 +450,7 @@ X-Signature: calculated-signature-here
     }
 }
 
-### Get All Surcharge Providers Created by Merchant
+### Get All Surcharge Providers Created by Merchant (Default - Active/Inactive only)
 GET {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers
 X-Merchant-ID: {{merchantId}}
 X-API-Key: your-api-key-here
@@ -369,7 +458,16 @@ X-Timestamp: {{$datetime iso8601}}
 X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
 
+### Get All Surcharge Providers Including Deleted (for Audit)
+GET {{FeeNominalService_HostAddress}}/api/v1/merchants/{{merchantId}}/surcharge-providers?includeDeleted=true
+X-Merchant-ID: {{merchantId}}
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
 # Note: This endpoint returns all surcharge providers created by the current merchant.
+# The includeDeleted parameter allows viewing deleted providers for audit purposes.
 # If the merchant has not created any providers, the response will be an empty array.
 # The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
 
@@ -388,7 +486,7 @@ X-Signature: calculated-signature-here
 #     "updatedAt": "2024-03-20T10:30:00Z",
 #     "createdBy": "merchant123",
 #     "updatedBy": "merchant123",
-#     "configuration": { ... }
+#     "configurations": [ ... ]
 #   }
 # ]
 # (If the merchant has not created any providers, the response will be: [])
@@ -413,6 +511,8 @@ X-Signature: calculated-signature-here
 #   "baseUrl": "https://api.interpayments.com/v1",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
+#       "name": "Interpayments Credentials",
+#       "description": "JWT-based authentication for Interpayments API",
 #       "required_fields": [...],
 #       "optional_fields": [...]
 #   },
@@ -421,7 +521,7 @@ X-Signature: calculated-signature-here
 #   "updatedAt": "2024-03-20T10:30:00Z",
 #   "createdBy": "merchant123",
 #   "updatedBy": "merchant123",
-#   "configuration": { ... }
+#   "configurations": [ ... ]
 # }
 
 ### Update Surcharge Provider
@@ -439,6 +539,8 @@ X-Signature: calculated-signature-here
     "baseUrl": "https://api.interpayments.com/v2",
     "authenticationType": "JWT",
     "credentialsSchema": {
+        "name": "Updated Interpayments Credentials",
+        "description": "Updated JWT-based authentication for Interpayments API",
         "required_fields": [
             {
                 "name": "client_id",
@@ -473,6 +575,7 @@ X-Signature: calculated-signature-here
 
 # Note: The merchantId in the URL must match the X-Merchant-ID header and the authenticated merchant.
 # The merchant must have created this provider to update it.
+# CredentialsSchema is optional - if not provided, existing schema is preserved.
 
 ### Response Example:
 # {
@@ -483,6 +586,8 @@ X-Signature: calculated-signature-here
 #   "baseUrl": "https://api.interpayments.com/v2",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
+#       "name": "Updated Interpayments Credentials",
+#       "description": "Updated JWT-based authentication for Interpayments API",
 #       "required_fields": [...],
 #       "optional_fields": [...]
 #   },
@@ -491,7 +596,7 @@ X-Signature: calculated-signature-here
 #   "updatedAt": "2024-03-20T10:35:00Z",
 #   "createdBy": "merchant123",
 #   "updatedBy": "merchant123",
-#   "configuration": { ... }
+#   "configurations": [ ... ]
 # }
 
 ### Delete Surcharge Provider (Soft Delete)
@@ -516,6 +621,8 @@ X-Signature: calculated-signature-here
 #   "baseUrl": "https://api.interpayments.com/v1",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
+#       "name": "Interpayments Credentials",
+#       "description": "JWT-based authentication for Interpayments API",
 #       "required_fields": [...],
 #       "optional_fields": [...]
 #   },
@@ -524,7 +631,7 @@ X-Signature: calculated-signature-here
 #   "updatedAt": "2024-03-20T10:35:00Z",
 #   "createdBy": "merchant123",
 #   "updatedBy": "merchant123",
-#   "configuration": { ... }
+#   "configurations": [ ... ]
 # }
 
 ### Restore Surcharge Provider
@@ -548,6 +655,8 @@ X-Signature: calculated-signature-here
 #   "baseUrl": "https://api.interpayments.com/v1",
 #   "authenticationType": "JWT",
 #   "credentialsSchema": {
+#       "name": "Interpayments Credentials",
+#       "description": "JWT-based authentication for Interpayments API",
 #       "required_fields": [...],
 #       "optional_fields": [...]
 #   },
@@ -556,14 +665,12 @@ X-Signature: calculated-signature-here
 #   "updatedAt": "2024-03-20T10:40:00Z",
 #   "createdBy": "merchant123",
 #   "updatedBy": "merchant123",
-#   "configuration": { ... }
+#   "configurations": [ ... ]
 # }
 
-### Surcharge Auth Endpoints
+### Surcharge Transaction Endpoints
 
-### Surcharge Endpoints
-
-# --- Surcharge Auth ---
+# --- Surcharge Auth (Initial) ---
 POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/auth
 Content-Type: application/json
 X-API-Key: your-api-key-here
@@ -748,3 +855,22 @@ X-Signature: calculated-signature-here
 #   "processedAt": "2025-05-20T04:52:24.803373Z",
 #   "errorMessage": null
 # }
+
+### Get Surcharge Transaction by ID
+GET {{FeeNominalService_HostAddress}}/api/v1/surcharge/transactions/b1e2c3d4-e5f6-7890-abcd-1234567890ef
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Get Surcharge Transactions with Pagination and Filtering
+GET {{FeeNominalService_HostAddress}}/api/v1/surcharge/transactions?page=1&pageSize=20&operationType=Auth&status=Completed
+X-API-Key: your-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+### Health Check Endpoints
+
+### Get Health Status
+GET {{FeeNominalService_HostAddress}}/api/v1/health
