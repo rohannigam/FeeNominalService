@@ -119,5 +119,10 @@ namespace FeeNominalService.Settings
         /// Maximum rate limit period in seconds
         /// </summary>
         public int MaxRateLimitPeriodSeconds { get; set; } = 3600;
+
+        /// <summary>
+        /// Whether to validate that credentials only contain fields defined in the schema
+        /// </summary>
+        public bool ValidateExtraFields { get; set; } = false;
     }
 } 
