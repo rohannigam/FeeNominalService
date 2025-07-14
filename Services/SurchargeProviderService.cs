@@ -102,6 +102,20 @@ namespace FeeNominalService.Services
             }
         }
 
+        public async Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId, bool includeDeleted)
+        {
+            try
+            {
+                _logger.LogInformation("Getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
+                return await _repository.GetByMerchantIdAsync(merchantId, includeDeleted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
+                throw;
+            }
+        }
+
         public async Task<IEnumerable<SurchargeProvider>> GetConfiguredProvidersByMerchantIdAsync(string merchantId)
         {
             try
@@ -150,13 +164,6 @@ namespace FeeNominalService.Services
             {
                 _logger.LogInformation("Creating provider {ProviderName} for merchant {MerchantId}", provider.Name, provider.CreatedBy);
 
-                // Check merchant provider limit
-                var currentProviderCount = await _repository.GetCountByMerchantAsync(provider.CreatedBy);
-                if (currentProviderCount >= _validationSettings.MaxProvidersPerMerchant)
-                {
-                    throw new InvalidOperationException($"Merchant has reached the maximum number of providers ({_validationSettings.MaxProvidersPerMerchant}). Current count: {currentProviderCount}. Error code: {SurchargeErrorCodes.Provider.PROVIDER_LIMIT_EXCEEDED}");
-                }
-
                 // Validate provider code uniqueness for this merchant only
                 if (await _repository.ExistsByCodeAndMerchantAsync(provider.Code, provider.CreatedBy))
                 {
@@ -195,7 +202,8 @@ namespace FeeNominalService.Services
                     provider.ProviderType = "INTERPAYMENTS"; // Or infer from template/logic
                 }
 
-                return await _repository.AddAsync(provider);
+                // Use transaction-based validation to prevent race conditions
+                return await _repository.AddWithLimitCheckAsync(provider, _validationSettings.MaxProvidersPerMerchant);
             }
             catch (Exception ex)
             {
@@ -234,8 +242,8 @@ namespace FeeNominalService.Services
                     UpdatedBy = provider.CreatedBy
                 };
 
-                // Save the configuration to the database
-                var savedConfig = await _configService.CreateAsync(config);
+                // Save the configuration to the database (now with requestor)
+                var savedConfig = await _configService.CreateAsync(config, merchantId);
 
                 // Add the configuration to the provider for the response
                 createdProvider.Configurations = new List<SurchargeProviderConfig> { savedConfig };

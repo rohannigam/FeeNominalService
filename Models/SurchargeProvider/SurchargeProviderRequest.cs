@@ -42,7 +42,7 @@ namespace FeeNominalService.Models.SurchargeProvider
         /// <summary>
         /// Validates the credentials schema structure using configuration settings
         /// </summary>
-        public bool ValidateCredentialsSchema(out List<string> errors, SurchargeProviderValidationSettings? settings = null)
+        public virtual bool ValidateCredentialsSchema(out List<string> errors, SurchargeProviderValidationSettings? settings = null)
         {
             errors = new List<string>();
 
@@ -201,6 +201,13 @@ namespace FeeNominalService.Models.SurchargeProvider
             if (Configuration.Credentials == null)
                 errors.Add("Configuration credentials are required");
 
+            // Validate credentials against schema if both are provided
+            if (Configuration.Credentials != null && CredentialsSchema != null)
+            {
+                var schemaValidationErrors = ValidateCredentialsAgainstSchema(Configuration.Credentials, settings);
+                errors.AddRange(schemaValidationErrors);
+            }
+
             // Validate timeout if provided
             var maxTimeout = settings?.MaxTimeoutSeconds ?? 300;
             if (Configuration.Timeout.HasValue && (Configuration.Timeout.Value < 1 || Configuration.Timeout.Value > maxTimeout))
@@ -227,6 +234,119 @@ namespace FeeNominalService.Models.SurchargeProvider
                 errors.Add($"Rate limit period must be between 1 and {maxRateLimitPeriod} seconds");
 
             return errors.Count == 0;
+        }
+
+        /// <summary>
+        /// Validates that configuration credentials match the defined schema requirements
+        /// </summary>
+        private List<string> ValidateCredentialsAgainstSchema(object credentials, SurchargeProviderValidationSettings? settings = null)
+        {
+            var errors = new List<string>();
+
+            try
+            {
+                // Parse the credentials schema to extract required fields
+                var schemaJson = JsonSerializer.Serialize(CredentialsSchema);
+                var schemaDoc = JsonDocument.Parse(schemaJson);
+                var schemaRoot = schemaDoc.RootElement;
+
+                // Extract required field names from schema
+                var requiredFieldNames = new List<string>();
+                if (schemaRoot.TryGetProperty("required_fields", out var requiredFieldsElement) && 
+                    requiredFieldsElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var field in requiredFieldsElement.EnumerateArray())
+                    {
+                        if (field.TryGetProperty("name", out var nameElement))
+                        {
+                            var fieldName = nameElement.GetString();
+                            if (!string.IsNullOrWhiteSpace(fieldName))
+                            {
+                                requiredFieldNames.Add(fieldName);
+                            }
+                        }
+                    }
+                }
+
+                // Parse configuration credentials
+                var credentialsJson = JsonSerializer.Serialize(credentials);
+                var credentialsDoc = JsonDocument.Parse(credentialsJson);
+                var credentialsRoot = credentialsDoc.RootElement;
+
+                // Check that all required fields are present in credentials
+                foreach (var requiredFieldName in requiredFieldNames)
+                {
+                    if (!credentialsRoot.TryGetProperty(requiredFieldName, out var fieldValue))
+                    {
+                        errors.Add($"Required field '{requiredFieldName}' is missing from configuration credentials");
+                        continue;
+                    }
+
+                    // Check that required fields have non-empty values
+                    if (fieldValue.ValueKind == JsonValueKind.Null || 
+                        (fieldValue.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(fieldValue.GetString())))
+                    {
+                        errors.Add($"Required field '{requiredFieldName}' cannot be null or empty");
+                    }
+
+                    // Validate field value length if settings provided
+                    if (settings != null && fieldValue.ValueKind == JsonValueKind.String)
+                    {
+                        var fieldValueString = fieldValue.GetString() ?? string.Empty;
+                        
+                        if (fieldValueString.Length < settings.MinCredentialValueLength)
+                        {
+                            errors.Add($"Field '{requiredFieldName}' value length ({fieldValueString.Length}) is below minimum ({settings.MinCredentialValueLength})");
+                        }
+
+                        if (fieldValueString.Length > settings.MaxCredentialValueLength)
+                        {
+                            errors.Add($"Field '{requiredFieldName}' value length ({fieldValueString.Length}) exceeds maximum ({settings.MaxCredentialValueLength})");
+                        }
+                    }
+                }
+
+                // Check for extra fields not defined in schema (optional validation)
+                if (settings != null && settings.ValidateExtraFields)
+                {
+                    var schemaFieldNames = new HashSet<string>(requiredFieldNames, StringComparer.OrdinalIgnoreCase);
+                    
+                    // Add optional field names if they exist in schema
+                    if (schemaRoot.TryGetProperty("optional_fields", out var optionalFieldsElement) && 
+                        optionalFieldsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var field in optionalFieldsElement.EnumerateArray())
+                        {
+                            if (field.TryGetProperty("name", out var nameElement))
+                            {
+                                var fieldName = nameElement.GetString();
+                                if (!string.IsNullOrWhiteSpace(fieldName))
+                                {
+                                    schemaFieldNames.Add(fieldName);
+                                }
+                            }
+                        }
+                    }
+
+                    foreach (var property in credentialsRoot.EnumerateObject())
+                    {
+                        if (!schemaFieldNames.Contains(property.Name))
+                        {
+                            errors.Add($"Field '{property.Name}' is not defined in the credentials schema");
+                        }
+                    }
+                }
+            }
+            catch (JsonException ex)
+            {
+                errors.Add($"Error parsing credentials or schema: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Error validating credentials against schema: {ex.Message}");
+            }
+
+            return errors;
         }
 
         private List<string> ValidateCredentialField(JsonElement field, string fieldPath, SurchargeProviderValidationSettings? settings = null)

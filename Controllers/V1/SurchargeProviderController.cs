@@ -233,13 +233,14 @@ namespace FeeNominalService.Controllers.V1
         /// Get all surcharge providers for the specified merchant
         /// </summary>
         /// <param name="merchantId">Merchant ID</param>
+        /// <param name="includeDeleted">Optional: Include deleted providers in the response (default: false)</param>
         /// <returns>List of surcharge providers</returns>
         [HttpGet]
-        public async Task<IActionResult> GetAllProviders(string merchantId)
+        public async Task<IActionResult> GetAllProviders(string merchantId, [FromQuery] bool includeDeleted = false)
         {
             try
             {
-                _logger.LogInformation("Getting surcharge providers for merchant: {MerchantId}", merchantId);
+                _logger.LogInformation("Getting surcharge providers for merchant: {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
                 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -255,8 +256,8 @@ namespace FeeNominalService.Controllers.V1
                     return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                 }
 
-                // Get all providers created by this merchant
-                var providers = await _surchargeProviderService.GetByMerchantIdAsync(merchantId);
+                // Get all providers created by this merchant (with optional includeDeleted parameter)
+                var providers = await _surchargeProviderService.GetByMerchantIdAsync(merchantId, includeDeleted);
                 return Ok(providers.ToResponse());
             }
             catch (InvalidOperationException ex)
@@ -386,10 +387,17 @@ namespace FeeNominalService.Controllers.V1
                 // Validate the credentials schema structure only if provided
                 if (request.CredentialsSchema != null)
                 {
+                    _logger.LogDebug("CredentialsSchema is not null, validating...");
                     if (!request.ValidateCredentialsSchema(out var schemaErrors, _validationSettings))
                     {
+                        _logger.LogWarning("Credentials schema validation failed: {Errors}", string.Join(", ", schemaErrors));
                         return BadRequest(ApiErrorResponse.InvalidCredentialsSchema(schemaErrors));
                     }
+                    _logger.LogDebug("Credentials schema validation passed");
+                }
+                else
+                {
+                    _logger.LogDebug("CredentialsSchema is null, skipping validation");
                 }
 
                 // Validate status code format if provided
@@ -519,10 +527,22 @@ namespace FeeNominalService.Controllers.V1
                 }
 
                 // Get the updated provider with DELETED status to return in response
+                // Use includeDeleted: true to get the deleted provider
                 var deletedProvider = await _surchargeProviderService.GetByIdAsync(id, includeDeleted: true);
                 if (deletedProvider == null)
                 {
                     return Ok(new { success = true, message = "Provider soft deleted successfully" });
+                }
+
+                // Debug: Log the status we're getting back
+                _logger.LogDebug("Retrieved deleted provider {ProviderId} with status: {Status}", 
+                    id, deletedProvider.Status?.Code ?? "NULL");
+
+                // Verify the status is actually DELETED
+                if (deletedProvider.Status?.Code != "DELETED")
+                {
+                    _logger.LogWarning("Provider {ProviderId} was soft deleted but status is {Status}, not DELETED", 
+                        id, deletedProvider.Status?.Code ?? "NULL");
                 }
 
                 return Ok(deletedProvider.ToResponse());

@@ -249,4 +249,167 @@ CREATE TABLE api_keys (
 - Merchant isolation and provider config matching are strictly enforced for all auth and follow-up requests.
 - API documentation, Postman collections, and HTTP files are fully up to date and reflect the current contract.
 - End-to-end testing and validation have been completed for all surcharge auth scenarios.
+
+
+************************************************************************
+7/14/2025 - Weekly Summary
+************************************************************************
+
+## **Summary of Changes in Last 6 Hours - 7/14/2025**
+
+### **1. Surcharge Provider Update Validation Fix**
+**Problem:** Update requests were failing with `SURCH_2005 - Credentials schema is required` even when credentials schema was provided.
+
+**Root Cause:** The `ValidateCredentialsSchema` method in the base class always required a schema, and the derived class was hiding (not overriding) the property/method, causing validation to always fail.
+
+**Solution:**
+- Made the base method `virtual` and the derived method `override`
+- Removed the `new` property from the derived class to avoid property hiding and model binding issues
+- Added debug logging to trace the validation flow
+
+### **2. Surcharge Provider Delete Status Fix**
+**Problem:** When deleting a surcharge provider, the response showed "ACTIVE" status instead of "DELETED".
+
+**Root Cause:** The entity might not be properly reloaded from the database after the soft delete operation, or there might be a caching issue.
+
+**Solution:**
+- Added debug logging to track the status changes
+- Added verification to ensure the status is correctly set to "DELETED"
+- Added explicit reloading of the entity after the soft delete operation
+
+### **3. EF Core Transaction Error Fix**
+**Problem:** Runtime error about user-initiated transactions and retrying execution strategies.
+
+**Solution:** Wrapped manual transaction logic in the execution strategy for Npgsql.
+
+### **4. is_primary Logic and Documentation**
+**Added/clarified logic** to ensure only one surcharge provider configuration per (merchant, provider) pair can be primary.
+**Added WARN logging** when a new config is set as primary and another is demoted.
+**Updated documentation** to reflect the new `isPrimary` field and single-primary enforcement.
+
+---
+
+## **Files Updated/Added**
+
+### **Controllers/**
+1. **Controllers/V1/SurchargeProviderController.cs**
+   - Added debug logging for credentials schema validation
+   - Fixed delete method to properly reload entity after soft delete
+   - Added status verification and debug logging for delete operations
+
+### **Models/**
+2. **Models/SurchargeProvider/SurchargeProviderRequest.cs**
+   - Made `ValidateCredentialsSchema` method `virtual` for proper overriding
+
+3. **Models/SurchargeProvider/SurchargeProviderUpdateRequest.cs**
+   - Overrode `ValidateCredentialsSchema` to allow optional schema on update
+   - Removed the `CredentialsSchema` property from the derived class to avoid property hiding
+   - Added debug logging to the validation method
+
+### **Repositories/**
+4. **Repositories/SurchargeProviderRepository.cs**
+   - Wrapped transaction logic in the execution strategy for Npgsql
+   - Added debug logging to `SoftDeleteAsync` method to track status changes
+   - Added verification to ensure status is saved correctly
+
+### **Documentation/**
+5. **Docs/Endpoints/SurchargeProviderEndpoints.txt**
+   - Updated documentation for the `isPrimary` field and single-primary enforcement
+
+6. **SurchargeCalcuilationDocumentation.md**
+   - Updated documentation for the `isPrimary` field and single-primary enforcement
+
+---
+
+## **Key Technical Changes**
+
+1. **Method Overriding:** Changed from `new` to `override` for proper polymorphism
+2. **Property Inheritance:** Removed duplicate property to avoid hiding issues
+3. **EF Core Transactions:** Used execution strategy for Npgsql compatibility
+4. **Debug Logging:** Added comprehensive logging for troubleshooting
+5. **Status Verification:** Added checks to ensure correct status is returned
+
+---
+
+## **Expected Results**
+
+- ✅ Update requests now work with or without credentials schema
+- ✅ Delete responses show "DELETED" status correctly
+- ✅ No more EF Core transaction errors
+- ✅ Proper single-primary enforcement for configurations
+- ✅ Updated documentation for API consumers
+- ✅ No compiler warnings
+
+The codebase is now more robust, maintainable, and follows proper inheritance patterns.
+
+---
+
+## **7/14/2025 - Additional Changes: GET Surcharge Providers with Deleted Support**
+
+### **New Feature: Optional Deleted Provider Inclusion**
+**Problem:** No way to view deleted providers for audit or administrative purposes.
+
+**Solution:** Added optional `includeDeleted` query parameter to GET surcharge providers endpoint.
+
+**Implementation:**
+- **Service Layer:** Added overload method `GetByMerchantIdAsync(string merchantId, bool includeDeleted)`
+- **Controller:** Updated `GetAllProviders` to accept optional `includeDeleted` query parameter (default: false)
+- **Repository:** Leveraged existing `GetByMerchantIdAsync(string merchantId, bool includeDeleted)` method
+- **Documentation:** Updated API docs with examples and usage notes
+
+### **Files Updated:**
+
+#### **Services/**
+1. **Services/ISurchargeProviderService.cs**
+   - Added new method signature: `GetByMerchantIdAsync(string merchantId, bool includeDeleted)`
+
+2. **Services/SurchargeProviderService.cs**
+   - Added implementation of the new overload method with proper logging
+
+#### **Controllers/**
+3. **Controllers/V1/SurchargeProviderController.cs**
+   - Updated `GetAllProviders` method to accept optional `includeDeleted` query parameter (default: false)
+   - Added proper logging for the new parameter
+   - Updated method documentation
+
+#### **Documentation/**
+4. **Docs/Endpoints/SurchargeProviderEndpoints.txt**
+   - Added query parameter documentation for `includeDeleted`
+   - Updated example requests to show both default and includeDeleted=true scenarios
+   - Added notes about the functionality and use cases
+
+### **API Usage Examples:**
+
+```bash
+# Get only active and inactive providers (default behavior)
+GET /api/v1/merchants/{merchantId}/surcharge-providers
+
+# Include deleted providers for audit purposes
+GET /api/v1/merchants/{merchantId}/surcharge-providers?includeDeleted=true
+```
+
+### **Key Benefits:**
+- ✅ **Backward Compatible:** Existing clients continue to work without changes
+- ✅ **Optional Parameter:** Defaults to `false` to maintain current behavior
+- ✅ **Audit Support:** Enables viewing deleted providers for administrative purposes
+- ✅ **Admin Interface:** Supports full provider history visibility
+- ✅ **Recovery Scenarios:** Helps identify deleted providers for potential restoration
+
+### **Use Cases:**
+1. **Audit Purposes:** View all providers including deleted ones
+2. **Admin Interfaces:** Full visibility of provider history
+3. **Recovery Scenarios:** Identify deleted providers for potential restoration
+4. **Compliance:** Track provider lifecycle for regulatory requirements
+
+The implementation leverages existing repository infrastructure and provides a clean, minimal addition that enhances administrative capabilities without breaking existing functionality.
 	
+Here are the files that were changed in the last 6 hours:
+Controllers/V1/SurchargeProviderController.cs
+Services/ISurchargeProviderService.cs
+Services/SurchargeProviderService.cs
+Repositories/SurchargeProviderRepository.cs
+Models/SurchargeProvider/SurchargeProviderRequest.cs
+Models/SurchargeProvider/SurchargeProviderUpdateRequest.cs
+Docs/Endpoints/SurchargeProviderEndpoints.txt
+SurchargeCalcuilationDocumentation.md
+ImplemenationNotes.txt  

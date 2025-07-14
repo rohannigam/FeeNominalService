@@ -153,6 +153,7 @@ The following limits are configurable via `SurchargeProviderValidationSettings`:
     },
     "configuration": {              // Optional
         "configName": "string",     // Required if configuration provided, max 100 chars
+        "isPrimary": true,          // Optional, defaults to true for first config, otherwise must be set explicitly. Only one config per (merchant, provider) pair can be primary.
         "credentials": {            // Required if configuration provided
             "field_name": "value"   // Must match schema, max 10,000 chars per value
         },
@@ -246,6 +247,7 @@ curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-
     },
     "configuration": {
         "configName": "Production Config",
+        "isPrimary": true,
         "credentials": {
             "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
             "client_id": "interpayments-client-123"
@@ -263,6 +265,9 @@ curl -X POST "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-
 **GET** `/api/v1/merchants/{merchantId}/surcharge-providers`
 
 Returns all surcharge providers created by the specified merchant.
+
+**Query Parameters:**
+- `includeDeleted` (optional): Include deleted providers in the response (default: false)
 
 #### Response
 ```json
@@ -287,13 +292,28 @@ Returns all surcharge providers created by the specified merchant.
 
 #### Example Request
 ```bash
+# Get only active and inactive providers (default)
 curl -X GET "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers" \
   -H "X-Merchant-ID: MERCHANT001" \
   -H "X-Timestamp: 2024-03-20T10:30:00Z" \
   -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
   -H "X-API-Key: your-api-key" \
   -H "X-Signature: calculated-signature"
+
+# Include deleted providers
+curl -X GET "https://api.feenominal.com/api/v1/merchants/MERCHANT001/surcharge-providers?includeDeleted=true" \
+  -H "X-Merchant-ID: MERCHANT001" \
+  -H "X-Timestamp: 2024-03-20T10:30:00Z" \
+  -H "X-Nonce: 123e4567-e89b-12d3-a456-426614174000" \
+  -H "X-API-Key: your-api-key" \
+  -H "X-Signature: calculated-signature"
 ```
+
+**Notes:**
+- By default, only active and inactive providers are returned
+- Set `includeDeleted=true` to include providers with DELETED status
+- This is useful for audit purposes or admin interfaces
+- Deleted providers will have `"status": "DELETED"` in the response
 
 ### 3. Get Surcharge Provider by ID
 **GET** `/api/v1/merchants/{merchantId}/surcharge-providers/{id}`

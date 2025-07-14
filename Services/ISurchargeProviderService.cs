@@ -13,6 +13,7 @@ namespace FeeNominalService.Services
         Task<SurchargeProvider?> GetByCodeAsync(string code);
         Task<IEnumerable<SurchargeProvider>> GetAllAsync();
         Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId);
+        Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId, bool includeDeleted);
         Task<IEnumerable<SurchargeProvider>> GetConfiguredProvidersByMerchantIdAsync(string merchantId);
         Task<IEnumerable<SurchargeProvider>> GetActiveAsync();
         Task<SurchargeProvider> CreateAsync(SurchargeProvider provider);

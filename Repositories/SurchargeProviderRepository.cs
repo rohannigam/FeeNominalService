@@ -6,6 +6,7 @@ using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using FeeNominalService.Models.Common;
 
 namespace FeeNominalService.Repositories
 {
@@ -428,6 +429,10 @@ namespace FeeNominalService.Repositories
                 provider.UpdatedAt = DateTime.UtcNow;
                 provider.UpdatedBy = deletedBy;
 
+                // Debug: Log the status change
+                _logger.LogDebug("Updating provider {ProviderId} status from {OldStatus} to DELETED", 
+                    id, provider.Status?.Code ?? "NULL");
+
                 // Deactivate all provider configurations and unset primary
                 if (provider.Configurations != null)
                 {
@@ -441,6 +446,14 @@ namespace FeeNominalService.Repositories
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Debug: Verify the status was saved correctly
+                var savedProvider = await _context.SurchargeProviders
+                    .Include(p => p.Status)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+                
+                _logger.LogDebug("After save, provider {ProviderId} status is: {Status}", 
+                    id, savedProvider?.Status?.Code ?? "NULL");
 
                 _logger.LogInformation("Provider {ProviderId} soft deleted by {DeletedBy} and all configs deactivated/unset primary", id, deletedBy);
                 return true;
@@ -513,6 +526,46 @@ namespace FeeNominalService.Repositories
                 _logger.LogError(ex, "Error getting provider count for merchant {MerchantId}", merchantId);
                 throw;
             }
+        }
+
+        public async Task<SurchargeProvider> AddWithLimitCheckAsync(SurchargeProvider provider, int maxProvidersPerMerchant)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    // Check merchant provider limit within transaction
+                    var currentProviderCount = await _context.SurchargeProviders
+                        .Include(p => p.Status)
+                        .Where(p => p.CreatedBy == provider.CreatedBy && p.Status.Code != "DELETED")
+                        .CountAsync();
+
+                    if (currentProviderCount >= maxProvidersPerMerchant)
+                    {
+                        await transaction.RollbackAsync();
+                        throw new InvalidOperationException($"Merchant has reached the maximum number of providers ({maxProvidersPerMerchant}). Current count: {currentProviderCount}. Error code: {SurchargeErrorCodes.Provider.PROVIDER_LIMIT_EXCEEDED}");
+                    }
+
+                    // Add the provider
+                    _context.SurchargeProviders.Add(provider);
+                    await _context.SaveChangesAsync();
+
+                    // Commit the transaction
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation("Successfully created provider {ProviderId} for merchant {MerchantId} (count: {Count})", 
+                        provider.Id, provider.CreatedBy, currentProviderCount + 1);
+
+                    return provider;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
         }
     }
 } 

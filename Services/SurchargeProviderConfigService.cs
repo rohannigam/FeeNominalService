@@ -113,7 +113,7 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<SurchargeProviderConfig> CreateAsync(SurchargeProviderConfig config)
+        public async Task<SurchargeProviderConfig> CreateAsync(SurchargeProviderConfig config, string requestor)
         {
             try
             {
@@ -128,6 +128,19 @@ namespace FeeNominalService.Services
                     {
                         existingPrimary.IsPrimary = false;
                         await _repository.UpdateAsync(existingPrimary);
+                        _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
+                            requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                    }
+                }
+                else
+                {
+                    // If not explicitly primary, check if this is the first config for this merchant/provider
+                    var hasPrimary = await HasPrimaryConfigAsync(config.MerchantId.ToString(), config.ProviderId);
+                    if (!hasPrimary)
+                    {
+                        config.IsPrimary = true;
+                        _logger.LogInformation("No existing primary config found for merchant {MerchantId}, provider {ProviderId}. Defaulting new config {ConfigId} ('{ConfigName}') to primary.",
+                            config.MerchantId, config.ProviderId, config.Id, config.ConfigName);
                     }
                 }
 
@@ -149,7 +162,7 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<SurchargeProviderConfig> UpdateAsync(SurchargeProviderConfig config)
+        public async Task<SurchargeProviderConfig> UpdateAsync(SurchargeProviderConfig config, string requestor)
         {
             try
             {
@@ -170,6 +183,8 @@ namespace FeeNominalService.Services
                     {
                         existingPrimary.IsPrimary = false;
                         await _repository.UpdateAsync(existingPrimary);
+                        _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
+                            requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
                     }
                 }
 

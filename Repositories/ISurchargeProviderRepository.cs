@@ -28,5 +28,6 @@ namespace FeeNominalService.Repositories
         Task<bool> HasConfigurationAsync(string merchantId, Guid providerId);
         Task<SurchargeProviderStatus?> GetStatusByCodeAsync(string code);
         Task<int> GetCountByMerchantAsync(string merchantId);
+        Task<SurchargeProvider> AddWithLimitCheckAsync(SurchargeProvider provider, int maxProvidersPerMerchant);
     }
 } 
