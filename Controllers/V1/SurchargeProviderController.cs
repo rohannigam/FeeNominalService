@@ -4,6 +4,7 @@ using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Models.Common;
 using FeeNominalService.Services;
 using FeeNominalService.Settings;
+using FeeNominalService.Utils;
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -48,7 +49,11 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Creating surcharge provider for merchant: {MerchantId}", merchantId);
+                // Log the request with masked sensitive data
+                var maskedRequest = SensitiveDataMasker.MaskSensitiveData(request);
+                
+                _logger.LogInformation("Creating surcharge provider for merchant: {MerchantId}. Request:\n{MaskedRequest}", 
+                    merchantId, maskedRequest);
 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -121,6 +126,10 @@ namespace FeeNominalService.Controllers.V1
                     // Otherwise, just create the provider
                     result = await _surchargeProviderService.CreateAsync(provider);
                 }
+
+                // Log successful creation
+                _logger.LogInformation("Successfully created surcharge provider: {ProviderId} ({ProviderName}) for merchant: {MerchantId}", 
+                    result.Id, result.Name, merchantId);
 
                 return Ok(result.ToResponse());
             }
@@ -353,7 +362,10 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Updating surcharge provider: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                // Log the request with masked sensitive data
+                var maskedRequest = SensitiveDataMasker.MaskSensitiveData(request);
+                _logger.LogInformation("Updating surcharge provider: {ProviderId} for merchant: {MerchantId}. Request:\n{MaskedRequest}", 
+                    id, merchantId, maskedRequest);
 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -437,6 +449,11 @@ namespace FeeNominalService.Controllers.V1
                 existingProvider.UpdatedBy = merchantId;
 
                 var result = await _surchargeProviderService.UpdateAsync(existingProvider);
+                
+                // Log successful update
+                _logger.LogInformation("Successfully updated surcharge provider: {ProviderId} ({ProviderName}) for merchant: {MerchantId}", 
+                    result.Id, result.Name, merchantId);
+
                 return Ok(result.ToResponse());
             }
             catch (KeyNotFoundException ex)

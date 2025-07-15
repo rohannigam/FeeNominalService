@@ -1227,7 +1227,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"code\": \"{{providerCode}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"configuration\": {\n        \"ConfigName\": \"{{providerConfigName}}\",\n        \"credentials\": {{providerConfigCredentials}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
+							"raw": "{\n    \"name\": \"{{providerName}}\",\n    \"code\": \"{{providerCode}}\",\n    \"description\": \"{{providerDescription}}\",\n    \"baseUrl\": \"{{providerBaseUrl}}\",\n    \"authenticationType\": \"{{providerAuthType}}\",\n    \"credentialsSchema\": {{providerCredentialsSchema}},\n    \"providerType\": \"{{providerType}}\",\n    \"configuration\": {\n        \"ConfigName\": \"{{providerConfigName}}\",\n        \"credentials\": {{providerConfigCredentials}},\n        \"timeout\": {{providerConfigTimeout}},\n        \"retryCount\": {{providerConfigRetryCount}},\n        \"retryDelay\": {{providerConfigRetryDelay}},\n        \"rateLimit\": {{providerConfigRateLimit}},\n        \"rateLimitPeriod\": {{providerConfigRateLimitPeriod}},\n        \"metadata\": {{providerConfigMetadata}}\n    }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/surcharge-providers",

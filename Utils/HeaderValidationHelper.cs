@@ -74,7 +74,17 @@ namespace FeeNominalService.Utils
             if (string.IsNullOrEmpty(secret)) return "<null>";
             if (secret.Length <= showStart + showEnd)
                 return new string('*', secret.Length);
-            return secret.Substring(0, showStart) + "..." + secret.Substring(secret.Length - showEnd);
+            
+            // Use SensitiveDataMasker for consistent masking logic
+            var maskedValue = SensitiveDataMasker.MaskSensitiveData(secret);
+            
+            // If SensitiveDataMasker didn't change it (not a JWT), use the original logic
+            if (maskedValue == secret)
+            {
+                return secret.Substring(0, showStart) + "..." + secret.Substring(secret.Length - showEnd);
+            }
+            
+            return maskedValue;
         }
     }
 } 

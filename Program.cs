@@ -25,6 +25,7 @@ using System.Reflection;
 using FeeNominalService.Repositories;
 using FeeNominalService.Middleware;
 using FeeNominalService.Services.AWS;
+using FeeNominalService.Services.Adapters.InterPayments;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Utils;

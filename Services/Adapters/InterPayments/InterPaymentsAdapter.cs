@@ -9,7 +9,7 @@ using FeeNominalService.Exceptions;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Utils;
 
-namespace FeeNominalService.Services;
+namespace FeeNominalService.Services.Adapters.InterPayments;
 
 public class InterPaymentsAdapter : ISurchargeProviderAdapter
 {
@@ -102,7 +102,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         }
 
         _logger.LogInformation("Sending request to Interpayments: {Url}", InterpaymentsUrl);
-        _logger.LogDebug("Interpayments Request JSON: {Request}", JsonSerializer.Serialize(interpaymentsRequest, new JsonSerializerOptions { WriteIndented = true }));
+        _logger.LogInformation("Interpayments Request JSON: {Request}", JsonSerializer.Serialize(interpaymentsRequest, new JsonSerializerOptions { WriteIndented = true }));
 
         HttpResponseMessage response;
         try
@@ -123,7 +123,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        _logger.LogDebug("Interpayments Response JSON: {Response}", JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement, new JsonSerializerOptions { WriteIndented = true }));
+        _logger.LogInformation("Interpayments Response JSON: {Response}", JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement, new JsonSerializerOptions { WriteIndented = true }));
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 

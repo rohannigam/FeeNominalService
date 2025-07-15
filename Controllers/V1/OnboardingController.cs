@@ -315,6 +315,13 @@ namespace FeeNominalService.Controllers.V1
                 // Generate API key
                 var apiKeyResponse = await _apiKeyService.GenerateApiKeyAsync(request);
 
+                // Log the response details for debugging
+                _logger.LogInformation("Generated API key response for merchant {MerchantId}: HasApiKey={HasApiKey}, HasSecret={HasSecret}, ExpiresAt={ExpiresAt}", 
+                    request.MerchantId, 
+                    !string.IsNullOrEmpty(apiKeyResponse.ApiKey), 
+                    !string.IsNullOrEmpty(apiKeyResponse.Secret),
+                    apiKeyResponse.ExpiresAt);
+
                 // Add audit trail entry for API key generation
                 var onboardingMetadata = request.OnboardingMetadata;
                 var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
@@ -327,12 +334,20 @@ namespace FeeNominalService.Controllers.V1
                     performedBy
                 );
 
-                return Ok(new ApiResponse<GenerateApiKeyResponse>
+                var response = new ApiResponse<GenerateApiKeyResponse>
                 {
                     Success = true,
                     Message = "API key generated successfully",
                     Data = apiKeyResponse
-                });
+                };
+
+                // Log the final response structure
+                _logger.LogDebug("Final response structure: Success={Success}, Message={Message}, DataType={DataType}", 
+                    response.Success, 
+                    response.Message, 
+                    response.Data?.GetType().Name ?? "null");
+
+                return Ok(response);
             }
             catch (Exception ex)
             {

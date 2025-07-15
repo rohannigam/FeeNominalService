@@ -1,5 +1,5 @@
 {
-	"id": "812e5d2a-2944-409f-be45-748917d1e8e9",
+	"id": "5660bba5-1ea6-4b1a-b714-53fe5dd26797",
 	"name": "FeeNominalSurchargeService Environment",
 	"values": [
 		{
@@ -667,9 +667,15 @@
 			"value": "78719",
 			"type": "default",
 			"enabled": true
+		},
+		{
+			"key": "providerType",
+			"value": "INTERPAYMENTS",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2025-07-03T17:45:46.522Z",
-	"_postman_exported_using": "Postman/11.52.3"
+	"_postman_exported_at": "2025-07-14T21:38:32.361Z",
+	"_postman_exported_using": "Postman/11.53.5"
 }
