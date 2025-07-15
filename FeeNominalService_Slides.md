@@ -1,5 +1,29 @@
-# FeeNominalService - Comprehensive Overview
-## Enterprise Payment Processing Microservice Architecture
+# FeeNominalService - Modern API Platform for Merchant & Surcharge Management
+
+---
+
+## Slide 0: Service Overview & Capabilities (2024)
+
+**FeeNominalService** is a modern, enterprise-grade microservice designed to:
+
+- **Accept requests from a variety of sources:**
+  - Onboarding portals, admin tools, legacy SOAP web services, and provider integrations
+- **Deliver rich onboarding and merchant management:**
+  - Full merchant lifecycle, audit trail, and compliance support
+- **Provide robust API key management:**
+  - Initial and additional API key generation, rotation, revocation, and secure admin API key creation
+- **Support secure, scalable surcharge processing:**
+  - Real-time auth, sale, refund, and bulk sale operations
+- **Enable flexible, environment-aware secrets management:**
+  - AWS Secrets Manager in production, local DB for development, with rerunnable migration scripts
+- **Recent improvements:**
+  - Dedicated admin API key endpoint with header-based authentication
+  - Seamless local/production secret lookup for admin and merchant keys
+  - Rerunnable, idempotent migration scripts for local onboarding
+  - Enhanced logging, error handling, and endpoint security
+
+**Result:**
+- A secure, extensible, and production-ready platform for payment, merchant, and provider management.
 
 ---
 
@@ -502,9 +526,13 @@ erDiagram
 - `GET /merchants/external/{externalId}` - **Get by external ID**
 - `GET /merchants/{merchantId}/audit-trail` - **Audit trail retrieval**
 
+#### **Admin Endpoints** (`/api/v1/admin`)
+- `POST /apiKey/generate` - **Secure admin/superuser API key creation (admin-only)**
+
 #### **Surcharge Processing** (`/api/v1/surcharge`)
 - `POST /auth` - **Initial authorization**
 - `POST /sale` - **Sale processing**
+- `POST /bulk-sale-complete` - **Bulk sale complete (admin-only, cross-merchant bulk sale processing)**
 - `POST /refund` - **Refund processing**
 - `POST /cancel` - **Cancellation processing**
 - `GET /transactions/{id}` - **Get transaction details**
@@ -517,6 +545,12 @@ erDiagram
 - `PUT /{id}` - **Update provider**
 - `DELETE /{id}` - **Soft delete provider**
 - `POST /{id}/restore` - **Restore deleted provider**
+
+#### **Health & Monitoring Endpoints**
+- `GET /api/health/live` - **Service liveness check**
+- `GET /api/health/ready` - **Service readiness check**
+- `GET /api/health` - **Legacy health check**
+- `GET /api/v1/ping` - **Lightweight ping endpoint**
 
 ---
 
