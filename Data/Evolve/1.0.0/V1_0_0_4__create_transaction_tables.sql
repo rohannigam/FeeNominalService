@@ -1,14 +1,11 @@
 /*
 Migration: V1_0_0_4__create_transaction_tables.sql
-Description: Creates tables for managing transactions and their statuses
+Description: (Removed transaction_statuses and related logic; see step 24 for drops)
 Dependencies: 
 - V1_0_0_1__create_schema.sql (requires fee_nominal schema)
 - V1_0_0_2__create_merchant_tables.sql (requires merchants table)
 Changes:
-- Creates transaction_statuses table with initial status data
-- Creates transactions table
-- Creates transaction_audit_logs table
-- Inserts default transaction statuses
+- (All transaction_statuses logic removed)
 */
 
 DO $$
@@ -23,75 +20,7 @@ BEGIN
     RAISE NOTICE 'Set search path to fee_nominal';
 END $$;
 
-CREATE TABLE IF NOT EXISTS fee_nominal.transaction_statuses (
-    transaction_status_id SERIAL PRIMARY KEY,
-    code VARCHAR(50) NOT NULL UNIQUE,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created transaction_statuses table';
-END $$;
-
--- Verify transaction_statuses table
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'fee_nominal' AND tablename = 'transaction_statuses') THEN
-        RAISE EXCEPTION 'Table transaction_statuses was not created successfully';
-    END IF;
-    RAISE NOTICE 'Verified transaction_statuses table creation';
-END $$;
-
--- Remove the entire CREATE TABLE IF NOT EXISTS fee_nominal.transactions ... block and any related constraints, triggers, or references.
-
-CREATE TABLE IF NOT EXISTS fee_nominal.transaction_audit_logs (
-    audit_log_id SERIAL PRIMARY KEY,
-    transaction_id INTEGER NOT NULL REFERENCES fee_nominal.transactions(transaction_id),
-    action VARCHAR(50) NOT NULL,
-    details JSONB,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255)
-);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created transaction_audit_logs table';
-END $$;
-
--- Verify transaction_audit_logs table
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'fee_nominal' AND tablename = 'transaction_audit_logs') THEN
-        RAISE EXCEPTION 'Table transaction_audit_logs was not created successfully';
-    END IF;
-    RAISE NOTICE 'Verified transaction_audit_logs table creation';
-END $$;
-
--- Insert default transaction statuses
-INSERT INTO fee_nominal.transaction_statuses (code, name, description) VALUES
-    ('PENDING', 'Pending', 'Transaction is pending processing'),
-    ('PROCESSING', 'Processing', 'Transaction is being processed'),
-    ('COMPLETED', 'Completed', 'Transaction has been completed successfully'),
-    ('FAILED', 'Failed', 'Transaction has failed'),
-    ('CANCELLED', 'Cancelled', 'Transaction has been cancelled'),
-    ('REFUNDED', 'Refunded', 'Transaction has been refunded')
-ON CONFLICT (code) DO NOTHING;
-DO $$
-BEGIN
-    RAISE NOTICE 'Inserted default transaction statuses';
-END $$;
-
--- Verify data insertion
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM fee_nominal.transaction_statuses WHERE code = 'PENDING') THEN
-        RAISE EXCEPTION 'Default transaction statuses were not inserted successfully';
-    END IF;
-    RAISE NOTICE 'Verified default transaction statuses insertion';
-END $$;
+-- (transaction_statuses table creation, inserts, and verification removed)
 
 DO $$
 BEGIN

@@ -1,11 +1,9 @@
 /*
 Rollback: U1_0_0_104__create_transaction_tables_rollback.sql
-Description: Rolls back the creation of transaction-related tables
+Description: (No-op; all transaction-related tables removed from step 4)
 Dependencies: V1_0_0_4__create_transaction_tables.sql
 Changes:
-- Drops transaction_audit_logs table
-- Drops transactions table
-- Drops transaction_statuses table
+- (All transaction_audit_logs and transaction_statuses logic removed)
 */
 
 DO $$
@@ -13,18 +11,7 @@ BEGIN
     RAISE NOTICE 'Starting U1_0_0_104__create_transaction_tables rollback...';
 END $$;
 
--- Drop tables in reverse order of creation
-DROP TABLE IF EXISTS fee_nominal.transaction_audit_logs CASCADE;
-DO $$
-BEGIN
-    RAISE NOTICE 'Dropped transaction_audit_logs table';
-END $$;
-
-DROP TABLE IF EXISTS fee_nominal.transaction_statuses CASCADE;
-DO $$
-BEGIN
-    RAISE NOTICE 'Dropped transaction_statuses table';
-END $$;
+-- (No tables to drop; all logic removed)
 
 DO $$
 BEGIN
