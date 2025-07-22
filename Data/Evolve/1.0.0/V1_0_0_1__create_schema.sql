@@ -35,13 +35,22 @@ BEGIN
 END $$;
 
 -- Create function for updating updated_at column
-CREATE OR REPLACE FUNCTION fee_nominal.update_updated_at_column()
-RETURNS TRIGGER AS $$
+DO $$
 BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column' AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'fee_nominal')
+    ) THEN
+        EXECUTE $$
+        CREATE FUNCTION fee_nominal.update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        $$;
+    END IF;
+END $$;
 DO $$
 BEGIN
     RAISE NOTICE 'Created update_updated_at_column function';

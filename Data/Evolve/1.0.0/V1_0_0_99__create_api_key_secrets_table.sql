@@ -70,23 +70,33 @@ CREATE INDEX IF NOT EXISTS idx_api_key_secrets_created_at ON fee_nominal.api_key
 CREATE INDEX IF NOT EXISTS idx_api_key_secrets_scope ON fee_nominal.api_key_secrets(scope);
 
 -- Add updated_at trigger and function
-CREATE OR REPLACE FUNCTION fee_nominal.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 DO $$
 BEGIN
-    RAISE NOTICE 'Created update_updated_at_column function';
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column' AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'fee_nominal')
+    ) THEN
+        EXECUTE $$
+        CREATE FUNCTION fee_nominal.update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        $$;
+    END IF;
 END $$;
-
-DROP TRIGGER IF EXISTS update_api_key_secrets_updated_at ON fee_nominal.api_key_secrets;
-CREATE TRIGGER update_api_key_secrets_updated_at
-    BEFORE UPDATE ON fee_nominal.api_key_secrets
-    FOR EACH ROW
-    EXECUTE FUNCTION fee_nominal.update_updated_at_column();
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_api_key_secrets_updated_at'
+    ) THEN
+        CREATE TRIGGER update_api_key_secrets_updated_at
+            BEFORE UPDATE ON fee_nominal.api_key_secrets
+            FOR EACH ROW
+            EXECUTE FUNCTION fee_nominal.update_updated_at_column();
+    END IF;
+END $$;
 DO $$
 BEGIN
     RAISE NOTICE 'Created trigger for updated_at column';
