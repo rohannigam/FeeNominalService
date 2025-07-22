@@ -16,7 +16,6 @@ END $$;
 -- Temporarily disable audit triggers
 ALTER TABLE fee_nominal.merchants DISABLE TRIGGER audit_merchants;
 ALTER TABLE fee_nominal.api_keys DISABLE TRIGGER audit_api_keys;
-ALTER TABLE fee_nominal.transactions DISABLE TRIGGER audit_transactions;
 
 DO $$
 BEGIN
@@ -74,7 +73,6 @@ END $$;
 -- Re-enable audit triggers
 ALTER TABLE fee_nominal.merchants ENABLE TRIGGER audit_merchants;
 ALTER TABLE fee_nominal.api_keys ENABLE TRIGGER audit_api_keys;
-ALTER TABLE fee_nominal.transactions ENABLE TRIGGER audit_transactions;
 
 DO $$
 BEGIN

@@ -49,14 +49,6 @@ BEGIN
     RAISE NOTICE 'Dropped indexes on api_key tables';
 END $$;
 
--- Drop indexes on transaction table
-DROP INDEX IF EXISTS fee_nominal.idx_transactions_merchant;
-DROP INDEX IF EXISTS fee_nominal.idx_transactions_created_at;
-DO $$
-BEGIN
-    RAISE NOTICE 'Dropped indexes on transaction table';
-END $$;
-
 -- Drop indexes on audit tables
 DROP INDEX IF EXISTS fee_nominal.idx_audit_trail_merchant;
 DROP INDEX IF EXISTS fee_nominal.idx_audit_logs_created_at_entity_type;

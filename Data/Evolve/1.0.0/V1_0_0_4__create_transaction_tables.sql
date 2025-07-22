@@ -46,31 +46,7 @@ BEGIN
     RAISE NOTICE 'Verified transaction_statuses table creation';
 END $$;
 
-CREATE TABLE IF NOT EXISTS fee_nominal.transactions (
-    transaction_id SERIAL PRIMARY KEY,
-    merchant_id UUID NOT NULL REFERENCES fee_nominal.merchants(merchant_id),
-    transaction_status_id INTEGER NOT NULL REFERENCES fee_nominal.transaction_statuses(transaction_status_id),
-    amount DECIMAL(19,4) NOT NULL,
-    currency VARCHAR(3) NOT NULL,
-    reference_id VARCHAR(255) NOT NULL,
-    description TEXT,
-    metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created transactions table';
-END $$;
-
--- Verify transactions table
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'fee_nominal' AND tablename = 'transactions') THEN
-        RAISE EXCEPTION 'Table transactions was not created successfully';
-    END IF;
-    RAISE NOTICE 'Verified transactions table creation';
-END $$;
+-- Remove the entire CREATE TABLE IF NOT EXISTS fee_nominal.transactions ... block and any related constraints, triggers, or references.
 
 CREATE TABLE IF NOT EXISTS fee_nominal.transaction_audit_logs (
     audit_log_id SERIAL PRIMARY KEY,

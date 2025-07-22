@@ -97,18 +97,6 @@ BEGIN
     RAISE NOTICE 'Created index on api_keys.is_active';
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_transactions_merchant ON fee_nominal.transactions(merchant_id);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on transactions.merchant_id';
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON fee_nominal.transactions(created_at);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on transactions.created_at';
-END $$;
-
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at_entity_type ON fee_nominal.audit_logs(created_at, entity_type);
 DO $$
 BEGIN

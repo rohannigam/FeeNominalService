@@ -50,11 +50,6 @@ CREATE TRIGGER update_api_keys_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.update_updated_at_column();
 
-CREATE TRIGGER update_transactions_updated_at
-    BEFORE UPDATE ON fee_nominal.transactions
-    FOR EACH ROW
-    EXECUTE FUNCTION fee_nominal.update_updated_at_column();
-
 -- Function to log transaction history
 CREATE OR REPLACE FUNCTION fee_nominal.log_transaction_history()
 RETURNS TRIGGER AS $$
@@ -148,11 +143,6 @@ CREATE TRIGGER audit_merchants
 
 CREATE TRIGGER audit_api_keys
     AFTER INSERT OR UPDATE OR DELETE ON fee_nominal.api_keys
-    FOR EACH ROW
-    EXECUTE FUNCTION fee_nominal.log_audit_details();
-
-CREATE TRIGGER audit_transactions
-    AFTER INSERT OR UPDATE OR DELETE ON fee_nominal.transactions
     FOR EACH ROW
     EXECUTE FUNCTION fee_nominal.log_audit_details();
 

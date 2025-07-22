@@ -20,12 +20,6 @@ BEGIN
     RAISE NOTICE 'Dropped transaction_audit_logs table';
 END $$;
 
-DROP TABLE IF EXISTS fee_nominal.transactions CASCADE;
-DO $$
-BEGIN
-    RAISE NOTICE 'Dropped transactions table';
-END $$;
-
 DROP TABLE IF EXISTS fee_nominal.transaction_statuses CASCADE;
 DO $$
 BEGIN

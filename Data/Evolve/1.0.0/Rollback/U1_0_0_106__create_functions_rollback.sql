@@ -15,7 +15,6 @@ BEGIN
 END $$;
 
 -- Drop triggers first
-DROP TRIGGER IF EXISTS audit_transactions ON fee_nominal.transactions;
 DROP TRIGGER IF EXISTS audit_api_keys ON fee_nominal.api_keys;
 DROP TRIGGER IF EXISTS audit_merchants ON fee_nominal.merchants;
 DROP TRIGGER IF EXISTS log_transaction_history ON fee_nominal.transactions;

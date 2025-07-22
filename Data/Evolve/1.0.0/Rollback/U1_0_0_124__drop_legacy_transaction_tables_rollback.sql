@@ -22,21 +22,6 @@ CREATE TABLE IF NOT EXISTS transaction_statuses (
 );
 DO $$ BEGIN RAISE NOTICE 'Recreated transaction_statuses table'; END $$;
 
--- Recreate transactions
-CREATE TABLE IF NOT EXISTS transactions (
-    transaction_id SERIAL PRIMARY KEY,
-    merchant_id UUID NOT NULL,
-    transaction_status_id INTEGER NOT NULL,
-    amount DECIMAL(19,4) NOT NULL,
-    currency VARCHAR(3) NOT NULL,
-    reference_id VARCHAR(255) NOT NULL,
-    description TEXT,
-    metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-DO $$ BEGIN RAISE NOTICE 'Recreated transactions table'; END $$;
-
 -- Recreate transaction_audit_logs
 CREATE TABLE IF NOT EXISTS transaction_audit_logs (
     audit_log_id SERIAL PRIMARY KEY,
