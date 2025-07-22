@@ -1,0 +1,132 @@
+# Surcharge Cancel Endpoint Documentation
+
+## Endpoint
+POST /api/v1/surcharge/cancel
+
+---
+
+## Overview
+The Surcharge Cancel endpoint allows a merchant or service user to cancel a previously authorized or completed surcharge transaction. Each cancel operation creates a new transaction record in the database, always linked to the root (auth) transaction for full auditability and traceability.
+
+---
+
+## Request Fields
+- **surchargeTransactionId** (GUID, optional, preferred): The internal ID of the original surcharge transaction (auth or sale) to cancel. If provided, all other fields are optional.
+- **providerTransactionId** (string, optional): The provider's transaction ID (e.g., InterPayments sTxId). If provided, the following fields are required:
+  - **correlationId** (string, required)
+  - **providerCode** (string, required)
+  - **providerType** (string, required)
+- **correlationId** (string, optional): Correlation identifier for linking related transactions (required if using providerTransactionId).
+- **providerCode** (string, optional): Provider code (required if using providerTransactionId).
+- **providerType** (string, optional): Provider type (required if using providerTransactionId).
+- **merchantTransactionId** (string, optional): Merchant's own transaction identifier.
+- **reasonCode** (string, optional): Reason for cancellation (e.g., ABANDONED, SWITCHED_PAYMENT_TO_ACH, etc.).
+- **data** (array of string, optional): Additional data for the cancellation.
+- **authCode** (string, optional): Authorization code for the transaction.
+- **cardToken** (string, optional): Tokenized card information.
+
+### Example Request (Preferred)
+```json
+{
+  "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+}
+```
+
+### Example Request (Provider Transaction)
+```json
+{
+  "providerTransactionId": "ip-tx-001",
+  "correlationId": "cancel-123456",
+  "providerCode": "INTERPAY",
+  "providerType": "INTERPAYMENTS",
+  "reasonCode": "ABANDONED",
+  "data": ["extra1", "extra2"],
+  "authCode": "auth-xyz",
+  "cardToken": "token-abc"
+}
+```
+
+---
+
+## Response Fields
+- **surchargeTransactionId** (GUID): The ID of the new cancel transaction.
+- **correlationId** (string): Correlation identifier for the cancel operation.
+- **merchantTransactionId** (string): Merchant's transaction ID for the cancel.
+- **providerTransactionId** (string): Provider's transaction ID for the cancel.
+- **originalTransactionId** (GUID): The root (auth) transaction ID for the chain.
+- **status** (string): Status of the cancel operation ("Cancelled" or "Failed").
+- **provider** (string): Provider code.
+- **processedAt** (datetime): When the cancel was processed.
+- **errorMessage** (string, nullable): Error message if the operation failed.
+
+### Example Response
+```json
+{
+  "surchargeTransactionId": "cancel-tx-001",
+  "correlationId": "cancel-123456",
+  "merchantTransactionId": "cancel-987654",
+  "providerTransactionId": "ip-cancel-001",
+  "originalTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+  "status": "Cancelled",
+  "provider": "INTERPAY",
+  "processedAt": "2025-05-20T04:52:24.803373Z",
+  "errorMessage": null
+}
+```
+
+---
+
+## Workflow Diagram
+
+```
++-------------------+
+|  Client/Service   |
++--------+----------+
+         |
+         | 1. POST /api/v1/surcharge/cancel
+         v
++--------+----------+
+|  FeeNominal API   |
++--------+----------+
+         |
+         | 2. Lookup original transaction (by surchargeTransactionId or providerTransactionId+correlationId)
+         |
+         | 3. Find root (auth) transaction in chain
+         |
+         | 4. Call provider cancel endpoint (e.g., InterPayments)
+         |
+         | 5. Create new cancel transaction in DB, link to root
+         |
+         | 6. Return response with new cancel transaction ID and root originalTransactionId
+         v
++-------------------+
+|      Client       |
++-------------------+
+```
+
+---
+
+## Notes & Special Behaviors
+- **DB Linkage:** Every cancel operation creates a new transaction record, with `OriginalSurchargeTransId` set to the root (auth) transaction.
+- **Auditability:** All cancel operations are fully auditable and traceable via the root linkage.
+- **Warning Logging:** If the most recent transaction in the chain is already Completed, Cancelled, or Failed, a warning is logged (not returned in the response).
+- **Idempotency:** Multiple cancel requests on the same chain will each create a new cancel transaction, but only the first may have an effect at the provider.
+- **Best Practice:** Prefer using `surchargeTransactionId` for cancel requests. Use providerTransactionId+correlationId+providerCode+providerType only if you do not have the internal ID.
+
+---
+
+## Change History
+- **2024-06:** Endpoint updated to always link cancel transactions to the root (auth) transaction. Logging and documentation improved. Request/response models updated for flexibility and auditability.
+
+---
+
+## Usage Scenarios
+- Cancel a pending or completed surcharge transaction by internal ID (preferred).
+- Cancel by provider transaction ID if internal ID is not available (requires extra fields).
+- Audit all cancel operations by tracing the root transaction chain.
+
+---
+
+## Caveats
+- The cancel operation may be allowed by the provider even for Completed transactions. Your system logs a warning but does not block the request.
+- The API response does not include warning messages; check logs for operational warnings. 

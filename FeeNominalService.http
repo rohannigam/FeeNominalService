@@ -891,7 +891,7 @@ X-Signature: calculated-signature-here
 #   "error": null
 # }
 
-# --- Surcharge Cancel ---
+### --- Surcharge Cancel ---
 POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/cancel
 Content-Type: application/json
 X-API-Key: your-api-key-here
@@ -900,10 +900,18 @@ X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
 
 {
-  "correlationId": "cancel-123456",
-  "merchantTransactionId": "cancel-987654",
-  "originalTransactionId": "sale-tx-001",
-  "cancelReason": "Customer request"
+  // Option 1: Use surchargeTransactionId (all other fields optional)
+  "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+  // Option 2: Use providerTransactionId, providerCode, providerType, correlationId (all required if surchargeTransactionId not provided)
+  // "providerTransactionId": "ip-tx-001",
+  // "providerCode": "INTERPAY",
+  // "providerType": "INTERPAYMENTS",
+  // "correlationId": "cancel-123456"
+  // Optionally, you may include:
+  // "reasonCode": "ABANDONED",
+  // "data": ["extra1", "extra2"],
+  // "authCode": "auth-xyz",
+  // "cardToken": "token-abc"
 }
 
 ### Response Example:
@@ -912,12 +920,15 @@ X-Signature: calculated-signature-here
 #   "correlationId": "cancel-123456",
 #   "merchantTransactionId": "cancel-987654",
 #   "providerTransactionId": "ip-cancel-001",
-#   "originalTransactionId": "sale-tx-001",
-#   "status": "Completed",
+#   "originalTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef", // always the root (auth) transaction
+#   "status": "Cancelled",
 #   "provider": "INTERPAY",
 #   "processedAt": "2025-05-20T04:52:24.803373Z",
 #   "errorMessage": null
 # }
+#
+# Note: The cancel operation always creates a new transaction in the DB, linked to the root (auth) transaction via originalTransactionId.
+# If the most recent transaction in the chain is already Completed, Cancelled, or Failed, a warning is logged (not returned in the response).
 
 ### Get Surcharge Transaction by ID
 GET {{FeeNominalService_HostAddress}}/api/v1/surcharge/transactions/b1e2c3d4-e5f6-7890-abcd-1234567890ef

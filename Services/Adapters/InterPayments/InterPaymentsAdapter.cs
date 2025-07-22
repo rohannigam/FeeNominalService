@@ -273,4 +273,67 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         var doc = JsonDocument.Parse(json);
         return (true, doc, null);
     }
+
+    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
+        string sTxId,
+        SurchargeProviderConfig providerConfig,
+        string? mTxId = null,
+        string? cardToken = null,
+        string? reasonCode = null,
+        List<string>? data = null,
+        string? authCode = null)
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+        // Extract JWT token and token type from provider config credentials
+        var credentials = providerConfig.Credentials;
+        if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
+            return (false, null, "Missing JWT token in provider credentials.");
+        var jwtToken = jwtTokenProp.GetString();
+        var tokenType = "Bearer";
+        if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
+            tokenType = tokenTypeProp.GetString() ?? "Bearer";
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, jwtToken);
+
+        // Build request payload
+        var payload = new Dictionary<string, object?>
+        {
+            ["sTxId"] = sTxId
+        };
+        if (!string.IsNullOrWhiteSpace(mTxId))
+            payload["mTxId"] = mTxId;
+        if (!string.IsNullOrWhiteSpace(cardToken))
+            payload["cardToken"] = cardToken;
+        if (!string.IsNullOrWhiteSpace(reasonCode))
+            payload["reasonCode"] = reasonCode;
+        if (data != null && data.Count > 0)
+            payload["data"] = data;
+        if (!string.IsNullOrWhiteSpace(authCode))
+            payload["authCode"] = authCode;
+
+        var cancelUrl = InterpaymentsUrl.TrimEnd('/') + "/cancel";
+        _logger.LogInformation("Sending InterPayments cancel request to: {Url}", cancelUrl);
+        _logger.LogInformation("InterPayments Cancel Request JSON: {Request}", JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsJsonAsync(cancelUrl, payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending cancel request to InterPayments");
+            return (false, null, ex.Message);
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("InterPayments Cancel Response JSON: {Response}", json);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("InterPayments cancel API returned error: {StatusCode} {Content}", response.StatusCode, json);
+            return (false, null, json);
+        }
+
+        var doc = JsonDocument.Parse(json);
+        return (true, doc, null);
+    }
 } 

@@ -221,8 +221,12 @@ namespace FeeNominalService.Controllers.V1
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
+                // Extract API key or user identity for audit
+                var apiKey = User.FindFirst("ApiKey")?.Value;
+                var actor = !string.IsNullOrEmpty(apiKey) ? apiKey : "system";
+
                 // Process the surcharge cancellation
-                var response = await _surchargeTransactionService.ProcessCancelAsync(request, merchantId);
+                var response = await _surchargeTransactionService.ProcessCancelAsync(request, merchantId, actor);
 
                 _logger.LogInformation("Successfully processed surcharge cancel for transaction: {CorrelationId}, " +
                     "surcharge transaction ID: {SurchargeTransactionId}", 

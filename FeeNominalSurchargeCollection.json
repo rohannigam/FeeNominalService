@@ -3397,18 +3397,10 @@
 									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
 									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
 									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;",
-									"",
-									"console.log('Surcharge Cancel Request:');",
-									"console.log('Transaction ID:', transactionId);",
-									"console.log('Request Body:', requestBody);",
-									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
-									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						},
 						{
@@ -3439,7 +3431,8 @@
 									"    }",
 									"});"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -3453,7 +3446,134 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"transactionId\": \"{{surchargeTransactionId}}\",\n    \"reason\": \"{{cancelReason}}\",\n    \"metadata\": {\n        \"source\": \"postman-test\",\n        \"testId\": \"{{$guid}}\"\n    }\n}"
+							"raw": "{\n  \"surchargeTransactionId\": \"{{surchargeTransactionId}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/cancel",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"cancel"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Cancel w ProvTransId",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get transaction ID from previous auth",
+									"const transactionId = pm.environment.get('surchargeTransactionId');",
+									"if (!transactionId) {",
+									"    console.error('Transaction ID not found. Please run Surcharge Auth first.');",
+									"    return;",
+									"}",
+									"",
+									"// Get request body",
+									"const requestBody = JSON.stringify({",
+									"    transactionId: transactionId,",
+									"    reason: pm.environment.get('cancelReason') || 'Customer request',",
+									"    metadata: {",
+									"        source: 'postman-test',",
+									"        testId: pm.variables.replaceIn('{{$guid}}')",
+									"    }",
+									"});",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('transactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('updatedAt');",
+									"        ",
+									"        console.log('Surcharge Cancel Response:');",
+									"        console.log('Transaction ID:', jsonData.data.transactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        ",
+									"        // Verify status is CANCELLED",
+									"        pm.expect(jsonData.data.status).to.equal('CANCELLED');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correlationId\": \"{{surchargeCorrelationId}}\",\n  \"providerTransactionId\": \"{{surchargeProviderTransactionId}}\",\n  //\"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n  \"providerType\": \"{{providerType}}\",\n  \"providerCode\": \"{{providerCode}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/surcharge/cancel",
