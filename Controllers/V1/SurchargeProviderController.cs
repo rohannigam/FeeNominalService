@@ -81,6 +81,12 @@ namespace FeeNominalService.Controllers.V1
                     return BadRequest(ApiErrorResponse.InvalidConfiguration(configErrors));
                 }
 
+                // Advanced BaseUrl validation
+                if (!UrlSecurityValidator.IsValidBaseUrl(request.BaseUrl, out var baseUrlError))
+                {
+                    return BadRequest(ApiErrorResponse.InvalidConfiguration(new List<string> { baseUrlError }));
+                }
+
                 // Validate actual credentials if configuration is provided
                 if (request.Configuration?.Credentials != null)
                 {
@@ -394,6 +400,12 @@ namespace FeeNominalService.Controllers.V1
                 if (status == null)
                 {
                     return BadRequest(ApiErrorResponse.InvalidStatusCode(statusCode));
+                }
+
+                // Advanced BaseUrl validation for update
+                if (!UrlSecurityValidator.IsValidBaseUrl(request.BaseUrl, out var updateBaseUrlError))
+                {
+                    return BadRequest(ApiErrorResponse.InvalidConfiguration(new List<string> { updateBaseUrlError }));
                 }
 
                 // Update the provider

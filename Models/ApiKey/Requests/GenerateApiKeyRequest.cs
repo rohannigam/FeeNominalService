@@ -41,6 +41,12 @@ public class GenerateApiKeyRequest
     public string? Purpose { get; set; }
 
     /// <summary>
+    /// Optional unique name for the API key (must be unique per merchant)
+    /// </summary>
+    [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+    public string? Name { get; set; }
+
+    /// <summary>
     /// Number of days until the API key expires (default: 365)
     /// </summary>
     [Range(1, 3650, ErrorMessage = "ExpirationDays must be between 1 and 3650 days")]

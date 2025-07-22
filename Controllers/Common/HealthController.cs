@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using FeeNominalService.Data;
 using System.Diagnostics;
+using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FeeNominalService.Controllers.Common
 {
@@ -19,13 +21,19 @@ namespace FeeNominalService.Controllers.Common
 
         // Liveness probe - lightweight, no dependencies
         [HttpGet("live")]
+        [AllowAnonymous]
         public IActionResult Liveness()
         {
-            return Ok(new { status = "Alive", service = "FeeNominalService" });
+            var informationalVersion = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            var fileVersion = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
+            return Ok(new { status = "Alive", service = "FeeNominalService", version = informationalVersion, buildVersion = fileVersion });
         }
 
         // Readiness probe - checks critical dependencies (DB)
         [HttpGet("ready")]
+        [AllowAnonymous]
         public async Task<IActionResult> Readiness()
         {
             var sw = Stopwatch.StartNew();
@@ -51,6 +59,7 @@ namespace FeeNominalService.Controllers.Common
 
         // Legacy endpoint for backward compatibility
         [HttpGet]
+        [AllowAnonymous]
         public IActionResult Health()
         {
             return Ok(new { status = "Alive", service = "FeeNominalService" });

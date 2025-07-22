@@ -18,6 +18,12 @@ public class GenerateInitialApiKeyRequest
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Optional unique name for the API key (must be unique per merchant)
+    /// </summary>
+    [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+    public string? Name { get; set; }
+
     [Range(1, 10000, ErrorMessage = "RateLimit must be between 1 and 10000")]
     public int? RateLimit { get; set; }
 

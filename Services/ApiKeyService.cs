@@ -821,28 +821,38 @@ namespace FeeNominalService.Services
                 throw new InvalidOperationException("Merchant has reached the maximum number of active API keys (5)");
             }
 
-            // Determine a unique, human-readable name for the API key. The database enforces
-            // a UNIQUE constraint on (merchant_id, name) so we must avoid collisions with any
-            // existing key (active OR historical).
-
-            var baseName = merchant.Name?.Trim();
-            if (string.IsNullOrWhiteSpace(baseName))
-            {
-                baseName = "APIKEY"; // sensible fallback – should never occur in practice
-            }
-
             // Gather **all** existing names (case-insensitive) for this merchant
             var existingNames = (await _apiKeyRepository.GetByMerchantIdAsync(merchant.MerchantId))
                 .Select(k => k.Name?.ToLowerInvariant())
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet();
 
-            var uniqueName = baseName;
-            var suffix = 1;
-            while (existingNames.Contains(uniqueName.ToLowerInvariant()))
+            string uniqueName;
+            if (!string.IsNullOrWhiteSpace(request.Name))
             {
-                uniqueName = $"{baseName}-{suffix}";
-                suffix++;
+                uniqueName = request.Name.Trim();
+                var baseUniqueName = uniqueName;
+                var suffix = 1;
+                while (existingNames.Contains(uniqueName.ToLowerInvariant()))
+                {
+                    uniqueName = $"{baseUniqueName}-{suffix}";
+                    suffix++;
+                }
+            }
+            else
+            {
+                var baseName = merchant.Name?.Trim();
+                if (string.IsNullOrWhiteSpace(baseName))
+                {
+                    baseName = "APIKEY";
+                }
+                uniqueName = baseName;
+                var suffix = 1;
+                while (existingNames.Contains(uniqueName.ToLowerInvariant()))
+                {
+                    uniqueName = $"{baseName}-{suffix}";
+                    suffix++;
+                }
             }
 
             // Generate new API key
@@ -857,7 +867,7 @@ namespace FeeNominalService.Services
                 AllowedEndpoints = request.AllowedEndpoints ?? Array.Empty<string>(),
                 Purpose = request.Purpose,
                 Name = uniqueName,
-                Description = request.Description ?? "API Key for merchant " + merchant.Name,
+                Description = request.Description ?? $"API Key for merchant {merchant.Name}",
                 MerchantId = request.MerchantId,
                 CreatedBy = request.IsAdmin ? "admin" : request.OnboardingMetadata?.AdminUserId ?? "unknown",
                 ExpirationDays = request.ExpirationDays ?? 365, // Use request value or default to 1 year
@@ -1027,6 +1037,40 @@ namespace FeeNominalService.Services
                 var apiKey = Guid.NewGuid().ToString("N");
                 var secret = Guid.NewGuid().ToString("N");
 
+                // Gather **all** existing names (case-insensitive) for this merchant
+                var existingNames = (await _apiKeyRepository.GetByMerchantIdAsync(merchantId))
+                    .Select(k => k.Name?.ToLowerInvariant())
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .ToHashSet();
+
+                string uniqueName;
+                if (!string.IsNullOrWhiteSpace(request.Name))
+                {
+                    uniqueName = request.Name.Trim();
+                    var baseUniqueName = uniqueName;
+                    var suffix = 1;
+                    while (existingNames.Contains(uniqueName.ToLowerInvariant()))
+                    {
+                        uniqueName = $"{baseUniqueName}-{suffix}";
+                        suffix++;
+                    }
+                }
+                else
+                {
+                    var baseName = merchant.Name?.Trim();
+                    if (string.IsNullOrWhiteSpace(baseName))
+                    {
+                        baseName = "APIKEY";
+                    }
+                    uniqueName = baseName;
+                    var suffix = 1;
+                    while (existingNames.Contains(uniqueName.ToLowerInvariant()))
+                    {
+                        uniqueName = $"{baseName}-{suffix}";
+                        suffix++;
+                    }
+                }
+
                 // Create API key record
                 var apiKeyEntity = new Models.ApiKey.ApiKey
                 {
@@ -1039,10 +1083,11 @@ namespace FeeNominalService.Services
                     AllowedEndpoints = request.AllowedEndpoints ?? Array.Empty<string>(),
                     Description = request.Description,
                     Purpose = request.Purpose,
-                    Name = request.Description ?? "Initial API Key",
+                    Name = uniqueName,
                     CreatedBy = request.OnboardingMetadata.AdminUserId,
                     OnboardingReference = request.OnboardingMetadata.OnboardingReference,
-                    ExpirationDays = request.ExpirationDays ?? 365 // Use request value or default to 1 year
+                    ExpirationDays = request.ExpirationDays ?? 365, // Use request value or default to 1 year
+                    OnboardingTimestamp = request.OnboardingMetadata?.OnboardingTimestamp ?? DateTime.UtcNow
                 };
 
                 var createdApiKey = await _apiKeyRepository.CreateAsync(apiKeyEntity);
@@ -1086,7 +1131,7 @@ namespace FeeNominalService.Services
                     Secret = secret,
                     CreatedAt = apiKeyEntity.CreatedAt,
                     RateLimit = apiKeyEntity.RateLimit,
-                    AllowedEndpoints = apiKeyEntity.AllowedEndpoints,
+                    AllowedEndpoints = apiKeyEntity.AllowedEndpoints!,
                     Description = apiKeyEntity.Description,
                     Purpose = apiKeyEntity.Purpose,
                     OnboardingMetadata = request.OnboardingMetadata

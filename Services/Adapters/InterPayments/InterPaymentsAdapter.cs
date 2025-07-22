@@ -16,7 +16,6 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<InterPaymentsAdapter> _logger;
-    private const string InterpaymentsUrl = ApiConstants.InterpaymentsBaseAddress;
 
     public InterPaymentsAdapter(IHttpClientFactory httpClientFactory, ILogger<InterPaymentsAdapter> logger)
     {
@@ -47,6 +46,14 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         }
 
         return (true, null);
+    }
+
+    private static string GetBaseUrl(SurchargeProviderConfig providerConfig)
+    {
+        var baseUrl = providerConfig.Provider?.BaseUrl;
+        if (!string.IsNullOrWhiteSpace(baseUrl))
+            return baseUrl.TrimEnd('/');
+        throw new SurchargeException("Provider baseUrl is not configured. Please set a valid baseUrl in the provider configuration.");
     }
 
     public async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, SurchargeProviderConfig providerConfig)
@@ -103,17 +110,19 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
             interpaymentsRequest["sTxId"] = request.ProviderTransactionId;
         }
 
-        _logger.LogInformation("Sending request to Interpayments: {Url}", InterpaymentsUrl);
+        var baseUrl = GetBaseUrl(providerConfig);
+        _logger.LogInformation("Using InterPayments baseUrl: {BaseUrl}", baseUrl);
+        _logger.LogInformation("Sending request to Interpayments: {Url}", baseUrl);
         _logger.LogInformation("Interpayments Request JSON: {Request}", JsonSerializer.Serialize(interpaymentsRequest, new JsonSerializerOptions { WriteIndented = true }));
 
         HttpResponseMessage response;
         try
         {
-            response = await httpClient.PostAsJsonAsync(InterpaymentsUrl, interpaymentsRequest);
+            response = await httpClient.PostAsJsonAsync(baseUrl, interpaymentsRequest);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending request to Interpayments");
+            _logger.LogError(ex, "Error sending request to InterPayments");
             throw new SurchargeException(SurchargeErrorCodes.InterPayments.SEND_REQUEST_FAILED, ex.Message, ex);
         }
 
@@ -188,8 +197,9 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
             payload["mTxId"] = mTxId;
         }
 
-        // Determine sale endpoint URL
-        var saleUrl = InterpaymentsUrl.TrimEnd('/') + "/sale";
+        var baseUrl = GetBaseUrl(providerConfig);
+        var saleUrl = baseUrl + "/sale";
+        _logger.LogInformation("Using InterPayments baseUrl: {BaseUrl}", baseUrl);
         _logger.LogInformation("Sending InterPayments sale request to: {Url}", saleUrl);
         _logger.LogInformation("InterPayments Sale Request JSON: {Request}", JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
 
@@ -224,54 +234,10 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         return (true, doc, null);
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, JsonDocument credentials)
+    public Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, JsonDocument credentials)
     {
-        var httpClient = _httpClientFactory.CreateClient();
-        // Extract JWT token and token type from credentials
-        if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
-            return (false, null, "Missing JWT token in provider credentials.");
-        var jwtToken = jwtTokenProp.GetString();
-        var tokenType = "Bearer";
-        if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
-            tokenType = tokenTypeProp.GetString() ?? "Bearer";
-        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, jwtToken);
-
-        // Build InterPayments bulk sale payload
-        var payload = new List<Dictionary<string, object?>>();
-        foreach (var sale in sales)
-        {
-            var item = new Dictionary<string, object?>
-            {
-                ["sTxId"] = sale.ProviderTransactionId
-            };
-            payload.Add(item);
-        }
-
-        var bulkSaleUrl = ApiConstants.InterpaymentsBaseAddress.TrimEnd('/') + "/bulk/sale";
-        _logger.LogInformation("Sending InterPayments bulk sale request to: {Url}", bulkSaleUrl);
-        _logger.LogInformation("InterPayments Bulk Sale Request JSON: {Request}", System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-
-        HttpResponseMessage response;
-        try
-        {
-            response = await httpClient.PostAsJsonAsync(bulkSaleUrl, payload);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending bulk sale request to InterPayments");
-            return (false, null, ex.Message);
-        }
-
-        var json = await response.Content.ReadAsStringAsync();
-        _logger.LogInformation("InterPayments Bulk Sale Response JSON: {Response}", json);
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogError("InterPayments bulk sale API returned error: {StatusCode} {Content}", response.StatusCode, json);
-            return (false, null, json);
-        }
-
-        var doc = JsonDocument.Parse(json);
-        return (true, doc, null);
+        // This method now requires providerConfig to be available elsewhere. If not, throw a NotImplementedException for now.
+        throw new NotImplementedException("ProcessBulkSaleAsync requires providerConfig. Please update the interface or provide providerConfig another way.");
     }
 
     public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
@@ -310,7 +276,9 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         if (!string.IsNullOrWhiteSpace(authCode))
             payload["authCode"] = authCode;
 
-        var cancelUrl = InterpaymentsUrl.TrimEnd('/') + "/cancel";
+        var baseUrl = GetBaseUrl(providerConfig);
+        var cancelUrl = baseUrl + "/cancel";
+        _logger.LogInformation("Using InterPayments baseUrl: {BaseUrl}", baseUrl);
         _logger.LogInformation("Sending InterPayments cancel request to: {Url}", cancelUrl);
         _logger.LogInformation("InterPayments Cancel Request JSON: {Request}", JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
 

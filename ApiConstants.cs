@@ -3,11 +3,6 @@ namespace FeeNominalService
     public static class ApiConstants
     {
         //API Endpoints
-        public const string InterpaymentsBaseAddress = "https://api-test.interpayments.com/v1/ch";
-        public const string InterpaymentsBaseSaleAddress = "https://api-test.interpayments.com/v1/ch/sale";
-        public const string InterpaymentsBaseRefundAddress = "https://api-test.interpayments.com/v1/ch/refund";
-        public const string InterpaymentsBaseCancelAddress = "https://api-test.interpayments.com/v1/ch/cancel";
-
         // Headers
         public const string ContentTypeHeader = "application/json";
         public const string AcceptHeader = "application/json";
