@@ -20,13 +20,14 @@ FeeNominalService is a microservice designed to handle surcharge calculations, m
 **CURRENT ENDPOINTS:**
 ```
 /api/v1/surcharge/auth                    // Process surcharge authorization
+/api/v1/surcharge/sale                    // Process surcharge sale (single)
+/api/v1/surcharge/bulk-sale-complete      // Process bulk/admin sale (batch)
 /api/v1/surcharge/transactions/{id}       // Get transaction by ID
 /api/v1/surcharge/transactions            // List transactions with pagination
 ```
 
 **PLANNED ENDPOINTS (Coming Soon):**
 ```
-/api/v1/surcharge/sale                    // Process surcharge sale
 /api/v1/surcharge/refund                  // Process surcharge refund
 /api/v1/surcharge/cancel                  // Process surcharge cancellation
 ```

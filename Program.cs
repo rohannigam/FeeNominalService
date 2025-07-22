@@ -78,6 +78,10 @@ builder.Services.AddHttpClient();
 // Configure API key settings
 builder.Services.Configure<ApiKeySettings>(builder.Configuration.GetSection("ApiKeySettings"));
 builder.Services.Configure<ApiKeyConfiguration>(builder.Configuration.GetSection("ApiKeyConfiguration"));
+builder.Services.Configure<AwsSecretsManagerConfiguration>(builder.Configuration.GetSection("AWS:SecretsManager"));
+
+// Register SecretNameFormatter
+builder.Services.AddSingleton<SecretNameFormatter>();
 
 // Configure Surcharge Provider validation settings
 builder.Services.Configure<SurchargeProviderValidationSettings>(builder.Configuration.GetSection("SurchargeProviderValidation"));
@@ -93,7 +97,8 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
-    builder.Services.AddScoped<IAwsSecretsManagerService, AwsSecretsManagerService>();
+    builder.Services.AddAWSService<Amazon.SecretsManager.IAmazonSecretsManager>();
+    builder.Services.AddScoped<IAwsSecretsManagerService, FeeNominalService.Services.AwsSecretsManagerService>();
 }
 
 // Register repositories
@@ -172,7 +177,40 @@ builder.Services.AddAuthorization(options =>
             Log.Debug("Authorization check for path: {Path}", httpContext.Request.Path);
             Log.Debug("User claims: {Claims}", string.Join(", ", user.Claims.Select(c => $"{c.Type}: {c.Value}")));
 
+            var scope = user.FindFirst("Scope")?.Value;
+            var isAdmin = user.FindFirst("IsAdmin")?.Value;
             var merchantId = user.FindFirst("MerchantId")?.Value;
+
+            // Allow admin-scope keys without MerchantId
+            if (scope == "admin" && isAdmin == "true")
+            {
+                // Check if the endpoint is allowed
+                var allowedEndpoints = user.FindFirst("AllowedEndpoints")?.Value;
+                if (!string.IsNullOrEmpty(allowedEndpoints))
+                {
+                    var requestPath = httpContext.Request.Path.Value?.ToLower();
+                    if (string.IsNullOrEmpty(requestPath))
+                    {
+                        Log.Warning("Authorization failed: Request path is null or empty");
+                        return false;
+                    }
+
+                    var allowedPaths = allowedEndpoints.Split(',').Select(p => p.Trim().ToLower());
+                    Log.Debug("Checking endpoint access - Request path: {Path}, Allowed paths: {AllowedPaths}", 
+                        requestPath, string.Join(", ", allowedPaths));
+
+                    if (!EndpointMatcher.IsEndpointAllowed(requestPath, allowedPaths))
+                    {
+                        Log.Warning("Authorization failed: Endpoint {Path} not in allowed endpoints: {AllowedEndpoints}", 
+                            requestPath, allowedEndpoints);
+                        return false;
+                    }
+                }
+                Log.Debug("Authorization successful for admin key and path {Path}", httpContext.Request.Path);
+                return true;
+            }
+
+            // For merchant-scope keys, require MerchantId
             if (string.IsNullOrEmpty(merchantId))
             {
                 Log.Warning("Authorization failed: No MerchantId claim found");
@@ -180,8 +218,8 @@ builder.Services.AddAuthorization(options =>
             }
 
             // Check if the endpoint is allowed
-            var allowedEndpoints = user.FindFirst("AllowedEndpoints")?.Value;
-            if (!string.IsNullOrEmpty(allowedEndpoints))
+            var merchantAllowedEndpoints = user.FindFirst("AllowedEndpoints")?.Value;
+            if (!string.IsNullOrEmpty(merchantAllowedEndpoints))
             {
                 var requestPath = httpContext.Request.Path.Value?.ToLower();
                 if (string.IsNullOrEmpty(requestPath))
@@ -190,15 +228,14 @@ builder.Services.AddAuthorization(options =>
                     return false;
                 }
 
-                var allowedPaths = allowedEndpoints.Split(',').Select(p => p.Trim().ToLower());
-                
+                var allowedPaths = merchantAllowedEndpoints.Split(',').Select(p => p.Trim().ToLower());
                 Log.Debug("Checking endpoint access - Request path: {Path}, Allowed paths: {AllowedPaths}", 
                     requestPath, string.Join(", ", allowedPaths));
 
                 if (!EndpointMatcher.IsEndpointAllowed(requestPath, allowedPaths))
                 {
                     Log.Warning("Authorization failed: Endpoint {Path} not in allowed endpoints: {AllowedEndpoints}", 
-                        requestPath, allowedEndpoints);
+                        requestPath, merchantAllowedEndpoints);
                     return false;
                 }
             }
@@ -233,6 +270,9 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<InterPaymentsAdapter>();
 builder.Services.AddSingleton<ISurchargeProviderAdapterFactory, SurchargeProviderAdapterFactory>();
 
+// Bind BulkSaleSettings
+builder.Services.Configure<FeeNominalService.Settings.BulkSaleSettings>(builder.Configuration.GetSection("BulkSaleSettings"));
+
 var app = builder.Build();
 
 // Add middleware to handle ping endpoint before authentication
@@ -244,6 +284,14 @@ app.Use(async (context, next) =>
         await context.Response.WriteAsync("pong");
         return;
     }
+    
+    if (context.Request.Path.StartsWithSegments("/api/health"))
+    {
+        // Skip authentication for health endpoints
+        await next();
+        return;
+    }
+    
     await next();
 });
 

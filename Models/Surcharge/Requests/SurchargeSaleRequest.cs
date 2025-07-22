@@ -1,96 +1,90 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace FeeNominalService.Models.Surcharge.Requests;
 
 /// <summary>
-/// Request model for surcharge sale operations
+/// Custom validation attribute to ensure either SurchargeTransactionId is provided, or all required fields are present
 /// </summary>
+public class RequireSurchargeSaleIdentifiersAttribute : ValidationAttribute
+{
+    protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
+    {
+        if (validationContext.ObjectInstance is not SurchargeSaleRequest request)
+        {
+            return new ValidationResult("Invalid request object type.");
+        }
+        // If SurchargeTransactionId is provided, all other fields are optional
+        if (request.SurchargeTransactionId.HasValue)
+        {
+            return ValidationResult.Success;
+        }
+        // Otherwise, require CorrelationId, ProviderCode, ProviderType
+        if (string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            return new ValidationResult("CorrelationId is required if SurchargeTransactionId is not provided.");
+        }
+        if (string.IsNullOrWhiteSpace(request.ProviderCode))
+        {
+            return new ValidationResult("ProviderCode is required if SurchargeTransactionId is not provided.");
+        }
+        if (string.IsNullOrWhiteSpace(request.ProviderType))
+        {
+            return new ValidationResult("ProviderType is required if SurchargeTransactionId is not provided.");
+        }
+        return ValidationResult.Success;
+    }
+}
+
+/// <summary>
+/// Request to complete a surcharge sale transaction.
+/// </summary>
+/// <remarks>
+/// If <c>surchargeTransactionId</c> is provided, all other fields become optional and will be looked up from the database.
+/// If <c>surchargeTransactionId</c> is not provided, the following fields are required: <c>providerTransactionId</c>, <c>providerCode</c>, <c>providerType</c>, <c>correlationId</c>.
+/// </remarks>
+/// <example>
+/// // Using surchargeTransactionId (preferred):
+/// {
+///   "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+/// }
+/// // Using provider info:
+/// {
+///   "providerTransactionId": "ip-tx-001",
+///   "providerCode": "INTERPAY",
+///   "providerType": "INTERPAYMENTS",
+///   "correlationId": "sale-123456"
+/// }
+/// </example>
+[RequireSurchargeSaleIdentifiers]
 public class SurchargeSaleRequest
 {
     /// <summary>
-    /// Bank Identification Number (BIN) value for the transaction
+    /// Surcharge transaction ID (auth) to complete (optional)
     /// </summary>
-    [Required(ErrorMessage = "BIN value is required")]
-    public required string BinValue { get; set; }
+    public Guid? SurchargeTransactionId { get; set; }
 
     /// <summary>
-    /// Surcharge processor configuration identifier
+    /// Correlation identifier for linking related transactions (optional if SurchargeTransactionId is provided)
     /// </summary>
-    [Required(ErrorMessage = "Surcharge processor is required")]
-    public required string SurchargeProcessor { get; set; }
+    public string? CorrelationId { get; set; }
 
     /// <summary>
-    /// Transaction amount in cents
+    /// Merchant transaction identifier (optional)
     /// </summary>
-    [Required(ErrorMessage = "Amount is required")]
-    [Range(0.01, double.MaxValue, ErrorMessage = "Amount must be greater than 0")]
-    public decimal Amount { get; set; }
+    public string? MerchantTransactionId { get; set; }
 
     /// <summary>
-    /// Total transaction amount including surcharge
-    /// </summary>
-    [Required(ErrorMessage = "Total amount is required")]
-    [Range(0.01, double.MaxValue, ErrorMessage = "Total amount must be greater than 0")]
-    public decimal TotalAmount { get; set; }
-
-    /// <summary>
-    /// Country code for the transaction (e.g., USA, CAN)
-    /// </summary>
-    [Required(ErrorMessage = "Country is required")]
-    [StringLength(3, MinimumLength = 2, ErrorMessage = "Country must be 2-3 characters")]
-    public required string Country { get; set; }
-
-    /// <summary>
-    /// Postal code for the transaction (e.g., US ZIP, Canadian Postal, etc.)
-    /// </summary>
-    public string? PostalCode { get; set; }
-
-    /// <summary>
-    /// Campaign identifiers for surcharge calculation
-    /// </summary>
-    public List<string>? Campaign { get; set; }
-
-    /// <summary>
-    /// Additional data for surcharge calculation
-    /// </summary>
-    public List<string>? Data { get; set; }
-
-    /// <summary>
-    /// Tokenized card information
-    /// </summary>
-    public string? CardToken { get; set; }
-
-    /// <summary>
-    /// Entry method for the transaction
-    /// </summary>
-    public string? EntryMethod { get; set; }
-
-    /// <summary>
-    /// Non-surchargable amount in cents
-    /// </summary>
-    [Range(0, double.MaxValue, ErrorMessage = "Non-surchargable amount cannot be negative")]
-    public decimal? NonSurchargableAmount { get; set; }
-
-    /// <summary>
-    /// Provider transaction ID for follow-up operations
+    /// Provider transaction ID (e.g., InterPayments sTxId) for follow-up operations (optional)
     /// </summary>
     public string? ProviderTransactionId { get; set; }
 
     /// <summary>
-    /// Provider code for the surcharge provider
+    /// Provider type for validation (optional if SurchargeTransactionId is provided)
     /// </summary>
-    [Required(ErrorMessage = "Provider code is required")]
-    public required string ProviderCode { get; set; }
+    public string? ProviderType { get; set; }
 
     /// <summary>
-    /// Correlation identifier for linking related transactions
+    /// Provider code for validation (optional if SurchargeTransactionId is provided)
     /// </summary>
-    [Required(ErrorMessage = "Correlation ID is required")]
-    public required string CorrelationId { get; set; }
-
-    /// <summary>
-    /// Merchant transaction identifier
-    /// </summary>
-    public string? MerchantTransactionId { get; set; }
+    public string? ProviderCode { get; set; }
 }

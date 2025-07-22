@@ -7,9 +7,9 @@ namespace FeeNominalService.Models.ApiKey.Responses
     public class GenerateApiKeyResponse
     {
         /// <summary>
-        /// The internal merchant ID (GUID)
+        /// The internal merchant ID (GUID) - null for admin keys
         /// </summary>
-        public Guid MerchantId { get; set; }
+        public Guid? MerchantId { get; set; }
 
         /// <summary>
         /// The external merchant ID
@@ -55,6 +55,11 @@ namespace FeeNominalService.Models.ApiKey.Responses
         /// Description of the API key
         /// </summary>
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Whether this API key is an admin/superuser key (global cross-merchant access)
+        /// </summary>
+        public bool IsAdmin { get; set; } = false;
 
         /// <summary>
         /// Metadata about the onboarding process

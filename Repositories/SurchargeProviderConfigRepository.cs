@@ -289,5 +289,64 @@ namespace FeeNominalService.Repositories
                 throw;
             }
         }
+
+        public async Task<SurchargeProviderConfig?> GetAdminProviderConfigAsync(string providerCode)
+        {
+            try
+            {
+                // For admin operations, we look for a provider config that is admin-scoped
+                return await _context.SurchargeProviderConfigs
+                    .Include(c => c.Provider)
+                    .FirstOrDefaultAsync(c => 
+                        c.Scope == "admin" && 
+                        c.MerchantId == null && // Admin operation - no specific merchant
+                        c.Provider != null && c.Provider.Code == providerCode && 
+                        c.IsActive);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting admin config for provider code {ProviderCode}", providerCode);
+                throw;
+            }
+        }
+
+        public async Task<SurchargeProviderConfig?> GetByMerchantIdAndProviderCodeAsync(Guid merchantId, string providerCode)
+        {
+            try
+            {
+                return await _context.SurchargeProviderConfigs
+                    .Include(c => c.Provider)
+                    .FirstOrDefaultAsync(c => 
+                        c.MerchantId == merchantId && 
+                        c.Provider != null && c.Provider.Code == providerCode && 
+                        c.IsActive);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting config by merchant {MerchantId} and provider code {ProviderCode}", 
+                    merchantId, providerCode);
+                throw;
+            }
+        }
+
+        public async Task<SurchargeProviderConfig> CreateAsync(SurchargeProviderConfig config)
+        {
+            try
+            {
+                config.CreatedAt = DateTime.UtcNow;
+                config.UpdatedAt = DateTime.UtcNow;
+
+                _context.SurchargeProviderConfigs.Add(config);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Created provider config {ConfigId} for scope {Scope}", config.Id, config.Scope);
+                return config;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating config for scope {Scope}", config.Scope);
+                throw;
+            }
+        }
     }
 } 

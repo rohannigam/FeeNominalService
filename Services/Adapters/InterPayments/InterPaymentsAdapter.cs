@@ -8,6 +8,7 @@ using FeeNominalService.Models.Common;
 using FeeNominalService.Exceptions;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Utils;
+using FeeNominalService.Models.SurchargeProvider;
 
 namespace FeeNominalService.Services.Adapters.InterPayments;
 
@@ -48,11 +49,12 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         return (true, null);
     }
 
-    public async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, JsonDocument credentials)
+    public async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, SurchargeProviderConfig providerConfig)
     {
         var httpClient = _httpClientFactory.CreateClient();
 
         // Extract JWT token and token type from credentials
+        var credentials = providerConfig.Credentials;
         if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
             throw new SurchargeException(SurchargeErrorCodes.InterPayments.MISSING_JWT_TOKEN);
         var jwtToken = jwtTokenProp.GetString();
@@ -124,7 +126,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
 
         var json = await response.Content.ReadAsStringAsync();
         _logger.LogInformation("Interpayments Response JSON: {Response}", JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement, new JsonSerializerOptions { WriteIndented = true }));
-        using var doc = JsonDocument.Parse(json);
+        var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         // Map response fields
@@ -132,6 +134,11 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         var providerTransactionId = root.TryGetProperty("sTxId", out var sTxIdProp) ? sTxIdProp.GetString() : null;
         var message = root.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : null;
         var percent = root.TryGetProperty("transactionFeePercent", out var percentProp) ? percentProp.GetDecimal() : (decimal?)null;
+
+        // Get provider information from the database through providerConfig
+        var providerType = providerConfig.Provider?.ProviderType ?? "UNKNOWN";
+        var providerCode = providerConfig.Provider?.Code ?? "UNKNOWN";
+        var providerName = providerConfig.Provider?.Name ?? "Unknown";
 
         return new SurchargeAuthResponse
         {
@@ -143,10 +150,127 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
             SurchargeAmount = surchargeAmount,
             TotalAmount = (request.Amount + surchargeAmount),
             Status = message ?? "ok",
-            Provider = "InterPayments",
+            Provider = providerName,
+            ProviderType = providerType,
+            ProviderCode = providerCode,
             ProcessedAt = DateTime.UtcNow,
             ErrorMessage = null,
             SurchargeFeePercent = percent
         };
+    }
+
+    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessSaleAsync(SurchargeTransaction saleTransaction, SurchargeProviderConfig providerConfig, SurchargeSaleRequest saleRequest)
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+        // Extract JWT token and token type from provider config credentials
+        var credentials = providerConfig.Credentials;
+        if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
+            return (false, null, "Missing JWT token in provider credentials.");
+        var jwtToken = jwtTokenProp.GetString();
+        var tokenType = "Bearer";
+        if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
+            tokenType = tokenTypeProp.GetString() ?? "Bearer";
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, jwtToken);
+
+        // Build request payload
+        var payload = new Dictionary<string, object?>
+        {
+            ["sTxId"] = saleTransaction.ProviderTransactionId
+        };
+        // Add mTxId from the current sale request or extracted from original auth
+        var mTxId = saleRequest.MerchantTransactionId;
+        if (string.IsNullOrWhiteSpace(mTxId) && saleTransaction.RequestPayload.RootElement.TryGetProperty("merchantTransactionId", out var mTxIdProp))
+        {
+            mTxId = mTxIdProp.GetString();
+        }
+        if (!string.IsNullOrWhiteSpace(mTxId))
+        {
+            payload["mTxId"] = mTxId;
+        }
+
+        // Determine sale endpoint URL
+        var saleUrl = InterpaymentsUrl.TrimEnd('/') + "/sale";
+        _logger.LogInformation("Sending InterPayments sale request to: {Url}", saleUrl);
+        _logger.LogInformation("InterPayments Sale Request JSON: {Request}", JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsJsonAsync(saleUrl, payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending sale request to InterPayments");
+            return (false, null, ex.Message);
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("InterPayments Sale Response JSON: {Response}", json);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("InterPayments sale API returned error: {StatusCode} {Content}", response.StatusCode, json);
+            return (false, null, json);
+        }
+
+        var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        // Expect sTxId in response
+        var sTxId = root.TryGetProperty("sTxId", out var sTxIdProp) ? sTxIdProp.GetString() : null;
+        if (string.IsNullOrWhiteSpace(sTxId))
+        {
+            return (false, doc, "Missing sTxId in InterPayments sale response.");
+        }
+        // Optionally, check for other fields or error messages
+        return (true, doc, null);
+    }
+
+    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, JsonDocument credentials)
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+        // Extract JWT token and token type from credentials
+        if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
+            return (false, null, "Missing JWT token in provider credentials.");
+        var jwtToken = jwtTokenProp.GetString();
+        var tokenType = "Bearer";
+        if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
+            tokenType = tokenTypeProp.GetString() ?? "Bearer";
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, jwtToken);
+
+        // Build InterPayments bulk sale payload
+        var payload = new List<Dictionary<string, object?>>();
+        foreach (var sale in sales)
+        {
+            var item = new Dictionary<string, object?>
+            {
+                ["sTxId"] = sale.ProviderTransactionId
+            };
+            payload.Add(item);
+        }
+
+        var bulkSaleUrl = ApiConstants.InterpaymentsBaseAddress.TrimEnd('/') + "/bulk/sale";
+        _logger.LogInformation("Sending InterPayments bulk sale request to: {Url}", bulkSaleUrl);
+        _logger.LogInformation("InterPayments Bulk Sale Request JSON: {Request}", System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsJsonAsync(bulkSaleUrl, payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending bulk sale request to InterPayments");
+            return (false, null, ex.Message);
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("InterPayments Bulk Sale Response JSON: {Response}", json);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("InterPayments bulk sale API returned error: {StatusCode} {Content}", response.StatusCode, json);
+            return (false, null, json);
+        }
+
+        var doc = JsonDocument.Parse(json);
+        return (true, doc, null);
     }
 } 

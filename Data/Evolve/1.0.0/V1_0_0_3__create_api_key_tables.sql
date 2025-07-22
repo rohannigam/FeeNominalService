@@ -61,33 +61,7 @@ BEGIN
     RAISE NOTICE 'Verified api_keys table creation';
 END $$;
 
-CREATE TABLE IF NOT EXISTS fee_nominal.api_key_secrets (
-    id SERIAL PRIMARY KEY,
-    api_key VARCHAR(255) NOT NULL,
-    secret VARCHAR(255) NOT NULL,
-    merchant_id UUID NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Active',
-    is_revoked BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP WITH TIME ZONE,
-    revoked_at TIMESTAMP WITH TIME ZONE,
-    last_rotated TIMESTAMP WITH TIME ZONE,
-    UNIQUE(api_key)
-);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created api_key_secrets table';
-END $$;
-
--- Verify api_key_secrets table
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'fee_nominal' AND tablename = 'api_key_secrets') THEN
-        RAISE EXCEPTION 'Table api_key_secrets was not created successfully';
-    END IF;
-    RAISE NOTICE 'Verified api_key_secrets table creation';
-END $$;
+-- Remove api_key_secrets table creation and verification logic from this migration
 
 CREATE TABLE IF NOT EXISTS fee_nominal.api_key_audit_logs (
     audit_log_id SERIAL PRIMARY KEY,

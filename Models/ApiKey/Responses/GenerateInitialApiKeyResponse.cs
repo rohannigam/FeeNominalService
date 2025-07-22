@@ -7,16 +7,14 @@ namespace FeeNominalService.Models.ApiKey.Responses;
 
 public class GenerateInitialApiKeyResponse
 {
-    public Guid MerchantId { get; set; }
+    public Guid? MerchantId { get; set; }
     public string ExternalMerchantId { get; set; } = string.Empty;
     
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? ExternalMerchantGuid { get; set; }
     
     public string MerchantName { get; set; } = string.Empty;
-    public int StatusId { get; set; }
-    public string StatusCode { get; set; } = string.Empty;
-    public string StatusName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public Guid ApiKeyId { get; set; }
     public DateTime ExpiresAt { get; set; }

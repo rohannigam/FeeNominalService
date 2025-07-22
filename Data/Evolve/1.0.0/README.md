@@ -60,10 +60,24 @@ The setup scripts use environment variables for configuration:
 
 ### Recent Changes
 
+**Version 1.0.0.26**: Added comprehensive support for bulk operations and provider-agnostic functionality:
+- Added `provider_type` column to `surcharge_providers` for provider-agnostic operations
+- Added bulk operations support (`batch_id`, `merchant_transaction_id`, `sequence_number`) to `surcharge_trans`
+- Added sale/refund/cancel support (`original_surcharge_trans_id`, `created_by`, `updated_by`) to `surcharge_trans`
+- Added admin API key support (`is_admin`) to `api_keys`
+- Created performance indexes for all new columns
+
 **Version 1.0.0.24+**: Legacy transaction tables have been removed to clean up the database schema:
 - Removed unused legacy transaction tables
 - Cleaned up related indexes and constraints
 - Updated schema to reflect current application state
+
+### Migration Simplification
+
+Recent migrations have been simplified by combining multiple small migrations into single, efficient migrations:
+- **Before**: 5 separate migrations (V1_0_0_26 through V1_0_0_30) for bulk operations support
+- **After**: 1 combined migration (V1_0_0_26) that adds all necessary columns and indexes
+- **Benefits**: Reduced complexity, faster deployment, easier maintenance
 
 ### Running Migrations
 
@@ -76,7 +90,7 @@ evolve migrate --location=Data/Evolve/1.0.0
 To apply a specific migration:
 
 ```bash
-evolve migrate --location=Data/Evolve/1.0.0 --version=1.0.0.25
+evolve migrate --location=Data/Evolve/1.0.0 --version=1.0.0.26
 ```
 
 ### Rollback Strategy
@@ -118,9 +132,9 @@ Example output:
 ```
  version  | description                    | installed_on           | execution_time | success
 ----------|--------------------------------|------------------------|----------------|---------
- 1.0.0.25 | Drop batch transactions table  | 2024-03-20 10:16:00   | 00:00:02      | true
- 1.0.0.24 | Drop legacy transaction tables | 2024-03-20 10:15:00   | 00:00:03      | true
- 1.0.0.23 | Remove currency column         | 2024-03-20 10:14:00   | 00:00:01      | true
+ 1.0.0.26 | Add bulk operations support    | 2024-03-20 10:16:00   | 00:00:02      | true
+ 1.0.0.25 | Drop batch transactions table  | 2024-03-20 10:15:00   | 00:00:03      | true
+ 1.0.0.24 | Drop legacy transaction tables | 2024-03-20 10:14:00   | 00:00:01      | true
 ```
 
 ### Validate Migrations
@@ -147,6 +161,8 @@ This checks for:
 4. **Documentation**: Update this README when adding new migrations or changing the migration strategy.
 
 5. **Setup Scripts**: Ensure setup scripts have proper permissions and are tested in the target environment.
+
+6. **Migration Consolidation**: Combine related schema changes into single migrations to reduce complexity and improve deployment speed.
 
 ## Troubleshooting
 

@@ -387,4 +387,96 @@ public class SurchargeTransactionRepository : ISurchargeTransactionRepository
             throw;
         }
     }
+
+    public async Task<SurchargeTransaction?> GetLatestInOriginalChainAsync(Guid rootTransactionId, Guid merchantId)
+    {
+        try
+        {
+            // Start from the root transaction
+            var current = await _context.SurchargeTransactions
+                .FirstOrDefaultAsync(t => t.Id == rootTransactionId && t.MerchantId == merchantId);
+            if (current == null)
+                return null;
+
+            while (true)
+            {
+                if (current == null)
+                    break;
+                Guid? currentId = current?.Id;
+                if (currentId == null)
+                    break;
+                var child = await _context.SurchargeTransactions
+                    .Where(t => t.OriginalSurchargeTransId == currentId && t.MerchantId == merchantId)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .FirstOrDefaultAsync();
+                if (child == null)
+                    break;
+                current = child;
+            }
+            return current;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error traversing original_surcharge_trans_id chain from {RootTransactionId}", rootTransactionId);
+            throw;
+        }
+    }
+
+    public async Task<SurchargeTransaction?> GetLatestInProviderTransactionChainAsync(string providerTransactionId, Guid merchantId)
+    {
+        try
+        {
+            // Find the root transaction for this providerTransactionId and merchant
+            var root = await _context.SurchargeTransactions
+                .Where(t => t.ProviderTransactionId == providerTransactionId && t.MerchantId == merchantId)
+                .OrderBy(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+            if (root == null)
+                return null;
+
+            // Traverse the chain to the latest transaction
+            var current = root;
+            while (true)
+            {
+                if (current == null)
+                    break;
+                Guid? currentId = current?.Id;
+                if (currentId == null)
+                    break;
+                var child = await _context.SurchargeTransactions
+                    .Where(t => t.OriginalSurchargeTransId == currentId && t.MerchantId == merchantId)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .FirstOrDefaultAsync();
+                if (child == null)
+                    break;
+                current = child;
+            }
+            return current;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error traversing providerTransactionId chain from {ProviderTransactionId}", providerTransactionId);
+            throw;
+        }
+    }
+
+    public async Task<SurchargeTransaction?> GetByIdWithProviderConfigAsync(Guid id)
+    {
+        try
+        {
+            // EF Core's ThenInclude will not dereference nulls, but to silence the warning, we can use a pragma
+            #pragma warning disable CS8602 // Dereference of a possibly null reference.
+            var result = await _context.SurchargeTransactions
+                .Include(t => t.ProviderConfig)
+                .ThenInclude(pc => pc.Provider)
+                .FirstOrDefaultAsync(t => t.Id == id);
+            #pragma warning restore CS8602
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting surcharge transaction with provider config by ID {TransactionId}", id);
+            throw;
+        }
+    }
 }

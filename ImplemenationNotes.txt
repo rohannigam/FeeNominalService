@@ -287,9 +287,13 @@ CREATE TABLE api_keys (
 **Added WARN logging** when a new config is set as primary and another is demoted.
 **Updated documentation** to reflect the new `isPrimary` field and single-primary enforcement.
 
----
 
-## **Files Updated/Added**
+
+************************************************************************
+7/18/2025 - Weekly Summary
+************************************************************************
+
+### **Files Updated/Added**
 
 ### **Controllers/**
 1. **Controllers/V1/SurchargeProviderController.cs**
@@ -413,3 +417,566 @@ Models/SurchargeProvider/SurchargeProviderUpdateRequest.cs
 Docs/Endpoints/SurchargeProviderEndpoints.txt
 SurchargeCalcuilationDocumentation.md
 ImplemenationNotes.txt  
+
+---
+I'll scan through all the API endpoints to analyze how validations were implemented before the admin/merchant scoping separation and provide detailed thoughts on each endpoint. Let me start by examining the controllers and their endpoints.
+
+Ran tool
+Ran tool
+Ran tool
+Now let me examine each controller in detail, starting with the most complex ones:
+
+Read file: Controllers/V1/OnboardingController.cs
+Read file: Controllers/V1/OnboardingController.cs
+Read file: Controllers/V1/SurchargeController.cs
+Read file: Controllers/V1/SurchargeController.cs
+Read file: Controllers/V1/SurchargeProviderController.cs
+Read file: Controllers/V1/AdminController.cs
+Read file: Controllers/Common/HealthController.cs
+Read file: Controllers/MockController.cs
+Now let me examine the authentication middleware and authorization policies to understand how validation was implemented:
+
+Search files...
+Now let me examine the authorization policies and middleware to understand the complete validation flow:
+
+Read file: Program.cs
+Now let me examine the EndpointMatcher utility to understand how endpoint validation works:
+
+Read file: Services/EndpointMatcher.cs
+Now let me examine the HeaderValidationHelper to understand header validation:
+
+Read file: Utils/HeaderValidationHelper.cs
+Based on my comprehensive analysis of all the API endpoints and their validation implementations, here's my detailed assessment of how validations were implemented before the admin/merchant scoping separation:
+
+## **DETAILED ANALYSIS OF PRE-SCOPING VALIDATION IMPLEMENTATIONS**
+
+### **1. ONBOARDING CONTROLLER - API Key Management Endpoints**
+
+#### **Generate Initial API Key (`/api/v1/onboarding/apikey/initial-generate`)**
+**Previous Validation Approach:**
+- **Authentication**: Used `InitialKeyGeneration` policy requiring only timestamp/nonce validation
+- **Authorization**: Minimal - only required `IsInitialKeyGeneration` claim
+- **Business Logic**: Created merchant + API key in single transaction
+- **Issues**: No merchant validation, no scope separation, created merchant-scoped keys by default
+
+#### **Generate API Key (`/api/v1/onboarding/apikey/generate`)**
+**Previous Validation Approach:**
+- **Authentication**: Required full API key authentication with signature validation
+- **Header Validation**: 
+  - `X-Merchant-ID` header must match request body `MerchantId`
+  - `X-API-Key` header validation
+- **Authorization**: `ApiKeyAccess` policy requiring `MerchantId` claim
+- **Business Logic Validation**:
+  - API key entity must be ACTIVE status
+  - API key's merchant must match request merchant
+  - Merchant must exist in database
+  - Onboarding metadata validation (AdminUserId, OnboardingReference)
+- **Issues**: 
+  - Hardcoded merchant-centric validation
+  - No admin scope support
+  - Required merchant ID even for admin operations
+  - Mixed admin/merchant logic in single endpoint
+
+#### **Update API Key (`/api/v1/onboarding/apikey/update`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Business Logic**: 
+  - Fetched old API key info for audit trail
+  - Updated API key with new metadata
+  - Created audit trail entries
+- **Issues**: No scope validation, assumed merchant-scoped operations
+
+#### **Revoke API Key (`/api/v1/onboarding/apikey/revoke`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Business Logic**: 
+  - Validated API key exists and is active
+  - Revoked key and updated status
+  - Created audit trail entries
+- **Issues**: No scope validation, mixed admin/merchant logic
+
+#### **List API Keys (`/api/v1/onboarding/apikey/list`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Query Validation**: Required `merchantId` query parameter
+- **Business Logic**: Retrieved keys for specific merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+#### **Rotate API Key (`/api/v1/onboarding/apikey/rotate`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Business Logic**: 
+  - Generated new key while keeping old one active
+  - Updated expiration and rotation metadata
+  - Created audit trail entries
+- **Issues**: No scope validation, assumed merchant-scoped operations
+
+### **2. SURCHARGE CONTROLLER - Transaction Processing Endpoints**
+
+#### **Process Auth (`/api/v1/surcharge/auth`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Claims Validation**: 
+  - Required `MerchantId` claim from authentication
+  - Validated GUID format
+- **Business Logic**: Passed merchant ID to service layer
+- **Issues**: 
+  - No admin scope support
+  - Required merchant ID for all operations
+  - No cross-merchant capability
+
+#### **Process Sale (`/api/v1/surcharge/sale`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Claims Validation**: 
+  - Required `MerchantId` claim from authentication
+  - Validated GUID format
+- **Business Logic**: Passed merchant ID to service layer
+- **Issues**: Same as auth endpoint
+
+#### **Process Refund (`/api/v1/surcharge/refund`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Claims Validation**: 
+  - Required `MerchantId` claim from authentication
+  - Validated GUID format
+- **Business Logic**: Passed merchant ID to service layer
+- **Issues**: Same as auth endpoint
+
+#### **Process Cancel (`/api/v1/surcharge/cancel`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Claims Validation**: 
+  - Required `MerchantId` claim from authentication
+  - Validated GUID format
+- **Business Logic**: Passed merchant ID to service layer
+- **Issues**: Same as auth endpoint
+
+#### **Bulk Sale Complete (`/api/v1/surcharge/bulk-sale-complete`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Authorization**: 
+  - Required `Scope` claim to be "admin"
+  - Required `IsAdmin` claim to be "true"
+- **Business Logic Validation**:
+  - Required `ProviderCode` in request
+  - Generated batch ID if not provided
+- **Issues**: 
+  - Hardcoded admin validation
+  - No flexible scope system
+  - Mixed admin/merchant logic
+
+#### **Get Transaction By ID (`/api/v1/surcharge/transactions/{id}`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Claims Validation**: 
+  - Required `MerchantId` claim from authentication
+  - Validated GUID format
+- **Business Logic**: Retrieved transaction for specific merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+#### **Get Transactions (`/api/v1/surcharge/transactions`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **Claims Validation**: 
+  - Required `MerchantId` claim from authentication
+  - Validated GUID format
+- **Query Validation**: 
+  - Pagination parameters (page, pageSize)
+  - Optional filters (operationType, status)
+- **Business Logic**: Retrieved transactions for specific merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+### **3. SURCHARGE PROVIDER CONTROLLER - Provider Management**
+
+#### **Create Provider (`/api/v1/merchants/{merchantId}/surcharge-providers`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **URL Validation**: 
+  - Required `merchantId` in URL path
+  - Validated against authenticated merchant ID from claims
+- **Authorization**: Required merchant ID match between URL and claims
+- **Business Logic Validation**:
+  - Credentials schema validation
+  - Configuration validation
+  - Provider code uniqueness per merchant
+  - Status validation (ACTIVE)
+- **Issues**: 
+  - Merchant-centric URL structure
+  - No admin scope support
+  - Required merchant ID for all operations
+
+#### **Get All Providers (`/api/v1/merchants/{merchantId}/surcharge-providers`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **URL Validation**: 
+  - Required `merchantId` in URL path
+  - Validated against authenticated merchant ID from claims
+- **Query Validation**: Optional `includeDeleted` parameter
+- **Business Logic**: Retrieved providers for specific merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+#### **Get Provider By ID (`/api/v1/merchants/{merchantId}/surcharge-providers/{id}`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **URL Validation**: 
+  - Required `merchantId` in URL path
+  - Validated against authenticated merchant ID from claims
+- **Business Logic**: Retrieved specific provider for merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+#### **Update Provider (`/api/v1/merchants/{merchantId}/surcharge-providers/{id}`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **URL Validation**: 
+  - Required `merchantId` in URL path
+  - Validated against authenticated merchant ID from claims
+- **Business Logic Validation**:
+  - Credentials schema validation
+  - Configuration validation
+  - Provider existence validation
+- **Issues**: No admin scope support, merchant-centric only
+
+#### **Delete Provider (`/api/v1/merchants/{merchantId}/surcharge-providers/{id}`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **URL Validation**: 
+  - Required `merchantId` in URL path
+  - Validated against authenticated merchant ID from claims
+- **Business Logic**: Soft delete provider for merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+#### **Restore Provider (`/api/v1/merchants/{merchantId}/surcharge-providers/{id}/restore`)**
+**Previous Validation Approach:**
+- **Authentication**: Standard API key authentication
+- **URL Validation**: 
+  - Required `merchantId` in URL path
+  - Validated against authenticated merchant ID from claims
+- **Business Logic**: Restore soft-deleted provider for merchant
+- **Issues**: No admin scope support, merchant-centric only
+
+### **4. ADMIN CONTROLLER - Admin Operations**
+
+#### **Generate Admin API Key (`/api/v1/admin/apiKey/generate`)**
+**Previous Validation Approach:**
+- **Authentication**: `AllowAnonymous` - no standard authentication
+- **Authorization**: 
+  - Required `X-Admin-Secret` header
+  - Validated against stored admin secret from AWS Secrets Manager
+- **Business Logic**:
+  - Defaulted allowed endpoints to bulk sale complete
+  - Set `IsAdmin` flag to true
+- **Issues**: 
+  - Separate authentication mechanism
+  - Hardcoded admin secret validation
+  - No integration with main authentication system
+  - Limited to specific endpoints
+
+### **5. COMMON CONTROLLERS**
+
+#### **Health Controller (`/api/health`)**
+**Previous Validation Approach:**
+- **Authentication**: None - public endpoints
+- **Business Logic**: Database connectivity checks
+- **Issues**: None - appropriate for health endpoints
+
+#### **Ping Controller (`/api/v1/ping`)**
+**Previous Validation Approach:**
+- **Authentication**: None - public endpoint
+- **Business Logic**: Simple "pong" response
+- **Issues**: None - appropriate for ping endpoint
+
+#### **Mock Controller (`/api/v1/mock`)**
+**Previous Validation Approach:**
+- **Authentication**: None - development/testing only
+- **Business Logic**: Mock data responses
+- **Issues**: None - appropriate for mock endpoints
+
+## **KEY VALIDATION PATTERNS IDENTIFIED**
+
+### **1. Authentication Layer (ApiKeyAuthHandler)**
+**Previous Approach:**
+- **Header Validation**: Required `X-Merchant-ID`, `X-API-Key`, `X-Timestamp`, `X-Nonce`, `X-Signature`
+- **Signature Validation**: HMAC-SHA256 signature verification
+- **Timestamp Validation**: 5-minute tolerance window
+- **Claims Generation**: `MerchantId`, `ApiKey`, `AllowedEndpoints`
+- **Rate Limiting**: Per API key with configurable limits
+- **Issues**: 
+  - No scope claims
+  - No admin scope support
+  - Merchant-centric by design
+
+### **2. Authorization Layer (Program.cs Policies)**
+**Previous Approach:**
+- **InitialKeyGeneration Policy**: Only timestamp/nonce validation
+- **ApiKeyAccess Policy**: Required `MerchantId` claim + endpoint validation
+- **Endpoint Validation**: Wildcard matching with `EndpointMatcher`
+- **Issues**: 
+  - No scope-based authorization
+  - No admin scope support
+  - Merchant-centric policies
+
+### **3. Business Logic Validation**
+**Previous Approach:**
+- **Merchant Validation**: Always required merchant ID
+- **API Key Validation**: Status, expiration, rate limits
+- **Provider Validation**: Merchant-scoped provider operations
+- **Transaction Validation**: Merchant-scoped transaction processing
+- **Issues**: 
+  - No admin scope support
+  - No cross-merchant operations
+  - Hardcoded merchant-centric logic
+
+## **CRITICAL ISSUES WITH PRE-SCOPING VALIDATION**
+
+### **1. Schema Limitations**
+- **Merchant-Centric Design**: All tables required `merchant_id` (non-nullable)
+- **No Scope Separation**: No way to distinguish admin vs merchant operations
+- **Hardcoded Dependencies**: Business logic assumed merchant context
+
+### **2. Authentication Gaps**
+- **No Scope Claims**: Authentication didn't include scope information
+- **Admin Secret Bypass**: Admin operations used separate authentication mechanism
+- **Mixed Logic**: Admin and merchant operations mixed in same endpoints
+
+### **3. Authorization Weaknesses**
+- **No Scope-Based Policies**: Authorization policies didn't consider scope
+- **Hardcoded Admin Checks**: Admin validation hardcoded in endpoints
+- **No Flexible Permissions**: No granular permission system
+
+### **4. Business Logic Issues**
+- **Merchant Assumptions**: All operations assumed merchant context
+- **No Cross-Merchant Support**: No way to perform operations across merchants
+- **Provider Config Limitations**: Provider configs tied to specific merchants
+
+### **5. Security Concerns**
+- **Inconsistent Validation**: Different validation approaches for admin vs merchant
+- **Scope Confusion**: No clear separation between admin and merchant operations
+- **Audit Trail Gaps**: Audit trails didn't distinguish admin vs merchant operations
+
+## **RECOMMENDATIONS FOR POST-SCOPING IMPROVEMENTS**
+
+### **1. Unified Authentication**
+- **Scope Claims**: Include `Scope` and `IsAdmin` claims in authentication
+- **Consistent Validation**: Use same authentication mechanism for all operations
+- **Flexible Permissions**: Support both admin and merchant scopes
+
+### **2. Enhanced Authorization**
+- **Scope-Based Policies**: Create policies that consider scope
+- **Granular Permissions**: Support different permission levels
+- **Cross-Merchant Support**: Allow admin operations across merchants
+
+### **3. Improved Business Logic**
+- **Scope-Aware Operations**: Business logic should consider scope
+- **Flexible Provider Configs**: Support admin-scoped provider configurations
+- **Enhanced Audit Trails**: Distinguish between admin and merchant operations
+
+### **4. Better Security**
+- **Consistent Validation**: Apply same validation standards to all operations
+- **Clear Scope Separation**: Maintain clear boundaries between admin and merchant operations
+- **Enhanced Monitoring**: Track scope-based usage patterns
+
+This analysis reveals that the pre-scoping validation was fundamentally merchant-centric with ad-hoc admin support, leading to inconsistent validation patterns and security concerns. The new scope-based system addresses these issues by providing a unified, flexible, and secure approach to validation across all operations.
+
+
+
+
+************************************************************************
+7/19/2025 -  Complete Summary: Admin Endpoints & Secrets Manager Updates
+************************************************************************
+# **📋 Complete Summary: Admin Endpoints & Secrets Manager Updates**
+
+## **🎯 What We Accomplished Over Two Days**
+
+### **Day 1: Admin API Key Management Foundation**
+
+#### **1. Admin Controller Implementation**
+- **Created** `AdminController.cs` with admin-specific endpoints
+- **Implemented** `GenerateAdminApiKey` endpoint for creating global admin keys
+- **Added** `RotateAdminApiKey` and `RevokeAdminApiKey` endpoints
+- **Implemented** admin secret validation using `X-Admin-Secret` header
+- **Added** multi-service support with configurable service names
+
+#### **2. Admin Secret Management Scripts**
+- **Created** `Scripts/AdminSecretManagement/` directory
+- **Developed** `Setup-AdminSecret.ps1` (PowerShell script)
+- **Developed** `setup-admin-secret.sh` (Bash script)
+- **Created** comprehensive `README.md` with usage instructions
+- **Added** cross-platform support for AWS Secrets Manager secret creation
+
+#### **3. Database Schema Updates**
+- **Updated** `ApiKeySecret` entity to support nullable `merchantId`
+- **Fixed** Entity Framework Core configuration for admin keys
+- **Ensured** admin API keys can have `merchantId = NULL` for cross-merchant access
+
+### **Day 2: Configurable Secret Name Patterns**
+
+#### **1. Configuration System Overhaul**
+- **Created** `AwsSecretsManagerConfiguration.cs` model
+- **Added** configurable secret name formats:
+  - `MerchantSecretNameFormat`: `feenominal/merchants/{merchantId}/apikeys/{apiKey}`
+  - `AdminSecretNameFormat`: `feenominal/admin/apikeys/{serviceName}-admin-api-key-secret`
+- **Removed** legacy `SecretName` configuration
+
+#### **2. Secret Name Formatter Service**
+- **Created** `SecretNameFormatter.cs` utility service
+- **Implemented** pattern-based secret name formatting
+- **Added** secret name parsing and validation methods
+- **Provided** extraction utilities for API keys and service names
+
+#### **3. Service Updates (All Services)**
+**Updated 7 Services to use new formatter:**
+- ✅ `ApiKeyService.cs` - Updated 10+ hardcoded patterns
+- ✅ `RequestSigningService.cs` - Updated 2 patterns
+- ✅ `RequestSigningService.Debug.cs` - Updated 2 patterns
+- ✅ `AwsSecretsManagerService.cs` - Updated 1 pattern
+- ✅ `LocalApiKeySecretService.cs` - Updated to use formatter
+- ✅ `AdminController.cs` - Updated to use formatter
+- ✅ `MockController.cs` - Updated 2 patterns
+
+#### **4. Legacy Code Cleanup**
+- **Removed** unused legacy methods from `IAwsSecretsManagerService`
+- **Cleaned** `GetApiKeyAsync`, `GetApiKeysAsync`, `GetApiKeyByIdAsync` methods
+- **Updated** `ValidateApiKeyAsync` to use new formatter
+- **Simplified** interface and implementations
+
+## **🔧 Technical Implementation Details**
+
+### **Admin Secret Pattern:**
+```
+feenominal/admin/apikeys/{serviceName}-admin-api-key-secret
+```
+
+### **Merchant Secret Pattern:**
+```
+feenominal/merchants/{merchantId}/apikeys/{apiKey}
+```
+
+### **Configuration Structure:**
+```json
+"AWS": {
+  "SecretsManager": {
+    "MerchantSecretNameFormat": "feenominal/merchants/{merchantId}/apikeys/{apiKey}",
+    "AdminSecretNameFormat": "feenominal/admin/apikeys/{serviceName}-admin-api-key-secret"
+  }
+}
+```
+
+### **Admin Endpoints:**
+- `POST /api/v1/admin/apiKey/generate` - Generate admin API key
+- `POST /api/v1/admin/apikey/rotate` - Rotate admin API key
+- `POST /api/v1/admin/apikey/revoke` - Revoke admin API key
+
+## **�� Key Benefits Achieved**
+
+### **1. Admin Key Management**
+✅ **Global Access**: Admin keys can access any merchant data  
+✅ **Multi-Service Support**: Different admin keys per service  
+✅ **Secure Validation**: Admin secret required for key generation  
+✅ **Cross-Platform Scripts**: Easy deployment to AWS Secrets Manager  
+
+### **2. Configurable Secret Patterns**
+✅ **Flexible Naming**: Both patterns configurable via appsettings  
+✅ **Consistent Usage**: All services use centralized formatter  
+✅ **Backward Compatible**: Existing patterns work as defaults  
+✅ **Environment Specific**: Different patterns per environment  
+
+### **3. Code Quality**
+✅ **Single Source of Truth**: `SecretNameFormatter` for all secret naming  
+✅ **Type Safety**: Strongly typed configuration model  
+✅ **Maintainable**: Clean, focused interfaces and implementations  
+✅ **Testable**: Mock services for development and testing  
+
+## **📁 Files Created/Modified**
+
+### **New Files:**
+- `Controllers/V1/AdminController.cs`
+- `Models/Configuration/AwsSecretsManagerConfiguration.cs`
+- `Services/AWS/SecretNameFormatter.cs`
+- `Scripts/AdminSecretManagement/Setup-AdminSecret.ps1`
+- `Scripts/AdminSecretManagement/setup-admin-secret.sh`
+- `Scripts/AdminSecretManagement/README.md`
+
+### **Updated Files:**
+- `appsettings.json` & `appsettings.Development.json`
+- `Program.cs` (service registration)
+- `Services/ApiKeyService.cs`
+- `Services/RequestSigningService.cs`
+- `Services/RequestSigningService.Debug.cs`
+- `Services/AwsSecretsManagerService.cs`
+- `Services/AWS/LocalApiKeySecretService.cs`
+- `Services/AWS/IAwsSecretsManagerService.cs`
+- `Services/MockAwsSecretsManagerService.cs`
+- `Controllers/MockController.cs`
+
+## **🎉 Final Result**
+
+You now have a **complete, production-ready admin API key management system** with:
+
+1. **Secure admin endpoints** for generating, rotating, and revoking admin keys
+2. **Configurable secret naming patterns** for both admin and merchant secrets
+3. **Cross-platform deployment scripts** for AWS Secrets Manager
+4. **Clean, maintainable codebase** with no legacy baggage
+5. **Comprehensive documentation** for deployment and usage
+
+The system is **scalable, secure, and ready for production deployment**! 🚀
+
+
+************************************************************************
+7/19/2025 -  Complete Summary: Sale and Bulk Sale updates
+************************************************************************
+Certainly! Here’s a concise summary of the major work and improvements made over the last 1–2 days around the sale and bulk sale requests:
+
+---
+
+### 1. **Refactored Sale and Bulk Sale Endpoints**
+- **Single Sale (`/api/v1/surcharge/sale`):**
+  - Made `surchargeTransactionId` optional. If provided, all other fields (provider info, correlationId, etc.) become optional and are looked up from the database.
+  - If `surchargeTransactionId` is not provided, the request must include `providerTransactionId`, `providerCode`, `providerType`, and `correlationId`.
+  - The response now includes:
+    - `surchargeTransactionId` (from request or looked up)
+    - `originalSurchargeTransactionId` (root of the auth chain)
+    - `currentSurchargeTransactionId` (newly created sale transaction)
+    - `surchargeFee` and `surchargeFeePercent` (extracted from the referenced transaction)
+    - All other relevant transaction and provider fields
+
+- **Bulk Sale (`/api/v1/surcharge/bulk-sale-complete`):**
+  - Supports true admin/cross-merchant batch operations.
+  - Each sale item can use either `surchargeTransactionId` or direct provider info.
+  - Batch ID is always system-generated and unique.
+  - Supports partial success: each sale result is reported individually with status and error message if any.
+  - Per-sale response includes all the same fields as the single sale endpoint, including correct fee reporting.
+
+---
+
+### 2. **Fee Extraction and Data Integrity**
+- Fixed logic to ensure `surchargeFee` and `surchargeFeePercent` are always extracted from the correct transaction (using the incoming `surchargeTransactionId`).
+- Ensured that the response always reports the correct transaction IDs for traceability (`surchargeTransactionId`, `originalSurchargeTransactionId`, `currentSurchargeTransactionId`).
+
+---
+
+### 3. **Robust Error Handling and Null Safety**
+- Addressed and fixed all null dereference warnings and linter errors.
+- Added explicit null checks and improved variable scoping for clarity and safety.
+
+---
+
+### 4. **Documentation and Examples**
+- Updated the `.http` file and created new endpoint documentation (`SurchargeSaleAndBulkSaleEnpoints.txt`) with:
+  - Up-to-date request/response models
+  - Example requests and responses
+  - ASCII workflow diagrams
+  - Special notes on admin/cross-merchant support, batch ID generation, and error handling
+
+---
+
+### 5. **Admin/Batch Support and Security**
+- Clarified and enforced that bulk sale endpoints require admin-scope API keys.
+- Documented the authentication and security requirements for all endpoints.
+
+---
+
+**In summary:**  
+The sale and bulk sale flows are now more flexible, robust, and well-documented. They support both merchant and admin use cases, provide detailed per-transaction results, and ensure data integrity and traceability throughout the workflow.
+
+If you need a more technical or code-focused summary, or want a changelog for a specific file, let me know!

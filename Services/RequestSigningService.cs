@@ -30,13 +30,15 @@ namespace FeeNominalService.Services
         private readonly ApiKeyConfiguration _apiKeyConfig;
         private readonly ConcurrentDictionary<string, DateTime> _usedNonces;
         private readonly HashSet<string> _recentNonces;
+        private readonly SecretNameFormatter _secretNameFormatter;
 
         public RequestSigningService(
             IApiKeyRepository apiKeyRepository,
             IMerchantRepository merchantRepository,
             IAwsSecretsManagerService secretsManager,
             ILogger<RequestSigningService> logger,
-            IOptions<ApiKeyConfiguration> apiKeyConfig)
+            IOptions<ApiKeyConfiguration> apiKeyConfig,
+            SecretNameFormatter secretNameFormatter)
         {
             _apiKeyRepository = apiKeyRepository;
             _merchantRepository = merchantRepository;
@@ -45,6 +47,7 @@ namespace FeeNominalService.Services
             _apiKeyConfig = apiKeyConfig.Value;
             _usedNonces = new ConcurrentDictionary<string, DateTime>();
             _recentNonces = new HashSet<string>();
+            _secretNameFormatter = secretNameFormatter;
         }
 
         public bool ValidateTimestampAndNonce(string timestamp, string nonce)
@@ -169,7 +172,7 @@ namespace FeeNominalService.Services
                 _logger.LogDebug("Found valid API key: {ApiKey}", apiKey);
 
                 // 3. Get secret from AWS Secrets Manager
-                var secretName = $"feenominal/merchants/{merchant.MerchantId:D}/apikeys/{apiKey}";
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, apiKey);
                 _logger.LogDebug("Retrieving secret from AWS: {SecretName}", secretName);
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null || secretData.IsRevoked)
@@ -246,7 +249,7 @@ namespace FeeNominalService.Services
                     merchantId, apiKey, timestamp, nonce);
 
                 // 1. Get secret from AWS Secrets Manager
-                var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
                 _logger.LogDebug("Retrieving secret from AWS: {SecretName}", secretName);
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null)

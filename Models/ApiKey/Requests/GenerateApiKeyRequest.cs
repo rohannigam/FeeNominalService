@@ -12,11 +12,10 @@ namespace FeeNominalService.Models.ApiKey.Requests;
 public class GenerateApiKeyRequest
 {
     /// <summary>
-    /// The internal merchant ID (GUID) to generate the API key for
+    /// The internal merchant ID (GUID) to generate the API key for (null for admin keys)
     /// </summary>
-    [Required]
-    [JsonConverter(typeof(GuidConverter))]
-    public Guid MerchantId { get; set; }
+    [JsonConverter(typeof(NullableGuidConverter))]
+    public Guid? MerchantId { get; set; }
 
     /// <summary>
     /// Optional description for the API key
@@ -48,8 +47,18 @@ public class GenerateApiKeyRequest
     public int? ExpirationDays { get; set; }
 
     /// <summary>
-    /// Metadata about the onboarding process
+    /// Whether this API key is an admin/superuser key (global cross-merchant access)
     /// </summary>
-    [Required]
-    public OnboardingMetadata OnboardingMetadata { get; set; } = new();
+    public bool IsAdmin { get; set; } = false;
+
+    /// <summary>
+    /// Metadata about the onboarding process (not required for admin API keys)
+    /// </summary>
+    public OnboardingMetadata? OnboardingMetadata { get; set; } = null;
+
+    /// <summary>
+    /// Service name for admin API keys (used in secret naming)
+    /// </summary>
+    [StringLength(50)]
+    public string? ServiceName { get; set; }
 } 

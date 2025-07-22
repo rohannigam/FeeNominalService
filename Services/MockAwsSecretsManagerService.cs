@@ -117,78 +117,7 @@ namespace FeeNominalService.Services
             }
         }
 
-        public Task<string?> GetApiKeyAsync(string merchantId)
-        {
-            try
-            {
-                var secretName = $"apikey/{merchantId}/active";
-                if (_secrets.TryGetValue(secretName, out var secret))
-                {
-                    var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret);
-                    return Task.FromResult<string?>(apiKeySecret?.Secret);
-                }
-                return Task.FromResult<string?>(null);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving API key for merchant {MerchantId}", merchantId);
-                return Task.FromResult<string?>(null);
-            }
-        }
 
-        public Task<IEnumerable<ApiKeyInfo>> GetApiKeysAsync(string merchantId)
-        {
-            try
-            {
-                var apiKeys = new List<ApiKeyInfo>();
-                foreach (var secret in _secrets)
-                {
-                    if (secret.Key.StartsWith($"apikey/{merchantId}/"))
-                    {
-                        var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret.Value);
-                        if (apiKeySecret != null)
-                        {
-                            apiKeys.Add(new ApiKeyInfo
-                            {
-                                ApiKey = apiKeySecret.ApiKey,
-                                MerchantId = Guid.Parse(merchantId),
-                                Status = apiKeySecret.Status,
-                                CreatedAt = apiKeySecret.CreatedAt,
-                                LastRotatedAt = apiKeySecret.LastRotated,
-                                RevokedAt = apiKeySecret.RevokedAt,
-                                IsRevoked = apiKeySecret.IsRevoked,
-                                IsExpired = apiKeySecret.ExpiresAt.HasValue && apiKeySecret.ExpiresAt.Value < DateTime.UtcNow
-                            });
-                        }
-                    }
-                }
-                return Task.FromResult<IEnumerable<ApiKeyInfo>>(apiKeys);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", merchantId);
-                return Task.FromResult<IEnumerable<ApiKeyInfo>>(new List<ApiKeyInfo>());
-            }
-        }
-
-        public Task<string?> GetApiKeyByIdAsync(string merchantId, string apiKeyId)
-        {
-            try
-            {
-                var secretName = $"apikey/{merchantId}/{apiKeyId}";
-                if (_secrets.TryGetValue(secretName, out var secret))
-                {
-                    var apiKeySecret = JsonSerializer.Deserialize<ApiKeySecret>(secret);
-                    return Task.FromResult<string?>(apiKeySecret?.Secret);
-                }
-                return Task.FromResult<string?>(null);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving API key {ApiKeyId} for merchant {MerchantId}", apiKeyId, merchantId);
-                return Task.FromResult<string?>(null);
-            }
-        }
 
         public Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
         {

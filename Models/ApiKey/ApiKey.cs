@@ -33,9 +33,8 @@ namespace FeeNominalService.Models.ApiKey
         /// <summary>
         /// Reference to the merchant who owns this API key
         /// </summary>
-        [Required]
         [Column("merchant_id")]
-        public Guid MerchantId { get; set; }
+        public Guid? MerchantId { get; set; }
 
         /// <summary>
         /// The actual API key value
@@ -146,7 +145,7 @@ namespace FeeNominalService.Models.ApiKey
         public string CreatedBy { get; set; } = string.Empty;
 
         /// <summary>
-        /// Reference to the onboarding process
+        /// Reference to the onboarding process (nullable for admin/superuser keys)
         /// </summary>
         [StringLength(50)]
         [Column("onboarding_reference")]
@@ -157,6 +156,27 @@ namespace FeeNominalService.Models.ApiKey
         /// </summary>
         [Column("onboarding_timestamp")]
         public DateTime? OnboardingTimestamp { get; set; }
+
+        /// <summary>
+        /// Whether this API key is an admin/superuser key (global cross-merchant access)
+        /// </summary>
+        [Required]
+        [Column("is_admin")]
+        public bool IsAdmin { get; set; } = false;
+
+        /// <summary>
+        /// Scope of the API key (e.g., 'merchant', 'admin')
+        /// </summary>
+        [StringLength(50)]
+        [Column("scope")]
+        public string Scope { get; set; } = "merchant";
+
+        /// <summary>
+        /// Service name for the API key
+        /// </summary>
+        [Column("service_name")]
+        [StringLength(100)]
+        public string? ServiceName { get; set; }
 
         /// <summary>
         /// Navigation property for the merchant who owns this API key

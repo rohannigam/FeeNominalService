@@ -23,13 +23,15 @@ namespace FeeNominalService.Services
         private readonly ApiKeyConfiguration _apiKeyConfig;
         private readonly ConcurrentDictionary<string, DateTime> _usedNonces;
         private readonly HashSet<string> _recentNonces;
+        private readonly SecretNameFormatter _secretNameFormatter;
 
         public RequestSigningServiceDebug(
             IApiKeyRepository apiKeyRepository,
             IMerchantRepository merchantRepository,
             IAwsSecretsManagerService secretsManager,
             ILogger<RequestSigningServiceDebug> logger,
-            IOptions<ApiKeyConfiguration> apiKeyConfig)
+            IOptions<ApiKeyConfiguration> apiKeyConfig,
+            SecretNameFormatter secretNameFormatter)
         {
             _apiKeyRepository = apiKeyRepository;
             _merchantRepository = merchantRepository;
@@ -38,6 +40,7 @@ namespace FeeNominalService.Services
             _apiKeyConfig = apiKeyConfig.Value;
             _usedNonces = new ConcurrentDictionary<string, DateTime>();
             _recentNonces = new HashSet<string>();
+            _secretNameFormatter = secretNameFormatter;
         }
 
         public async Task<bool> ValidateRequestAsync(string merchantId, string apiKey, string timestamp, string nonce, string requestBody, string signature)
@@ -89,7 +92,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Found valid API key: {ApiKey}", apiKey);
 
                 // 3. Get secret from AWS Secrets Manager
-                var secretName = $"feenominal/merchants/{merchant.MerchantId:D}/apikeys/{apiKey}";
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, apiKey);
                 _logger.LogInformation("Retrieving secret from AWS: {SecretName}", secretName);
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null || secretData.IsRevoked)
@@ -159,7 +162,8 @@ namespace FeeNominalService.Services
 
         public async Task<string> GenerateSignatureAsync(string merchantId, string apiKey, string timestamp, string nonce)
         {
-            var secret = await _secretsManager.GetSecretAsync($"feenominal/merchants/{merchantId}/apikeys/{apiKey}");
+            var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
+            var secret = await _secretsManager.GetSecretAsync(secretName);
             if (string.IsNullOrEmpty(secret))
             {
                 throw new KeyNotFoundException($"Secret not found for merchant {merchantId} and API key {apiKey}");

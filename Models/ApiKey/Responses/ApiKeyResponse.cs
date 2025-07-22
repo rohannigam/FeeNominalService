@@ -8,4 +8,5 @@ public class ApiKeyResponse
     public int? RateLimit { get; set; }
     public string[] AllowedEndpoints { get; set; } = Array.Empty<string>();
     public string? Purpose { get; set; }
+    public bool IsAdmin { get; set; } = false;
 } 

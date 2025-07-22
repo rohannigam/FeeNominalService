@@ -1,0 +1,148 @@
+# Admin API Key Management Endpoints
+
+This document describes the endpoints related to admin API key management, including their input/output fields and operational details. It also includes a detailed section on Admin Secret Management & API Key Lifecycle.
+
+---
+
+## Quick Start: Initial Admin Secret Setup
+
+**Before you can generate the first admin API key, you must manually create the admin secret in AWS Secrets Manager.**
+
+### Step-by-Step: Storing the Initial Admin Secret
+1. **Determine the secret name:**
+   - The secret name is defined by the `AdminSecretNameFormat` configuration (e.g., `feenominal/admin/apikeys/feenominal-admin-api-key-secret`).
+   - Replace `{serviceName}` with your configured service name if needed.
+2. **Create the secret in AWS Secrets Manager:**
+   - Go to the AWS Secrets Manager console.
+   - Click 'Store a new secret'.
+   - Choose 'Other type of secret'.
+   - Enter a key-value pair:
+     - **Key:** `secret` (or use the expected key for your environment)
+     - **Value:** A strong, random string (this will be your bootstrap admin secret)
+   - Set the secret name to the value from step 1.
+   - Save the secret.
+3. **Record the secret value securely.**
+   - You will use this value as the `X-Admin-Secret` header for the initial admin API key generation request.
+
+**Note:** In local development, the secret may be stored in the local database table `api_key_secrets` with `MerchantId = NULL` and `Scope = "admin"`.
+
+---
+
+## Endpoints
+
+### 1. Generate Admin API Key
+- **Endpoint:** `POST /api/v1/admin/apikey/generate`
+- **Description:** Generates the initial admin API key and secret. Only allowed if no admin key currently exists.
+- **Headers:**
+  - `Content-Type: application/json`
+  - `X-Admin-Secret: <bootstrap secret>` (required for first-time generation)
+  - `X-Timestamp: <ISO8601 timestamp>`
+  - `X-Nonce: <unique string>`
+  - `X-Signature: <HMAC signature>`
+- **Request Body:** _(none)_
+- **Response:**
+  - `200 OK` with JSON body:
+    ```json
+    {
+      "apiKey": "<admin-api-key>",
+      "secret": "<admin-secret>",
+      "expiresAt": "<ISO8601 datetime>",
+      "rateLimit": <int>,
+      "allowedEndpoints": ["*"],
+      "isAdmin": true
+    }
+    ```
+  - `409 Conflict` if an admin key already exists.
+
+---
+
+### 2. Rotate Admin API Key
+- **Endpoint:** `POST /api/v1/admin/apikey/rotate`
+- **Description:** Rotates the admin API key and secret. Requires current admin credentials.
+- **Headers:**
+  - `Content-Type: application/json`
+  - `X-API-Key: <current-admin-api-key>`
+  - `X-Timestamp: <ISO8601 timestamp>`
+  - `X-Nonce: <unique string>`
+  - `X-Signature: <HMAC signature using current admin secret>`
+- **Request Body:** _(none)_
+- **Response:**
+  - `200 OK` with JSON body (same as generate response, but with new key/secret)
+  - `401 Unauthorized` if credentials are invalid.
+
+---
+
+### 3. (Other Admin Endpoints)
+- All other admin-protected endpoints require the current admin API key and secret in the headers as above.
+- Refer to the main API documentation for details on each endpoint's specific input/output.
+
+---
+
+## Admin Secret Management & API Key Lifecycle
+
+### Overview
+The FeeNominalService implements a secure, single-source-of-truth pattern for managing the admin API key and secret. This ensures that only one valid admin credential exists at any time, and that the process for bootstrapping, rotating, and authenticating admin access is robust and auditable.
+
+### Lifecycle Stages
+
+#### 1. Bootstrap (Initial Admin Secret)
+- **Purpose:** Allows the very first admin API key to be generated in a new environment.
+- **Where is it stored?**
+  - **Production:** In AWS Secrets Manager, at a location defined by the `AdminSecretNameFormat` configuration (e.g., `feenominal/admin/apikeys/feenominal-admin-api-key-secret`).
+  - **Local Development:** In the local database table `api_key_secrets` with `MerchantId = NULL` and `Scope = "admin"`.
+- **How is it used?**
+  - The value of the secret at this location is provided in the `X-Admin-Secret` header for the initial admin API key generation endpoint.
+  - The service validates the HMAC signature using this secret.
+  - **Important:** The secret must be manually created in AWS Secrets Manager before the first admin key can be generated. If it does not exist, the request will fail.
+
+#### 2. Initial Admin API Key Generation
+- **What happens?**
+  - The service authenticates the request using the bootstrap secret.
+  - If successful, it generates a new admin API key and a new admin secret.
+  - The new admin secret **overwrites** the bootstrap secret at the same location in AWS Secrets Manager (or local DB).
+- **Result:**
+  - The bootstrap secret is no longer valid.
+  - The new admin API key and secret are now the only valid credentials for all admin operations.
+
+#### 3. Ongoing Admin Authentication
+- **How does it work?**
+  - All admin-protected endpoints (including key rotation) require the current admin API key and secret.
+  - The service always looks up the secret at the configured `AdminSecretNameFormat` location.
+  - The HMAC signature is validated using the **current** admin secret stored at this location.
+
+#### 4. Admin Key Rotation
+- **How is it done?**
+  - The admin can rotate the key/secret using a dedicated endpoint.
+  - The service generates a new admin API key and secret, and **overwrites** the value at the same secret location.
+  - Only the latest key/secret pair is valid for future admin operations.
+
+#### 5. Duplicate/Repeat Generation Attempts
+- **What happens if someone tries to generate another admin key using the bootstrap secret?**
+  - The request will fail: the secret at the configured location has been replaced, so the signature will not match.
+- **What if someone tries to generate another admin key using the new secret?**
+  - The service should check for an existing active admin key and return a clear error (e.g., "Admin API key already exists. Use the rotate endpoint to rotate the admin key.").
+
+### Security & Operational Implications
+- **Single Source of Truth:** Only one admin key/secret pair is valid at any time, stored at a well-known location.
+- **No Orphaned Secrets:** The bootstrap secret is automatically replaced after the first admin key is generated.
+- **No Reuse:** The bootstrap secret cannot be reused after the first admin key is created.
+- **Disaster Recovery:** If the current admin secret is lost, a manual reset in AWS Secrets Manager is required to re-bootstrap the system.
+
+### Configuration Example
+```json
+"AdminSecretNameFormat": "feenominal/admin/apikeys/{serviceName}-admin-api-key-secret"
+```
+- `{serviceName}` is replaced with your configured service name (e.g., `"feenominal"`).
+
+### Summary Table
+| Step                | Secret Location (example)                                 | Used for...                        |
+|---------------------|----------------------------------------------------------|------------------------------------|
+| Bootstrap           | `feenominal/admin/apikeys/feenominal-admin-api-key-secret` | Initial admin key generation       |
+| After generation    | `feenominal/admin/apikeys/feenominal-admin-api-key-secret` | All admin authentication/rotation  |
+
+### Key Takeaways
+- Only one valid admin key/secret exists at a time.
+- All admin authentication and rotation uses the secret at the configured location.
+- The bootstrap secret is only valid for the very first admin key generation.
+- Subsequent admin key generations are blocked unless you use the rotate endpoint.
+- Losing the current admin secret requires a manual reset in AWS Secrets Manager. 

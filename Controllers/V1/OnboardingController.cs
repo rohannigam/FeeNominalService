@@ -53,6 +53,18 @@ namespace FeeNominalService.Controllers.V1
         public async Task<ActionResult<GenerateInitialApiKeyResponse>> GenerateInitialApiKeyAsync(
             [FromBody] GenerateInitialApiKeyRequest request)
         {
+            // Require X-Timestamp header
+            if (!Request.Headers.TryGetValue("X-Timestamp", out var timestamp))
+            {
+                return BadRequest(new { error = "Missing X-Timestamp header." });
+            }
+            // Require X-Nonce header
+            if (!Request.Headers.TryGetValue("X-Nonce", out var nonce))
+            {
+                return BadRequest(new { error = "Missing X-Nonce header." });
+            }
+            _logger.LogInformation("Initial API key generate requested with X-Timestamp: {Timestamp}, X-Nonce: {Nonce}", timestamp.ToString(), nonce.ToString());
+
             try
             {
                 _logger.LogInformation("Generating initial API key for merchant {MerchantName}", request.MerchantName);
@@ -82,9 +94,7 @@ namespace FeeNominalService.Controllers.V1
                     ExternalMerchantId = merchant.ExternalMerchantId,
                     ExternalMerchantGuid = merchant.ExternalMerchantGuid.HasValue ? merchant.ExternalMerchantGuid : null,
                     MerchantName = merchant.Name,
-                    StatusId = merchant.StatusId,
-                    StatusCode = merchant.StatusCode,
-                    StatusName = merchant.StatusName,
+                    Status = apiKeyResponse.Status,
                     ApiKey = apiKeyResponse.ApiKey,
                     ApiKeyId = apiKeyResponse.ApiKeyId,
                     Secret = apiKeyResponse.Secret,
@@ -247,6 +257,29 @@ namespace FeeNominalService.Controllers.V1
                     SurchargeErrorCodes.Onboarding.AUTHENTICATION_FAILED
                 ));
             }
+            // Enforce scope boundaries
+            var scopeClaim = User.FindFirst("Scope")?.Value;
+            var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
+            if (request.IsAdmin)
+            {
+                if (scopeClaim != "admin")
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only admin-scope keys can create admin keys.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
+            else
+            {
+                if (scopeClaim != "merchant" || merchantIdClaim != request.MerchantId?.ToString())
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only merchant-scope keys can create merchant keys for their own merchant.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
             try
             {
                 // Validate merchant ID header matches request
@@ -282,12 +315,46 @@ namespace FeeNominalService.Controllers.V1
                 // Ensure the API key's merchant matches the request's merchant
                 if (apiKeyEntity.MerchantId != request.MerchantId)
                 {
-                    return Forbid(); // Or return Unauthorized with a message
+                    return Unauthorized(new ApiErrorResponse(
+                        "API key merchant does not match request merchant.",
+                        "MERCHANT_MISMATCH"
+                    ));
+                }
+
+                // For admin API keys, skip merchant validation
+                if (request.IsAdmin)
+                {
+                    // Generate API key
+                    var adminApiKeyResponse = await _apiKeyService.GenerateApiKeyAsync(request);
+
+                    // Log the response details for debugging
+                    _logger.LogInformation("Generated admin API key response: HasApiKey={HasApiKey}, HasSecret={HasSecret}, ExpiresAt={ExpiresAt}", 
+                        !string.IsNullOrEmpty(adminApiKeyResponse.ApiKey), 
+                        !string.IsNullOrEmpty(adminApiKeyResponse.Secret),
+                        adminApiKeyResponse.ExpiresAt);
+
+                    var adminResponse = new ApiResponse<GenerateApiKeyResponse>
+                    {
+                        Success = true,
+                        Message = "Admin API key generated successfully",
+                        Data = adminApiKeyResponse
+                    };
+
+                    return Ok(adminResponse);
+                }
+
+                // For merchant API keys, validate merchant exists
+                if (!request.MerchantId.HasValue)
+                {
+                    return BadRequest(new ApiErrorResponse(
+                        SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND),
+                        SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND
+                    ));
                 }
 
                 // Get merchant
                 _logger.LogInformation("Retrieving merchant with ID {MerchantId}", request.MerchantId);
-                var merchant = await _merchantService.GetMerchantAsync(request.MerchantId);
+                var merchant = await _merchantService.GetMerchantAsync(request.MerchantId.Value);
                 if (merchant == null)
                 {
                     _logger.LogWarning("Merchant not found with ID {MerchantId}", request.MerchantId);
@@ -322,17 +389,20 @@ namespace FeeNominalService.Controllers.V1
                     !string.IsNullOrEmpty(apiKeyResponse.Secret),
                     apiKeyResponse.ExpiresAt);
 
-                // Add audit trail entry for API key generation
-                var onboardingMetadata = request.OnboardingMetadata;
-                var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
-                await _merchantService.CreateAuditTrailAsync(
-                    request.MerchantId,
-                    "API_KEY_GENERATED",
-                    "api_key",
-                    null,
-                    apiKeyResponse.ApiKey,
-                    performedBy
-                );
+                // Add audit trail entry for API key generation (skip for admin keys)
+                if (!request.IsAdmin && request.MerchantId.HasValue)
+                {
+                    var onboardingMetadata = request.OnboardingMetadata;
+                    var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
+                    await _merchantService.CreateAuditTrailAsync(
+                        request.MerchantId.Value,
+                        "API_KEY_GENERATED",
+                        "api_key",
+                        null,
+                        apiKeyResponse.ApiKey,
+                        performedBy
+                    );
+                }
 
                 var response = new ApiResponse<GenerateApiKeyResponse>
                 {
@@ -370,6 +440,34 @@ namespace FeeNominalService.Controllers.V1
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> UpdateApiKey([FromBody] UpdateApiKeyRequest request)
         {
+            // Enforce scope boundaries
+            var scopeClaim = User.FindFirst("Scope")?.Value;
+            var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
+            var apiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(request.ApiKey);
+            if (apiKeyInfo == null)
+            {
+                return NotFound("API key not found");
+            }
+            if (apiKeyInfo.Status == "admin")
+            {
+                if (scopeClaim != "admin")
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only admin-scope keys can update admin keys.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
+            else
+            {
+                if (scopeClaim != "merchant" || merchantIdClaim != apiKeyInfo.MerchantId?.ToString())
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only merchant-scope keys can update merchant keys for their own merchant.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
             try
             {
                 _logger.LogInformation("Updating API key for merchant {MerchantId}", request.MerchantId);
@@ -389,15 +487,18 @@ namespace FeeNominalService.Controllers.V1
                     ));
                 }
 
-                // Create audit trail entry for API key update
-                await _merchantService.CreateAuditTrailAsync(
-                    Guid.Parse(request.MerchantId),
-                    "API_KEY_UPDATED",
-                    "api_key",
-                    JsonSerializer.Serialize(oldApiKeyInfo),
-                    JsonSerializer.Serialize(updatedApiKeyResponse),
-                    performedBy
-                );
+                // Create audit trail entry for API key update (skip for admin keys)
+                if (!string.IsNullOrEmpty(request.MerchantId) && Guid.TryParse(request.MerchantId, out Guid merchantGuid))
+                {
+                    await _merchantService.CreateAuditTrailAsync(
+                        merchantGuid,
+                        "API_KEY_UPDATED",
+                        "api_key",
+                        JsonSerializer.Serialize(oldApiKeyInfo),
+                        JsonSerializer.Serialize(updatedApiKeyResponse),
+                        performedBy
+                    );
+                }
 
                 _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", request.MerchantId);
                 return Ok(new ApiResponse<ApiKeyInfo>
@@ -427,6 +528,34 @@ namespace FeeNominalService.Controllers.V1
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> RevokeApiKey([FromBody] RevokeApiKeyRequest request)
         {
+            // Enforce scope boundaries
+            var scopeClaim = User.FindFirst("Scope")?.Value;
+            var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
+            var apiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(request.ApiKey);
+            if (apiKeyInfo == null)
+            {
+                return NotFound("API key not found");
+            }
+            if (apiKeyInfo.Status == "admin")
+            {
+                if (scopeClaim != "admin")
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only admin-scope keys can revoke admin keys.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
+            else
+            {
+                if (scopeClaim != "merchant" || merchantIdClaim != apiKeyInfo.MerchantId?.ToString())
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only merchant-scope keys can revoke merchant keys for their own merchant.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
             try
             {
                 _logger.LogInformation("Revoking API key for merchant {MerchantId}", request.MerchantId);
@@ -443,15 +572,18 @@ namespace FeeNominalService.Controllers.V1
                 // Fetch the revoked API key info for response
                 var revokedApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(apiKey);
 
-                // Create audit trail entry for API key revocation
-                await _merchantService.CreateAuditTrailAsync(
-                    merchantGuid,
-                    "API_KEY_REVOKED",
-                    "api_key",
-                    null,
-                    apiKey + "_Revoked",
-                    performedBy
-                );
+                // Create audit trail entry for API key revocation (skip for admin keys)
+                if (!string.IsNullOrEmpty(request.MerchantId))
+                {
+                    await _merchantService.CreateAuditTrailAsync(
+                        merchantGuid,
+                        "API_KEY_REVOKED",
+                        "api_key",
+                        null,
+                        apiKey + "_Revoked",
+                        performedBy
+                    );
+                }
 
                 _logger.LogInformation("Successfully revoked API key for merchant {MerchantId}", request.MerchantId);
                 return Ok(new ApiResponse<ApiKeyRevokeResponse>
@@ -691,12 +823,39 @@ namespace FeeNominalService.Controllers.V1
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> RotateApiKey([FromBody] RotateApiKeyRequest request)
         {
+            // Enforce scope boundaries
+            var scopeClaim = User.FindFirst("Scope")?.Value;
+            var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
+            var apiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(request.ApiKey);
+            if (apiKeyInfo == null)
+            {
+                return NotFound("API key not found");
+            }
+            if (apiKeyInfo.Status == "admin")
+            {
+                if (scopeClaim != "admin")
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only admin-scope keys can rotate admin keys.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
+            else
+            {
+                if (scopeClaim != "merchant" || merchantIdClaim != apiKeyInfo.MerchantId?.ToString())
+                {
+                    return Unauthorized(new ApiErrorResponse(
+                        "Only merchant-scope keys can rotate merchant keys for their own merchant.",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+            }
             try
             {
                 _logger.LogInformation("Rotating API key for merchant {MerchantId}", request.MerchantId);
 
                 // Validate the API key exists and belongs to the merchant
-                var apiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(request.ApiKey);
                 if (apiKeyInfo == null)
                 {
                     _logger.LogWarning("API key {ApiKey} not found", request.ApiKey);
@@ -730,15 +889,18 @@ namespace FeeNominalService.Controllers.V1
                 var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
                 var performedBy = onboardingMetadata?.AdminUserId ?? "SYSTEM";
 
-                // Create audit trail entry for API key rotation
-                await _merchantService.CreateAuditTrailAsync(
-                    Guid.Parse(request.MerchantId),
-                    "API_KEY_ROTATED",
-                    "api_key",
-                    JsonSerializer.Serialize(apiKeyInfo),
-                    JsonSerializer.Serialize(rotatedApiKeyResponse),
-                    performedBy
-                );
+                // Create audit trail entry for API key rotation (skip for admin keys)
+                if (!string.IsNullOrEmpty(request.MerchantId) && Guid.TryParse(request.MerchantId, out Guid merchantGuid))
+                {
+                    await _merchantService.CreateAuditTrailAsync(
+                        merchantGuid,
+                        "API_KEY_ROTATED",
+                        "api_key",
+                        JsonSerializer.Serialize(apiKeyInfo),
+                        JsonSerializer.Serialize(rotatedApiKeyResponse),
+                        performedBy
+                    );
+                }
 
                 _logger.LogInformation("Successfully rotated API key for merchant {MerchantId}", request.MerchantId);
                 return Ok(new ApiResponse<GenerateApiKeyResponse>
@@ -796,12 +958,5 @@ namespace FeeNominalService.Controllers.V1
     public class UpdateMerchantStatusRequest
     {
         public int StatusId { get; set; }
-    }
-
-    public class ApiKeyRevokeResponse
-    {
-        public string ApiKey { get; set; } = string.Empty;
-        public DateTime RevokedAt { get; set; }
-        public string Status { get; set; } = string.Empty;
     }
 } 

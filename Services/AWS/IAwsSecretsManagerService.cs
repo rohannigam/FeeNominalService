@@ -12,9 +12,6 @@ namespace FeeNominalService.Services.AWS
         Task CreateSecretAsync(string secretName, Dictionary<string, string> secretValue);
         Task UpdateSecretAsync<T>(string secretName, T secretValue) where T : class;
         Task<IEnumerable<T>> GetAllSecretsAsync<T>() where T : class;
-        Task<string?> GetApiKeyAsync(string merchantId);
-        Task<IEnumerable<ApiKeyInfo>> GetApiKeysAsync(string merchantId);
-        Task<string?> GetApiKeyByIdAsync(string merchantId, string apiKeyId);
         Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey);
         Task RevokeApiKeyAsync(string merchantId, string apiKey);
     }

@@ -123,24 +123,30 @@ namespace FeeNominalService.Services
                 // Handle primary config
                 if (config.IsPrimary)
                 {
-                    var existingPrimary = await GetPrimaryConfigAsync(config.MerchantId.ToString(), config.ProviderId);
-                    if (existingPrimary != null)
+                    if (config.MerchantId.HasValue)
                     {
-                        existingPrimary.IsPrimary = false;
-                        await _repository.UpdateAsync(existingPrimary);
-                        _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
-                            requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                        var existingPrimary = await GetPrimaryConfigAsync(config.MerchantId.Value.ToString(), config.ProviderId);
+                        if (existingPrimary != null)
+                        {
+                            existingPrimary.IsPrimary = false;
+                            await _repository.UpdateAsync(existingPrimary);
+                            _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
+                                requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                        }
                     }
                 }
                 else
                 {
                     // If not explicitly primary, check if this is the first config for this merchant/provider
-                    var hasPrimary = await HasPrimaryConfigAsync(config.MerchantId.ToString(), config.ProviderId);
-                    if (!hasPrimary)
+                    if (config.MerchantId.HasValue)
                     {
-                        config.IsPrimary = true;
-                        _logger.LogInformation("No existing primary config found for merchant {MerchantId}, provider {ProviderId}. Defaulting new config {ConfigId} ('{ConfigName}') to primary.",
-                            config.MerchantId, config.ProviderId, config.Id, config.ConfigName);
+                        var hasPrimary = await HasPrimaryConfigAsync(config.MerchantId.Value.ToString(), config.ProviderId);
+                        if (!hasPrimary)
+                        {
+                            config.IsPrimary = true;
+                            _logger.LogInformation("No existing primary config found for merchant {MerchantId}, provider {ProviderId}. Defaulting new config {ConfigId} ('{ConfigName}') to primary.",
+                                config.MerchantId, config.ProviderId, config.Id, config.ConfigName);
+                        }
                     }
                 }
 
@@ -152,7 +158,7 @@ namespace FeeNominalService.Services
                 config.SuccessCount = 0;
                 config.ErrorCount = 0;
 
-                return await _repository.AddAsync(config);
+                return await _repository.CreateAsync(config);
             }
             catch (Exception ex)
             {
@@ -178,13 +184,16 @@ namespace FeeNominalService.Services
                 // Handle primary config
                 if (config.IsPrimary && !existingConfig.IsPrimary)
                 {
-                    var existingPrimary = await GetPrimaryConfigAsync(config.MerchantId.ToString(), config.ProviderId);
-                    if (existingPrimary != null && existingPrimary.Id != config.Id)
+                    if (config.MerchantId.HasValue)
                     {
-                        existingPrimary.IsPrimary = false;
-                        await _repository.UpdateAsync(existingPrimary);
-                        _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
-                            requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                        var existingPrimary = await GetPrimaryConfigAsync(config.MerchantId.Value.ToString(), config.ProviderId);
+                        if (existingPrimary != null && existingPrimary.Id != config.Id)
+                        {
+                            existingPrimary.IsPrimary = false;
+                            await _repository.UpdateAsync(existingPrimary);
+                            _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
+                                requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                        }
                     }
                 }
 
@@ -214,9 +223,9 @@ namespace FeeNominalService.Services
                 }
 
                 // If deleting a primary config, promote another active config
-                if (config.IsPrimary)
+                if (config.IsPrimary && config.MerchantId.HasValue)
                 {
-                    await PromoteNextPrimaryConfigAsync(config.MerchantId, config.ProviderId, config.Id);
+                    await PromoteNextPrimaryConfigAsync(config.MerchantId.Value, config.ProviderId, config.Id);
                 }
 
                 return await _repository.DeleteAsync(id);

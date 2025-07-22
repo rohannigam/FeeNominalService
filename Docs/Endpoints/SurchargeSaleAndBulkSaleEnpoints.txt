@@ -1,0 +1,203 @@
+Surcharge Sale and Bulk Sale Endpoints
+=====================================
+
+Overview
+--------
+This document describes the /api/v1/surcharge/sale (single sale) and /api/v1/surcharge/bulk-sale-complete (bulk/admin sale) endpoints, including request/response models, workflows, and usage notes.
+
+Endpoints
+---------
+
+1. Single Surcharge Sale
+   - URL: POST /api/v1/surcharge/sale
+   - Use case: Complete a surcharge sale for a single transaction, either by referencing a previous auth (surchargeTransactionId) or by direct provider info.
+
+2. Bulk Surcharge Sale Complete (Admin/Cross-Merchant)
+   - URL: POST /api/v1/surcharge/bulk-sale-complete
+   - Use case: Admins or batch jobs complete multiple surcharge sales across merchants/providers in a single request. Supports partial success and detailed per-sale results.
+
+Authentication & Security
+-------------------------
+- All endpoints require API key authentication and request signing.
+- Bulk sale endpoint requires an admin-scope API key.
+- See API documentation for required headers (X-API-Key, X-Timestamp, X-Nonce, X-Signature, etc).
+
+Request Models
+--------------
+
+Single Sale Request (SurchargeSaleRequest):
+-------------------------------------------
+- surchargeTransactionId (Guid, optional): If provided, all other fields become optional.
+- providerTransactionId (string, optional): Required if surchargeTransactionId is not provided.
+- providerCode (string, optional): Required if surchargeTransactionId is not provided.
+- providerType (string, optional): Required if surchargeTransactionId is not provided.
+- correlationId (string, optional): Required if surchargeTransactionId is not provided.
+- merchantTransactionId (string, optional)
+
+Example:
+{
+  "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+}
+
+Bulk Sale Complete Request (BulkSaleCompleteRequest):
+-----------------------------------------------------
+- sales (array of BulkSaleItem): Each item must have either surchargeTransactionId or all of providerTransactionId, providerCode, providerType, correlationId.
+
+Example:
+{
+  "sales": [
+    { "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef" },
+    { "providerTransactionId": "ip-tx-001", "providerCode": "INTERPAY", "providerType": "INTERPAYMENTS", "correlationId": "sale-123456" }
+  ]
+}
+
+Response Models
+---------------
+
+Single Sale Response (SurchargeSaleResponse):
+---------------------------------------------
+- surchargeTransactionId (Guid): The ID from the request (if provided), or the looked-up transaction.
+- originalSurchargeTransactionId (Guid): The root auth transaction in the chain.
+- currentSurchargeTransactionId (Guid): The newly generated sale transaction ID.
+- correlationId (string)
+- merchantTransactionId (string)
+- providerTransactionId (string)
+- amount (decimal)
+- status (string)
+- providerCode (string)
+- providerType (string)
+- processedAt (datetime)
+- errorMessage (string, nullable)
+- surchargeFee (decimal, nullable)
+- surchargeFeePercent (decimal, nullable)
+
+Bulk Sale Complete Response (BulkSaleCompleteResponse):
+------------------------------------------------------
+- batchId (string): System-generated unique batch ID.
+- totalCount (int): Number of sales in the request.
+- successCount (int): Number of successful sales.
+- failureCount (int): Number of failed sales.
+- results (array of SurchargeSaleResponse): Per-sale results (see above).
+- processedAt (datetime)
+
+Example Response:
+-----------------
+{
+  "batchId": "c9c1668a34b14a7c950b58d4314f6895",
+  "totalCount": 2,
+  "successCount": 2,
+  "failureCount": 0,
+  "results": [
+    {
+      "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+      "originalSurchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+      "currentSurchargeTransactionId": "sale-tx-002",
+      "correlationId": "sale-123456",
+      "merchantTransactionId": "sale-987654",
+      "providerTransactionId": "ip-sale-001",
+      "amount": 100.00,
+      "status": "Completed",
+      "providerCode": "INTERPAY",
+      "providerType": "INTERPAYMENTS",
+      "processedAt": "2025-05-20T04:52:24.803373Z",
+      "errorMessage": null,
+      "surchargeFee": 3.50,
+      "surchargeFeePercent": 3.5
+    }
+  ],
+  "processedAt": "2025-05-20T04:52:24.8137133Z"
+}
+
+Workflow Diagrams
+-----------------
+
+Single Sale Workflow:
+---------------------
+
++-------------------+
+|  Client           |
++-------------------+
+          |
+          |  POST /api/v1/surcharge/sale
+          v
++-------------------+
+|  API Gateway      |
++-------------------+
+          |
+          |  Validate request, lookup transaction (if needed)
+          v
++-------------------+
+|  SurchargeService |
++-------------------+
+          |
+          |  If surchargeTransactionId provided:
+          |    - Lookup original auth transaction
+          |    - Use DB values for provider info, fee, etc.
+          |  Else:
+          |    - Use provided provider info
+          |
+          |  Create new sale transaction
+          |  Call provider (e.g., InterPayments)
+          |  Store result, update status
+          v
++-------------------+
+|  DB/Provider      |
++-------------------+
+          |
+          |  Return SurchargeSaleResponse
+          v
++-------------------+
+|  Client           |
++-------------------+
+
+Bulk Sale Complete Workflow:
+----------------------------
+
++-------------------+
+|  Admin/Batch Job  |
++-------------------+
+          |
+          |  POST /api/v1/surcharge/bulk-sale-complete
+          v
++-------------------+
+|  API Gateway      |
++-------------------+
+          |
+          |  Validate admin key, group sales by provider
+          v
++-------------------+
+|  SurchargeService |
++-------------------+
+          |
+          |  For each sale:
+          |    - Lookup by surchargeTransactionId or provider info
+          |    - Create new sale transaction
+          |    - Call provider (bulk or serial)
+          |    - Store result, update status
+          |    - Collect per-sale response
+          |
+          |  Aggregate results, generate batchId
+          v
++-------------------+
+|  DB/Provider      |
++-------------------+
+          |
+          |  Return BulkSaleCompleteResponse
+          v
++-------------------+
+|  Admin/Batch Job  |
++-------------------+
+
+Special Behaviors & Notes
+-------------------------
+- If surchargeTransactionId is provided, all other fields are optional and will be looked up from the DB.
+- For bulk sale, batchId is always system-generated and unique.
+- Partial success is supported: failed sales are reported in the results array with errorMessage.
+- surchargeFee and surchargeFeePercent are extracted from the referenced transaction's response payload.
+- Admin/cross-merchant support: bulk endpoint can process sales for multiple merchants/providers in one batch.
+- All endpoints return 200 OK with detailed per-sale status, even if some sales fail.
+
+Change History
+--------------
+- v1.0: Initial version (2024-07-22)
+- v1.1: Added support for optional surchargeTransactionId, per-sale fee reporting, batchId auto-generation, and admin/cross-merchant bulk sales. 

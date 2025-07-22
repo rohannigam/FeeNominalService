@@ -145,6 +145,7 @@ public static class SurchargeErrorCodes
         public const string FILE_SYSTEM_ERROR = "SURCH_9013";
         public const string PROCESS_CRASH = "SURCH_9014";
         public const string OUT_OF_MEMORY = "SURCH_9015";
+        public const string INVALID_REQUEST = "SURCH_9016";
     }
 
     // Business Logic Errors (10000-10999)
@@ -326,6 +327,7 @@ public static class SurchargeErrorCodes
             System.FILE_SYSTEM_ERROR => "File system error",
             System.PROCESS_CRASH => "Process crash detected",
             System.OUT_OF_MEMORY => "Out of memory error",
+            System.INVALID_REQUEST => "Invalid request detected",
 
             // Business Logic
             Business.SURCHARGE_CALCULATION_FAILED => "Surcharge calculation failed",

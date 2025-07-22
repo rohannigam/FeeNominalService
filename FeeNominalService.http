@@ -754,7 +754,7 @@ X-Signature: calculated-signature-here
 #   "surchargeFeePercent": 3.5
 # }
 
-# --- Surcharge Sale ---
+### --- Surcharge Sale (Single) ---
 POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/sale
 Content-Type: application/json
 X-API-Key: your-api-key-here
@@ -763,36 +763,99 @@ X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
 
 {
-  "binValue": "411111",
-  "surchargeProcessor": "PROC1",
-  "amount": 100.00,
-  "totalAmount": 103.50,
-  "country": "USA",
-  "postalCode": "94105",
-  "campaign": ["SUMMER2024"],
-  "data": ["extra1", "extra2"],
-  "cardToken": "card-token-abc123",
-  "entryMethod": "ECOM",
-  "nonSurchargableAmount": 0.00,
-  "providerTransactionId": null,
-  "providerCode": "INTERPAY",
-  "correlationId": "sale-123456",
-  "merchantTransactionId": "sale-987654"
+  // Option 1: Use surchargeTransactionId (all other fields optional)
+  "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+  // Option 2: Use providerTransactionId, providerCode, providerType, correlationId (all required if surchargeTransactionId not provided)
+  // "providerTransactionId": "ip-tx-001",
+  // "providerCode": "INTERPAY",
+  // "providerType": "INTERPAYMENTS",
+  // "correlationId": "sale-123456"
 }
 
 ### Response Example:
 # {
-#   "surchargeTransactionId": "sale-tx-001",
+#   "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+#   "originalSurchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+#   "currentSurchargeTransactionId": "sale-tx-002",
 #   "correlationId": "sale-123456",
 #   "merchantTransactionId": "sale-987654",
 #   "providerTransactionId": "ip-sale-001",
-#   "originalAmount": 100.00,
-#   "surchargeAmount": 3.50,
-#   "totalAmount": 103.50,
+#   "amount": 100.00,
 #   "status": "Completed",
-#   "provider": "INTERPAY",
+#   "providerCode": "INTERPAY",
+#   "providerType": "INTERPAYMENTS",
 #   "processedAt": "2025-05-20T04:52:24.803373Z",
-#   "errorMessage": null
+#   "errorMessage": null,
+#   "surchargeFee": 3.50,
+#   "surchargeFeePercent": 3.5
+# }
+
+### --- Surcharge Bulk Sale Complete (Admin/Cross-Merchant) ---
+POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/bulk-sale-complete
+Content-Type: application/json
+X-API-Key: your-admin-api-key-here
+X-Timestamp: {{$datetime iso8601}}
+X-Nonce: {{$guid}}
+X-Signature: calculated-signature-here
+
+{
+  "sales": [
+    {
+      // Option 1: Use surchargeTransactionId (preferred)
+      "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+      // Option 2: Use providerTransactionId, providerCode, providerType, correlationId (all required if surchargeTransactionId not provided)
+      // "providerTransactionId": "ip-tx-001",
+      // "providerCode": "INTERPAY",
+      // "providerType": "INTERPAYMENTS",
+      // "correlationId": "sale-123456"
+    },
+    {
+      "surchargeTransactionId": "a1a51fcb-9f0c-4f5d-a866-f830a48cbb9b"
+    }
+  ]
+}
+
+### Response Example:
+# {
+#   "batchId": "c9c1668a34b14a7c950b58d4314f6895",
+#   "totalCount": 2,
+#   "successCount": 2,
+#   "failureCount": 0,
+#   "results": [
+#     {
+#       "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+#       "originalSurchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+#       "currentSurchargeTransactionId": "sale-tx-002",
+#       "correlationId": "sale-123456",
+#       "merchantTransactionId": "sale-987654",
+#       "providerTransactionId": "ip-sale-001",
+#       "amount": 100.00,
+#       "status": "Completed",
+#       "providerCode": "INTERPAY",
+#       "providerType": "INTERPAYMENTS",
+#       "processedAt": "2025-05-20T04:52:24.803373Z",
+#       "errorMessage": null,
+#       "surchargeFee": 3.50,
+#       "surchargeFeePercent": 3.5
+#     },
+#     {
+#       "surchargeTransactionId": "a1a51fcb-9f0c-4f5d-a866-f830a48cbb9b",
+#       "originalSurchargeTransactionId": "a1a51fcb-9f0c-4f5d-a866-f830a48cbb9b",
+#       "currentSurchargeTransactionId": "sale-tx-003",
+#       "correlationId": "sale-654321",
+#       "merchantTransactionId": "sale-123987",
+#       "providerTransactionId": "ip-sale-002",
+#       "amount": 120.00,
+#       "status": "Completed",
+#       "providerCode": "INTERPAY",
+#       "providerType": "INTERPAYMENTS",
+#       "processedAt": "2025-05-20T04:52:24.803373Z",
+#       "errorMessage": null,
+#       "surchargeFee": 4.20,
+#       "surchargeFeePercent": 3.5
+#     }
+#   ],
+#   "processedAt": "2025-05-20T04:52:24.8137133Z"
 # }
 
 # --- Surcharge Refund ---

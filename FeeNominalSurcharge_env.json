@@ -1,5 +1,5 @@
 {
-	"id": "5660bba5-1ea6-4b1a-b714-53fe5dd26797",
+	"id": "a1ae01b5-2219-4434-9227-9266340c9d50",
 	"name": "FeeNominalSurchargeService Environment",
 	"values": [
 		{
@@ -673,9 +673,132 @@
 			"value": "INTERPAYMENTS",
 			"type": "default",
 			"enabled": true
+		},
+		{
+			"key": "saleTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleOriginalTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleCorrelationId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleMerchantTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleProviderTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleAmount",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleStatus",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleProviderCode",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleProviderType",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "saleProcessedAt",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "adminApiKeyName",
+			"value": "AdminAPIKey_BulkSakes",
+			"enabled": true
+		},
+		{
+			"key": "adminApiKeyDescription",
+			"value": "APIKey used  to call Bulk Sale Endpoint only",
+			"enabled": true
+		},
+		{
+			"key": "adminSecret",
+			"value": "your-local-scheduleforger-secret",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "serviceName",
+			"value": "scheduleforger",
+			"enabled": true
+		},
+		{
+			"key": "origSurchargeTransactionId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "bulkSurchargeTxnIds",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "adminApiKey",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "adminApiSecret",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "bulkSaleCompletedCount",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "bulkSaleFailedCount",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "bulkSaleCompletedTxnIds",
+			"value": "",
+			"type": "any",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2025-07-14T21:38:32.361Z",
-	"_postman_exported_using": "Postman/11.53.5"
+	"_postman_exported_at": "2025-07-22T12:36:35.973Z",
+	"_postman_exported_using": "Postman/11.55.0"
 }

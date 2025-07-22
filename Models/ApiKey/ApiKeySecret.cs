@@ -5,7 +5,8 @@ namespace FeeNominalService.Models.ApiKey
         public int Id { get; set; }
         public string ApiKey { get; set; } = string.Empty;
         public string Secret { get; set; } = string.Empty;
-        public Guid MerchantId { get; set; }
+        public string Scope { get; set; } = "merchant";
+        public Guid? MerchantId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public DateTime? LastRotated { get; set; }

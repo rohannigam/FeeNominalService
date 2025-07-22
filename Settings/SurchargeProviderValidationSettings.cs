@@ -124,5 +124,8 @@ namespace FeeNominalService.Settings
         /// Whether to validate that credentials only contain fields defined in the schema
         /// </summary>
         public bool ValidateExtraFields { get; set; } = false;
+
+        public bool UseProviderBulkSale { get; set; } = false;
+        public int MaxRequestsPerBulkSale { get; set; } = 5000;
     }
 } 

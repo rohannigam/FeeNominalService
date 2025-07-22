@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using FeeNominalService.Models.Merchant;
 using FeeNominalService.Models.ApiKey;
+using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Services;
+using System.Text.Json;
 
 namespace FeeNominalService.Data
 {
@@ -31,7 +33,7 @@ namespace FeeNominalService.Data
                 await context.MerchantStatuses.AddRangeAsync(statuses);
                 await context.SaveChangesAsync();
 
-                // Add test merchant
+                // Add test merchant (for dev/test only)
                 var activeStatus = await context.MerchantStatuses.FirstOrDefaultAsync(s => s.Code == "ACTIVE");
                 if (activeStatus != null)
                 {

@@ -5,6 +5,7 @@ using FeeNominalService.Models.Surcharge.Responses;
 using FeeNominalService.Services;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
+using FeeNominalService.Models.Common;
 
 namespace FeeNominalService.Controllers.V1
 {
@@ -37,6 +38,7 @@ namespace FeeNominalService.Controllers.V1
             {
                 _logger.LogInformation("Processing surcharge auth for transaction: {CorrelationId}", 
                     request.CorrelationId);
+                _logger.LogInformation("Auth Request: {@Request}", request);
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
@@ -54,10 +56,15 @@ namespace FeeNominalService.Controllers.V1
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
+                // Extract API key or user identity for audit
+                var apiKey = User.FindFirst("ApiKey")?.Value;
+                var actor = !string.IsNullOrEmpty(apiKey) ? apiKey : "system";
+
                 // Process the surcharge authorization
-                var response = await _surchargeTransactionService.ProcessAuthAsync(request, merchantId);
+                var response = await _surchargeTransactionService.ProcessAuthAsync(request, merchantId, actor);
 
                 _logger.LogInformation("Successfully processed surcharge auth for transaction: {CorrelationId}, surcharge transaction ID: {SurchargeTransactionId}", request.CorrelationId, response.SurchargeTransactionId);
+                _logger.LogInformation("Auth Response: {@Response}", response);
 
                 return Ok(response);
             }
@@ -87,6 +94,7 @@ namespace FeeNominalService.Controllers.V1
             {
                 _logger.LogInformation("Processing surcharge sale for transaction: {CorrelationId}", 
                     request.CorrelationId);
+                _logger.LogInformation("Sale Request: {@Request}", request);
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
@@ -104,12 +112,17 @@ namespace FeeNominalService.Controllers.V1
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
+                // Extract API key or user identity for audit
+                var apiKey = User.FindFirst("ApiKey")?.Value;
+                var actor = !string.IsNullOrEmpty(apiKey) ? apiKey : "system";
+
                 // Process the surcharge sale
-                var response = await _surchargeTransactionService.ProcessSaleAsync(request, merchantId);
+                var response = await _surchargeTransactionService.ProcessSaleAsync(request, merchantId, actor);
 
                 _logger.LogInformation("Successfully processed surcharge sale for transaction: {CorrelationId}, " +
                     "surcharge transaction ID: {SurchargeTransactionId}", 
                     request.CorrelationId, response.SurchargeTransactionId);
+                _logger.LogInformation("Sale Response: {@Response}", response);
 
                 return Ok(response);
             }
@@ -228,6 +241,70 @@ namespace FeeNominalService.Controllers.V1
                 _logger.LogError(ex, "Error processing surcharge cancel for transaction: {CorrelationId}", 
                     request.CorrelationId);
                 return StatusCode(500, new { message = "An error occurred while processing the surcharge cancellation" });
+            }
+        }
+
+        /// <summary>
+        /// Process a batch of surcharge sale transactions (admin, cross-merchant)
+        /// </summary>
+        /// <param name="request">Batch sale complete request</param>
+        /// <returns>Batch sale complete response</returns>
+        [HttpPost("bulk-sale-complete")]
+        [Authorize(Policy = "ApiKeyAccess")]
+        public async Task<IActionResult> BulkSaleComplete([FromBody] BulkSaleCompleteRequest request)
+        {
+            try
+            {
+                // Validate admin scope from claims
+                var scopeClaim = User.FindFirst("Scope")?.Value;
+                var isAdminClaim = User.FindFirst("IsAdmin")?.Value;
+                var adminUser = User.FindFirst("ApiKey")?.Value ?? "unknown-admin";
+
+                if (scopeClaim != "admin" || isAdminClaim != "true")
+                {
+                    _logger.LogWarning("Non-admin API key attempted to access bulk sale complete endpoint");
+                    return Unauthorized(new ApiErrorResponse(
+                        "Admin access required for bulk operations",
+                        "INSUFFICIENT_PERMISSIONS"
+                    ));
+                }
+
+                // Validate sales array
+                if (request.Sales == null || request.Sales.Count == 0)
+                {
+                    _logger.LogWarning("No sales provided for bulk sale complete");
+                    return BadRequest(new { message = "At least one sale item is required for bulk operations" });
+                }
+
+                // Validate each sale item
+                for (int i = 0; i < request.Sales.Count; i++)
+                {
+                    var sale = request.Sales[i];
+                    bool hasAuth = sale.SurchargeTransactionId.HasValue;
+                    bool hasDirect = !string.IsNullOrWhiteSpace(sale.ProviderTransactionId)
+                        && !string.IsNullOrWhiteSpace(sale.ProviderCode)
+                        && !string.IsNullOrWhiteSpace(sale.CorrelationId);
+                    if (!hasAuth && !hasDirect)
+                    {
+                        _logger.LogWarning("Sale item at index {Index} missing required identifiers", i);
+                        return BadRequest(new { message = $"Each sale must have either surchargeTransactionId or all of providerTransactionId, providerCode, and correlationId (index {i})" });
+                    }
+                }
+
+                _logger.LogInformation("[AUDIT] Admin {AdminUser} starting bulk sale complete. Count: {Count}", adminUser, request.Sales?.Count ?? 0);
+                var response = await _surchargeTransactionService.ProcessBulkSaleCompleteAsync(request);
+                _logger.LogInformation("[AUDIT] Admin {AdminUser} completed bulk sale processing. BatchId: {BatchId}, Success: {SuccessCount}, Failed: {FailureCount}", adminUser, response.BatchId, response.SuccessCount, response.FailureCount);
+                return Ok(response);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation while processing bulk sale complete");
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing bulk sale complete");
+                return StatusCode(500, new { message = "An error occurred while processing the bulk sale complete" });
             }
         }
 

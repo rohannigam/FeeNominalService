@@ -46,9 +46,19 @@ public class SurchargeAuthResponse
     public required string Status { get; set; }
 
     /// <summary>
-    /// Provider that processed the surcharge
+    /// Provider that processed the surcharge (legacy field for backward compatibility)
     /// </summary>
     public required string Provider { get; set; }
+
+    /// <summary>
+    /// Provider type (e.g., 'INTERPAYMENTS', 'OTHERPROVIDER')
+    /// </summary>
+    public required string ProviderType { get; set; }
+
+    /// <summary>
+    /// Provider code (e.g., 'INTERPAYMENTS', 'XIPAY')
+    /// </summary>
+    public required string ProviderCode { get; set; }
 
     /// <summary>
     /// When the surcharge was processed

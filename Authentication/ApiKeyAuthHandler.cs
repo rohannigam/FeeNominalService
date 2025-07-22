@@ -10,6 +10,9 @@ using System.Security.Claims;
 using FeeNominalService.Utils;
 using FeeNominalService.Repositories;
 using FeeNominalService.Models.ApiKey;
+using System.Collections.Generic;
+using System.Text.Json;
+using FeeNominalService.Services.AWS;
 
 namespace FeeNominalService.Authentication
 {
@@ -21,6 +24,8 @@ namespace FeeNominalService.Authentication
         private readonly IApiKeyService _apiKeyService;
         private readonly IApiKeyRepository _apiKeyRepository;
         private readonly IApiKeyUsageRepository _apiKeyUsageRepository;
+        private readonly IAwsSecretsManagerService _secretsManager;
+        private readonly IMerchantRepository _merchantRepository;
 
         public ApiKeyAuthHandler(
             IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -30,7 +35,9 @@ namespace FeeNominalService.Authentication
             IOptions<ApiKeyConfiguration> apiKeyConfig,
             IApiKeyService apiKeyService,
             IApiKeyRepository apiKeyRepository,
-            IApiKeyUsageRepository apiKeyUsageRepository)
+            IApiKeyUsageRepository apiKeyUsageRepository,
+            IAwsSecretsManagerService secretsManager,
+            IMerchantRepository merchantRepository)
             : base(options, logger, encoder)
         {
             _requestSigningService = requestSigningService;
@@ -39,6 +46,8 @@ namespace FeeNominalService.Authentication
             _apiKeyService = apiKeyService;
             _apiKeyRepository = apiKeyRepository;
             _apiKeyUsageRepository = apiKeyUsageRepository;
+            _secretsManager = secretsManager;
+            _merchantRepository = merchantRepository;
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -46,6 +55,13 @@ namespace FeeNominalService.Authentication
             try
             {
                 _logger.LogDebug("Starting API key authentication for path: {Path}", Request.Path);
+
+                // Skip authentication for admin API key generation endpoint
+                if (Request.Path.StartsWithSegments("/api/v1/admin/apiKey/generate"))
+                {
+                    _logger.LogDebug("Skipping authentication for admin API key generation endpoint");
+                    return AuthenticateResult.NoResult();
+                }
 
                 // For initial API key generation, only validate timestamp and nonce
                 if (Request.Path.StartsWithSegments("/api/v1/onboarding/apikey/initial-generate"))
@@ -104,18 +120,35 @@ namespace FeeNominalService.Authentication
                     return AuthenticateResult.NoResult();
                 }
 
-                // Validate required headers
-                var (isValidMerchantId, merchantId, merchantIdError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-Merchant-ID");
+                // Debug: Log all headers received
+                _logger.LogInformation("=== AUTHENTICATION HEADERS DEBUG ===");
+                foreach (var header in Request.Headers)
+                {
+                    _logger.LogInformation("Header: {HeaderName} = {HeaderValue}", header.Key, header.Value);
+                }
+                _logger.LogInformation("=== END AUTHENTICATION HEADERS DEBUG ===");
+
+                // Validate required headers (except X-Merchant-ID for admin keys)
                 var (isValidApiKey, apiKey, apiKeyError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-API-Key");
                 var (isValidTimestamp, timestamp, timestampError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-Timestamp");
                 var (isValidNonce, nonce, nonceError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-Nonce");
                 var (isValidSignature, signature, signatureError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-Signature");
 
-                if (!isValidMerchantId || !isValidApiKey || !isValidTimestamp || !isValidNonce || !isValidSignature)
+                // Get merchant ID header (optional for admin keys)
+                var (isValidMerchantId, merchantId, merchantIdError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-Merchant-ID");
+
+                _logger.LogInformation("=== HEADER VALIDATION DEBUG ===");
+                _logger.LogInformation("ApiKey: Valid={IsValid}, Value={ApiKey}, Error={Error}", isValidApiKey, apiKey, apiKeyError);
+                _logger.LogInformation("Timestamp: Valid={IsValid}, Value={Timestamp}, Error={Error}", isValidTimestamp, timestamp, timestampError);
+                _logger.LogInformation("Nonce: Valid={IsValid}, Value={Nonce}, Error={Error}", isValidNonce, nonce, nonceError);
+                _logger.LogInformation("Signature: Valid={IsValid}, Value={Signature}, Error={Error}", isValidSignature, signature, signatureError);
+                _logger.LogInformation("MerchantId: Valid={IsValid}, Value={MerchantId}, Error={Error}", isValidMerchantId, merchantId, merchantIdError);
+                _logger.LogInformation("=== END HEADER VALIDATION DEBUG ===");
+
+                if (!isValidApiKey || !isValidTimestamp || !isValidNonce || !isValidSignature)
                 {
                     var errors = new[]
                     {
-                        merchantIdError,
                         apiKeyError,
                         timestampError,
                         nonceError,
@@ -124,6 +157,43 @@ namespace FeeNominalService.Authentication
 
                     _logger.LogWarning("Missing or invalid headers: {Errors}", string.Join(", ", errors));
                     return AuthenticateResult.Fail("Missing or invalid headers");
+                }
+
+                // Check if this is an admin API key
+                if (string.IsNullOrEmpty(apiKey))
+                {
+                    _logger.LogWarning("API key is null or empty");
+                    return AuthenticateResult.Fail("API key is null or empty");
+                }
+                
+                var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
+                if (apiKeyEntity == null)
+                {
+                    _logger.LogWarning("API key {ApiKey} not found", apiKey);
+                    return AuthenticateResult.Fail("API key not found");
+                }
+
+                var isAdminKey = apiKeyEntity.IsAdmin || apiKeyEntity.MerchantId == null;
+
+                // For admin keys, merchant ID is optional (can be empty/null)
+                // For merchant keys, merchant ID is required
+                if (!isAdminKey && !isValidMerchantId)
+                {
+                    _logger.LogWarning("Merchant ID header required for non-admin API keys: {Error}", merchantIdError);
+                    return AuthenticateResult.Fail("Merchant ID header required for non-admin API keys");
+                }
+
+                // Ensure merchantId is never null
+                var finalMerchantId = string.Empty;
+                if (isAdminKey)
+                {
+                    // For admin keys, use empty string if no merchant ID provided
+                    finalMerchantId = isValidMerchantId ? (merchantId ?? string.Empty) : string.Empty;
+                }
+                else
+                {
+                    // For merchant keys, merchant ID is required and should be valid
+                    finalMerchantId = merchantId ?? string.Empty;
                 }
 
                 // Validate timestamp
@@ -152,7 +222,7 @@ namespace FeeNominalService.Authentication
                 }
 
                 // Validate signature
-                if (string.IsNullOrEmpty(merchantId) || string.IsNullOrEmpty(apiKey) || 
+                if (string.IsNullOrEmpty(apiKey) || 
                     string.IsNullOrEmpty(timestamp) || string.IsNullOrEmpty(nonce) || 
                     string.IsNullOrEmpty(signature))
                 {
@@ -160,19 +230,22 @@ namespace FeeNominalService.Authentication
                     return AuthenticateResult.Fail("Missing required authentication parameters");
                 }
 
-                var isValid = await _apiKeyService.ValidateApiKeyAsync(merchantId, apiKey, timestamp, nonce, signature);
+                var isValid = await _apiKeyService.ValidateApiKeyAsync(finalMerchantId, apiKey, timestamp, nonce, signature, isAdminKey ? (apiKeyEntity.ServiceName ?? string.Empty) : string.Empty);
                 if (!isValid)
                 {
-                    _logger.LogWarning("Invalid signature for merchant {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid signature for {KeyType} {Identifier}", 
+                        isAdminKey ? "admin key" : "merchant", 
+                        isAdminKey ? apiKey : finalMerchantId);
                     return AuthenticateResult.Fail("Invalid signature");
                 }
 
-                _logger.LogDebug("API key validation successful for merchant {MerchantId}", merchantId);
+                _logger.LogDebug("API key validation successful for {KeyType} {Identifier}", 
+                    isAdminKey ? "admin key" : "merchant", 
+                    isAdminKey ? apiKey : finalMerchantId);
 
                 // Update last_used_at timestamp
                 try 
                 {
-                    var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
                     if (apiKeyEntity != null)
                     {
                         apiKeyEntity.LastUsedAt = DateTime.UtcNow;
@@ -200,9 +273,11 @@ namespace FeeNominalService.Authentication
                 // Create claims
                 var claims = new[]
                 {
-                    new Claim("MerchantId", merchantId),
+                    new Claim("MerchantId", isAdminKey ? string.Empty : finalMerchantId),
                     new Claim("ApiKey", apiKey),
-                    new Claim("AllowedEndpoints", string.Join(",", apiKeyInfo.AllowedEndpoints))
+                    new Claim("AllowedEndpoints", string.Join(",", apiKeyInfo.AllowedEndpoints)),
+                    new Claim("Scope", apiKeyInfo.Scope ?? "merchant"),
+                    new Claim("IsAdmin", apiKeyInfo.IsAdmin ? "true" : "false")
                 };
 
                 var identity = new ClaimsIdentity(claims, Scheme.Name);
@@ -214,7 +289,6 @@ namespace FeeNominalService.Authentication
                 // Usage count tracking
                 try
                 {
-                    var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
                     if (apiKeyEntity != null)
                     {
                         var windowStart = DateTime.UtcNow.AddMinutes(-_apiKeyConfig.RequestTimeWindowMinutes);

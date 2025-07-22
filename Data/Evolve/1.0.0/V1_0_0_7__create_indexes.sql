@@ -97,30 +97,6 @@ BEGIN
     RAISE NOTICE 'Created index on api_keys.is_active';
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_api_key_secrets_merchant ON fee_nominal.api_key_secrets(merchant_id);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on api_key_secrets.merchant_id';
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_api_key_secrets_status ON fee_nominal.api_key_secrets(status);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on api_key_secrets.status';
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_api_key_secrets_is_revoked ON fee_nominal.api_key_secrets(is_revoked);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on api_key_secrets.is_revoked';
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_api_key_secrets_created_at ON fee_nominal.api_key_secrets(created_at);
-DO $$
-BEGIN
-    RAISE NOTICE 'Created index on api_key_secrets.created_at';
-END $$;
-
 CREATE INDEX IF NOT EXISTS idx_transactions_merchant ON fee_nominal.transactions(merchant_id);
 DO $$
 BEGIN

@@ -1,11 +1,11 @@
 {
 	"info": {
-		"_postman_id": "52607db1-cffd-4446-b704-2bb2271550cc",
+		"_postman_id": "aa78ca75-c3ed-4166-aaf5-ab56e6d4e8f5",
 		"name": "FeeNominalService API",
 		"description": "Collection for testing the FeeNominalService API endpoints",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "32378011",
-		"_collection_link": "https://earwig.postman.co/workspace/Earwig-Workspace~76662190-f6bb-4fb6-8065-6fed724ace4b/collection/32378011-52607db1-cffd-4446-b704-2bb2271550cc?action=share&source=collection_link&creator=32378011"
+		"_collection_link": "https://earwig.postman.co/workspace/Earwig-Workspace~76662190-f6bb-4fb6-8065-6fed724ace4b/collection/32378011-aa78ca75-c3ed-4166-aaf5-ab56e6d4e8f5?action=share&source=collection_link&creator=32378011"
 	},
 	"item": [
 		{
@@ -2541,6 +2541,7 @@
 									"        ",
 									"        // Save the original transaction IDs that were sent in the request",
 									"        pm.environment.set('surchargeCorrelationId', pm.environment.get('surchargeCorrelationId'));",
+									"        pm.environment.set('origSurchargeTransactionId', jsonData.surchargeTransactionId);",
 									"        ",
 									"        console.log('Surcharge Auth Response:');",
 									"        console.log('Surcharge Transaction ID:', jsonData.surchargeTransactionId);",
@@ -2605,7 +2606,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"providerCode\": \"{{providerCode}}\",\n    \"binValue\": \"{{surchargeBinValue}}\",\n    \"surchargeProcessor\": \"{{surchargeProcessor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{amount}},\n    \"country\": \"{{surchargeCountry}}\",\n    \"postalCode\": \"{{surchargePostalCode}}\",\n    \"campaign\": {{surchargeCampaign}},\n    \"data\": {{surchargeData}},\n    \"correlationId\": \"{{surchargeCorrelationId}}\",\n    \"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n    \"cardToken\": \"{{surchargeCardToken}}\",\n    \"entryMethod\": \"{{surchargeEntryMethod}}\",\n    \"nonSurchargableAmount\": {{surchargeNonSurchargableAmount}}\n}"
+							"raw": "{\n    \"providerCode\": \"{{providerCode}}\",\n    \"binValue\": \"{{surchargeBinValue}}\",\n    \"surchargeProcessor\": \"{{surchargeProcessor}}\",\n    \"amount\": {{amount}},\n    \"totalAmount\": {{amount}},\n    \"country\": \"{{surchargeCountry}}\",\n    \"postalCode\": \"{{surchargePostalCode}}\",\n    \"campaign\": {{surchargeCampaign}},\n    \"data\": {{surchargeData}},\n    \"correlationId\": \"{{surchargeCorrelationId}}\",\n    \"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n    //\"cardToken\": \"{{surchargeCardToken}}\",\n    \"entryMethod\": \"{{surchargeEntryMethod}}\",\n    \"nonSurchargableAmount\": {{surchargeNonSurchargableAmount}}\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/surcharge/auth",
@@ -2903,6 +2904,7 @@
 									"        pm.expect(jsonData.data).to.have.property('providerTransactionId');",
 									"        // Save follow-up transaction data to environment",
 									"        pm.environment.set('surchargeFollowupTransactionId', jsonData.data.surchargeTransactionId);",
+									"        pm.environment.set('surchargeTransactionId', jsonData.surchargeTransactionId);",
 									"        pm.environment.set('surchargeFollowupMerchantTransactionId', jsonData.data.merchantTransactionId);",
 									"        pm.environment.set('surchargeFollowupStatus', jsonData.data.status);",
 									"        pm.environment.set('surchargeFollowupAmount', jsonData.data.surchargeAmount);",
@@ -3010,46 +3012,22 @@
 									"    return;",
 									"}",
 									"",
-									"// Get transaction ID from previous auth",
-									"const transactionId = pm.environment.get('surchargeTransactionId');",
-									"if (!transactionId) {",
-									"    console.error('Transaction ID not found. Please run Surcharge Auth first.');",
-									"    return;",
-									"}",
-									"",
-									"// Get request body",
-									"const requestBody = JSON.stringify({",
-									"    transactionId: transactionId,",
-									"    amount: parseFloat(pm.environment.get('surchargeAmount') || '100.00'),",
-									"    metadata: {",
-									"        source: 'postman-test',",
-									"        testId: pm.variables.replaceIn('{{$guid}}')",
-									"    }",
-									"});",
-									"",
 									"// Create data string to sign with pipe separators",
 									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
 									"",
 									"// Generate HMAC-SHA256 signature",
 									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
 									"",
+									"",
 									"// Set headers",
 									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
 									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
 									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
 									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
-									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
-									"",
-									"// Set the request body",
-									"pm.request.body.raw = requestBody;",
-									"",
-									"console.log('Surcharge Sale Request:');",
-									"console.log('Transaction ID:', transactionId);",
-									"console.log('Request Body:', requestBody);",
-									"console.log('BINVALUE:', (pm.environment.get('surchargeBinValue') || '4111111111111111').substring(0, 6));",
-									"console.log('POSTALCODE:', pm.environment.get('surchargePostalCode') || '78717');"
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						},
 						{
@@ -3080,7 +3058,8 @@
 									"    }",
 									"});"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -3094,7 +3073,118 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"transactionId\": \"{{surchargeTransactionId}}\",\n    \"amount\": {{surchargeAmount}},\n    \"metadata\": {\n        \"source\": \"postman-test\",\n        \"testId\": \"{{$guid}}\"\n    }\n}"
+							"raw": "{\n  //\"correlationId\": \"{{surchargeCorrelationId}}\",\n  \"SurchargeTransactionId\": \"{{surchargeTransactionId}}\"//,\n  //\"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n  //\"providerType\": \"{{providerType}}\",\n  //\"providerCode\": \"{{providerCode}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/sale",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"sale"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Sale w ProvTransId",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const now = new Date();",
+									"const timestamp = now.toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get API secret from environment",
+									"const apiSecret = pm.environment.get('apiSecret');",
+									"if (!apiSecret) {",
+									"    console.error('API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get merchant ID from environment",
+									"const merchantId = pm.environment.get('merchantId');",
+									"if (!merchantId) {",
+									"    console.error('Merchant ID not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get API key from environment",
+									"const apiKey = pm.environment.get('apiKey');",
+									"if (!apiKey) {",
+									"    console.error('API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const dataToSign = `${timestamp}|${nonce}|${merchantId}|${apiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(dataToSign, apiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-Merchant-ID', value: merchantId });",
+									"pm.request.headers.add({ key: 'X-API-Key', value: apiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Verify response",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required fields', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    ",
+									"    if (jsonData.data) {",
+									"        pm.expect(jsonData.data).to.have.property('transactionId');",
+									"        pm.expect(jsonData.data).to.have.property('status');",
+									"        pm.expect(jsonData.data).to.have.property('updatedAt');",
+									"        ",
+									"        console.log('Surcharge Sale Response:');",
+									"        console.log('Transaction ID:', jsonData.data.transactionId);",
+									"        console.log('Status:', jsonData.data.status);",
+									"        ",
+									"        // Verify status is COMPLETED",
+									"        pm.expect(jsonData.data.status).to.equal('COMPLETED');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correlationId\": \"{{surchargeCorrelationId}}\",\n  \"providerTransactionId\": \"{{surchargeProviderTransactionId}}\",\n  //\"merchantTransactionId\": \"{{surchargeMerchantTransactionId}}\",\n  \"providerType\": \"{{providerType}}\",\n  \"providerCode\": \"{{providerCode}}\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/surcharge/sale",
@@ -3493,6 +3583,400 @@
 								"surcharge",
 								"transactions",
 								"{{surchargeTransactionId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Surcharge Bulk Sale Complete",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get admin API key and secret",
+									"const adminApiKey = pm.environment.get('adminApiKey');",
+									"const adminApiSecret = pm.environment.get('adminApiSecret');",
+									"",
+									"// Create data string to sign",
+									"const data = `${timestamp}|${nonce}|${adminApiKey}`;",
+									"const signature = CryptoJS.HmacSHA256(data, adminApiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set environment variables for headers",
+									"pm.environment.set('timestamp', timestamp);",
+									"pm.environment.set('nonce', nonce);",
+									"pm.environment.set('signature', signature);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-API-Key', value: adminApiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// 1. Check for HTTP 200",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// 2. Parse the response",
+									"let jsonData;",
+									"try {",
+									"    jsonData = pm.response.json();",
+									"} catch (e) {",
+									"    pm.test(\"Response is valid JSON\", function () {",
+									"        pm.expect(false).to.be.true; // Force fail",
+									"    });",
+									"}",
+									"",
+									"// 3. Check for expected fields (adjust as per your actual response structure)",
+									"pm.test(\"Response has expected structure\", function () {",
+									"    pm.expect(jsonData).to.be.an(\"object\");",
+									"    // If your API wraps results in a 'data' field, adjust accordingly:",
+									"    // pm.expect(jsonData).to.have.property(\"data\");",
+									"    // let results = jsonData.data;",
+									"    let results = jsonData; // or jsonData.data if wrapped",
+									"    pm.expect(results).to.have.property(\"results\"); // or whatever your field is",
+									"    pm.expect(results.results).to.be.an(\"array\");",
+									"});",
+									"",
+									"// 4. Log and summarize each transaction result",
+									"if (jsonData && jsonData.results && Array.isArray(jsonData.results)) {",
+									"    let completed = 0, failed = 0;",
+									"    jsonData.results.forEach(function (item, idx) {",
+									"        console.log(`Txn #${idx + 1}:`, item);",
+									"        if (item.status && item.status.toUpperCase() === \"COMPLETED\") completed++;",
+									"        else failed++;",
+									"    });",
+									"    console.log(`Bulk Sale Complete: ${completed} completed, ${failed} failed.`);",
+									"    pm.environment.set(\"bulkSaleCompletedCount\", completed);",
+									"    pm.environment.set(\"bulkSaleFailedCount\", failed);",
+									"    // Optionally, save all completed IDs",
+									"    let completedIds = jsonData.results.filter(r => r.status && r.status.toUpperCase() === \"COMPLETED\").map(r => r.surchargeTransactionId);",
+									"    pm.environment.set(\"bulkSaleCompletedTxnIds\", JSON.stringify(completedIds));",
+									"}",
+									"",
+									"// 5. Optional: Fail test if any transaction failed",
+									"pm.test(\"All transactions completed successfully\", function () {",
+									"    let allCompleted = jsonData.results.every(r => r.status && r.status.toUpperCase() === \"COMPLETED\");",
+									"    pm.expect(allCompleted).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sales\": [\n    {\n      \"surchargeTransactionId\": \"4d739fcd-7523-4efb-a187-75bc8f781d96\"//,\n      //\"amount\": 123.45, // optional, will use auth amount if not provided\n      //\"providerType\": \"optional\",\n      //\"providerCode\": \"optional\"\n    },\n     {\n      \"surchargeTransactionId\": \"c3f7ef5b-1b21-4556-b511-4e04d0f0ad32\"//,\n      //\"amount\": 123.45, // optional, will use auth amount if not provided\n      //\"providerType\": \"optional\",\n      //\"providerCode\": \"optional\"\n    }\n    // ... more sale items\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/surcharge/bulk-sale-complete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"surcharge",
+								"bulk-sale-complete"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin API Key Management",
+			"item": [
+				{
+					"name": "Generate Admin API Key",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save admin API key and secret from response",
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.apiKey && jsonData.secret) {",
+									"  pm.environment.set('adminApiKey', jsonData.apiKey);",
+									"  pm.environment.set('adminApiSecret', jsonData.secret);",
+									"  console.log('Saved adminApiKey and adminApiSecret to environment');",
+									"  console.log('Admin API Key:', jsonData.apiKey);",
+									"  console.log('Admin API Secret:', jsonData.secret);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Validate admin secret is set\r",
+									"const adminSecret = pm.environment.get('adminSecret');\r",
+									"if (!adminSecret || adminSecret === 'your-local-admin-secret') {\r",
+									"    console.error('Please set a valid adminSecret in the collection variables');\r",
+									"    return;\r",
+									"}\r",
+									"\r",
+									"// Get service name\r",
+									"const serviceName = pm.environment.get('serviceName');\r",
+									"if (!serviceName) {\r",
+									"    console.error('Please set serviceName in the collection variables');\r",
+									"    return;\r",
+									"}\r",
+									"\r",
+									"// Log request details\r",
+									"console.log('Generating admin API key for service:', serviceName);\r",
+									"console.log('Using admin secret:', adminSecret.substring(0, 10) + '...');\r",
+									"console.log('Request URL:', pm.request.url.toString());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Admin-Secret",
+								"value": "{{adminSecret}}"
+							},
+							{
+								"key": "X-Timestamp",
+								"value": "{{timestamp}}",
+								"type": "text"
+							},
+							{
+								"key": "X-Nonce",
+								"value": "{{nonce}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceName\": \"{{serviceName}}\",\n  \"description\": \"Admin key for {{serviceName}} service\",\n  \"allowedEndpoints\": [\n    \"/api/v1/surcharge/bulk-sale-complete\",\n    \"/api/v1/admin/apikey/*\"\n  ],\n  \"purpose\": \"{{serviceName}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/apikey/generate",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"apikey",
+								"generate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Rotate Admin API Key",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get admin API secret from environment",
+									"const adminApiSecret = pm.environment.get('adminApiSecret');",
+									"if (!adminApiSecret) {",
+									"    console.error('Admin API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get admin API key from environment",
+									"const adminApiKey = pm.environment.get('adminApiKey');",
+									"if (!adminApiKey) {",
+									"    console.error('Admin API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const data = `${timestamp}|${nonce}|${adminApiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(data, adminApiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-API-Key', value: adminApiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Using Admin API Key:', adminApiKey);",
+									"console.log('Generated Timestamp:', timestamp);",
+									"console.log('Generated Nonce:', nonce);",
+									"console.log('Generated Signature:', signature);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Save new admin API key and secret from response",
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.apiKey && jsonData.secret) {",
+									"  pm.environment.set('adminApiKey', jsonData.apiKey);",
+									"  pm.environment.set('adminApiSecret', jsonData.secret);",
+									"  console.log('Saved new adminApiKey and adminApiSecret to environment');",
+									"  console.log('New Admin API Key:', jsonData.apiKey);",
+									"  console.log('New Admin API Secret:', jsonData.secret);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"serviceName\": \"{{serviceName}}\"\r\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/apikey/rotate",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"apikey",
+								"rotate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke Admin API Key",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate timestamp and nonce",
+									"const timestamp = new Date().toISOString();",
+									"const nonce = Math.random().toString(36).substring(2, 15);",
+									"",
+									"// Get admin API secret from environment",
+									"const adminApiSecret = pm.environment.get('adminApiSecret');",
+									"if (!adminApiSecret) {",
+									"    console.error('Admin API Secret not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Get admin API key from environment",
+									"const adminApiKey = pm.environment.get('adminApiKey');",
+									"if (!adminApiKey) {",
+									"    console.error('Admin API Key not found in environment');",
+									"    return;",
+									"}",
+									"",
+									"// Create data string to sign with pipe separators",
+									"const data = `${timestamp}|${nonce}|${adminApiKey}`;",
+									"",
+									"// Generate HMAC-SHA256 signature",
+									"const signature = CryptoJS.HmacSHA256(data, adminApiSecret).toString(CryptoJS.enc.Base64);",
+									"",
+									"// Set headers",
+									"pm.request.headers.add({ key: 'X-API-Key', value: adminApiKey });",
+									"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+									"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+									"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+									"",
+									"console.log('Using Admin API Key:', adminApiKey);",
+									"console.log('Generated Timestamp:', timestamp);",
+									"console.log('Generated Nonce:', nonce);",
+									"console.log('Generated Signature:', signature);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Clear adminApiKey and adminApiSecret on revoke",
+									"pm.environment.unset('adminApiKey');",
+									"pm.environment.unset('adminApiSecret');",
+									"console.log('Cleared adminApiKey and adminApiSecret from environment');",
+									"console.log('Admin API Key has been revoked successfully');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"serviceName\": \"{{serviceName}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/apikey/revoke",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"apikey",
+								"revoke"
 							]
 						}
 					},

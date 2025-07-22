@@ -87,4 +87,19 @@ public interface ISurchargeTransactionRepository
     /// Gets a surcharge transaction by provider transaction ID and correlation ID with merchant filtering (for secure follow-up validation)
     /// </summary>
     Task<SurchargeTransaction?> GetByProviderTransactionIdAndCorrelationIdForMerchantAsync(string providerTransactionId, string correlationId, Guid merchantId);
+
+    /// <summary>
+    /// Gets the latest transaction in the original_surcharge_trans_id chain for a given transaction
+    /// </summary>
+    Task<SurchargeTransaction?> GetLatestInOriginalChainAsync(Guid rootTransactionId, Guid merchantId);
+
+    /// <summary>
+    /// Gets the latest transaction in the original_surcharge_trans_id chain for a given providerTransactionId
+    /// </summary>
+    Task<SurchargeTransaction?> GetLatestInProviderTransactionChainAsync(string providerTransactionId, Guid merchantId);
+
+    /// <summary>
+    /// Gets a surcharge transaction by its ID with provider configuration eager loading
+    /// </summary>
+    Task<SurchargeTransaction?> GetByIdWithProviderConfigAsync(Guid id);
 }

@@ -4,8 +4,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using FeeNominalService.Models.ApiKey;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using FeeNominalService.Data;
 using Microsoft.EntityFrameworkCore;
+using FeeNominalService.Services.AWS;
 
 namespace FeeNominalService.Services.AWS;
 
@@ -13,11 +15,16 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
 {
     private readonly ILogger<LocalApiKeySecretService> _logger;
     private readonly ApplicationDbContext _context;
+    private readonly SecretNameFormatter _secretNameFormatter;
 
-    public LocalApiKeySecretService(ILogger<LocalApiKeySecretService> logger, ApplicationDbContext context)
+    public LocalApiKeySecretService(
+        ILogger<LocalApiKeySecretService> logger, 
+        ApplicationDbContext context, 
+        SecretNameFormatter secretNameFormatter)
     {
         _logger = logger;
         _context = context;
+        _secretNameFormatter = secretNameFormatter;
     }
 
     public async Task<string?> GetSecretAsync(string secretName)
@@ -25,6 +32,22 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Getting secret {SecretName} from database", secretName);
+            
+            // Special handling for admin secrets
+            if (secretName == "feenominal/admin/api-key-secret")
+            {
+                var adminSecret = await _context.ApiKeySecrets
+                    .FirstOrDefaultAsync(s => s.MerchantId == null && s.Scope == "admin" && s.Status == "ACTIVE" && !s.IsRevoked);
+                
+                if (adminSecret == null)
+                {
+                    _logger.LogWarning("No active admin secret found in database");
+                    return null;
+                }
+                
+                _logger.LogInformation("Found admin secret with API key: {ApiKey}", adminSecret.ApiKey);
+                return JsonSerializer.Serialize(adminSecret);
+            }
             
             // Extract API key from secret name
             var apiKey = ExtractApiKeyFromSecretName(secretName);
@@ -51,6 +74,22 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         try
         {
             _logger.LogInformation("Getting secret {SecretName} from database", secretName);
+            
+            // Special handling for admin secrets
+            if (secretName == "feenominal/admin/api-key-secret")
+            {
+                var adminSecret = await _context.ApiKeySecrets
+                    .FirstOrDefaultAsync(s => s.MerchantId == null && s.Scope == "admin" && s.Status == "ACTIVE" && !s.IsRevoked);
+                
+                if (adminSecret == null)
+                {
+                    _logger.LogWarning("No active admin secret found in database");
+                    return null;
+                }
+                
+                _logger.LogInformation("Found admin secret with API key: {ApiKey}", adminSecret.ApiKey);
+                return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(adminSecret));
+            }
             
             // Extract API key from secret name
             var apiKey = ExtractApiKeyFromSecretName(secretName);
@@ -138,11 +177,25 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
                 throw new ArgumentException($"Invalid secret name format: {secretName}");
             }
 
+            // Handle nullable MerchantId for admin secrets
+            Guid? merchantId = null;
+            if (secretValue.ContainsKey("MerchantId") && !string.IsNullOrEmpty(secretValue["MerchantId"]))
+            {
+                if (Guid.TryParse(secretValue["MerchantId"], out Guid parsedMerchantId))
+                {
+                    merchantId = parsedMerchantId;
+                }
+                else
+                {
+                    throw new ArgumentException($"Invalid MerchantId format: {secretValue["MerchantId"]}");
+                }
+            }
+
             var secret = new ApiKeySecret
             {
                 ApiKey = apiKey,
                 Secret = secretValue["Secret"],
-                MerchantId = Guid.Parse(secretValue["MerchantId"]),
+                MerchantId = merchantId, // Now properly handles null for admin secrets
                 CreatedAt = DateTime.UtcNow,
                 LastRotated = null,
                 IsRevoked = false,
@@ -218,80 +271,7 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
         }
     }
 
-    public async Task<string?> GetApiKeyAsync(string merchantId)
-    {
-        try
-        {
-            _logger.LogInformation("Getting API key for merchant {MerchantId} from database", merchantId);
-            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
-            {
-                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
-                return null;
-            }
-            var secret = await _context.ApiKeySecrets
-                .FirstOrDefaultAsync(s => s.MerchantId == merchantGuid && s.Status == "ACTIVE");
-            return secret?.ApiKey;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving API key for merchant {MerchantId}", merchantId);
-            return null;
-        }
-    }
 
-    public async Task<IEnumerable<ApiKeyInfo>> GetApiKeysAsync(string merchantId)
-    {
-        try
-        {
-            _logger.LogInformation("Getting all API keys for merchant {MerchantId} from database", merchantId);
-            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
-            {
-                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
-                return Enumerable.Empty<ApiKeyInfo>();
-            }
-            var secrets = await _context.ApiKeySecrets
-                .Where(s => s.MerchantId == merchantGuid)
-                .ToListAsync();
-
-            return secrets.Select(s => new ApiKeyInfo
-            {
-                ApiKey = s.ApiKey,
-                MerchantId = s.MerchantId,
-                Status = s.Status,
-                CreatedAt = s.CreatedAt,
-                LastRotatedAt = s.LastRotated,
-                RevokedAt = s.RevokedAt,
-                IsRevoked = s.IsRevoked,
-                IsExpired = s.ExpiresAt.HasValue && s.ExpiresAt.Value < DateTime.UtcNow
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", merchantId);
-            return Enumerable.Empty<ApiKeyInfo>();
-        }
-    }
-
-    public async Task<string?> GetApiKeyByIdAsync(string merchantId, string apiKeyId)
-    {
-        try
-        {
-            _logger.LogInformation("Getting API key {ApiKeyId} for merchant {MerchantId} from database", apiKeyId, merchantId);
-            if (!Guid.TryParse(merchantId, out Guid merchantGuid))
-            {
-                _logger.LogError("Invalid merchant ID format: {MerchantId}", merchantId);
-                return null;
-            }
-            var secret = await _context.ApiKeySecrets
-                .FirstOrDefaultAsync(s => s.MerchantId == merchantGuid && s.ApiKey == apiKeyId);
-            return secret?.ApiKey;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving API key {ApiKeyId} for merchant {MerchantId}", apiKeyId, merchantId);
-            return null;
-        }
-    }
 
     public async Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
     {
@@ -343,7 +323,28 @@ public class LocalApiKeySecretService : IAwsSecretsManagerService
 
     private string? ExtractApiKeyFromSecretName(string secretName)
     {
-        // Expected format: feenominal/merchants/{merchantId}/apikeys/{apiKey}
+        // Handle admin secret for local development
+        if (secretName == "feenominal/admin/api-key-secret")
+        {
+            // For admin secrets, we need to find the active admin secret in the database
+            // since the secret name doesn't contain the actual API key
+            return null; // We'll handle this specially in GetSecretAsync
+        }
+        
+        // Use the formatter to extract API key from admin secrets
+        if (_secretNameFormatter.IsAdminSecretName(secretName))
+        {
+            var serviceName = _secretNameFormatter.ExtractServiceNameFromAdminSecretName(secretName);
+            return serviceName != null ? $"{serviceName}-admin-api-key-secret" : null;
+        }
+        
+        // Use the formatter to extract API key from merchant secrets
+        if (_secretNameFormatter.IsMerchantSecretName(secretName))
+        {
+            return _secretNameFormatter.ExtractApiKeyFromMerchantSecretName(secretName);
+        }
+        
+        // Fallback for unknown patterns
         var parts = secretName.Split('/');
         return parts.Length >= 5 ? parts[4] : null;
     }

@@ -1,0 +1,314 @@
+{
+	"info": {
+		"_postman_id": "admin-api-key-management",
+		"name": "Admin API Key Management",
+		"description": "Collection for managing admin API keys in FeeNominalService",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Generate Admin API Key",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Validate admin secret is set",
+							"const adminSecret = pm.environment.get('adminSecret');",
+							"if (!adminSecret || adminSecret === 'your-local-admin-secret') {",
+							"    console.error('Please set a valid adminSecret in the collection variables');",
+							"    return;",
+							"}",
+							"",
+							"// Get service name",
+							"const serviceName = pm.environment.get('serviceName');",
+							"if (!serviceName) {",
+							"    console.error('Please set serviceName in the collection variables');",
+							"    return;",
+							"}",
+							"",
+							"// Log request details",
+							"console.log('Generating admin API key for service:', serviceName);",
+							"console.log('Using admin secret:', adminSecret.substring(0, 10) + '...');",
+							"console.log('Request URL:', pm.request.url.toString());"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Save admin API key and secret from response",
+							"var jsonData = pm.response.json();",
+							"if (jsonData && jsonData.apiKey && jsonData.secret) {",
+							"  pm.environment.set('adminApiKey', jsonData.apiKey);",
+							"  pm.environment.set('adminApiSecret', jsonData.secret);",
+							"  console.log('Saved adminApiKey and adminApiSecret to environment');",
+							"  console.log('Admin API Key:', jsonData.apiKey);",
+							"  console.log('Admin API Secret:', jsonData.secret);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Admin-Secret",
+						"value": "{{adminSecret}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"serviceName\": \"{{serviceName}}\",\n  \"description\": \"Admin key for {{serviceName}} service\",\n  \"allowedEndpoints\": [\n    \"/api/v1/surcharge/bulk-sale-complete\",\n    \"/api/v1/admin/apikey/*\"\n  ],\n  \"purpose\": \"{{serviceName}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/admin/apikey/generate",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"apikey",
+						"generate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Rotate Admin API Key",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Generate timestamp and nonce",
+							"const timestamp = new Date().toISOString();",
+							"const nonce = Math.random().toString(36).substring(2, 15);",
+							"",
+							"// Get admin API secret from environment",
+							"const adminApiSecret = pm.environment.get('adminApiSecret');",
+							"if (!adminApiSecret) {",
+							"    console.error('Admin API Secret not found in environment');",
+							"    return;",
+							"}",
+							"",
+							"// Get admin API key from environment",
+							"const adminApiKey = pm.environment.get('adminApiKey');",
+							"if (!adminApiKey) {",
+							"    console.error('Admin API Key not found in environment');",
+							"    return;",
+							"}",
+							"",
+							"// Create data string to sign with pipe separators",
+							"const data = `${timestamp}|${nonce}|${adminApiKey}`;",
+							"",
+							"// Generate HMAC-SHA256 signature",
+							"const signature = CryptoJS.HmacSHA256(data, adminApiSecret).toString(CryptoJS.enc.Base64);",
+							"",
+							"// Set headers",
+							"pm.request.headers.add({ key: 'X-API-Key', value: adminApiKey });",
+							"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+							"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+							"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+							"",
+							"console.log('Using Admin API Key:', adminApiKey);",
+							"console.log('Generated Timestamp:', timestamp);",
+							"console.log('Generated Nonce:', nonce);",
+							"console.log('Generated Signature:', signature);"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Save new admin API key and secret from response",
+							"var jsonData = pm.response.json();",
+							"if (jsonData && jsonData.apiKey && jsonData.secret) {",
+							"  pm.environment.set('adminApiKey', jsonData.apiKey);",
+							"  pm.environment.set('adminApiSecret', jsonData.secret);",
+							"  console.log('Saved new adminApiKey and adminApiSecret to environment');",
+							"  console.log('New Admin API Key:', jsonData.apiKey);",
+							"  console.log('New Admin API Secret:', jsonData.secret);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"serviceName\": \"{{serviceName}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/admin/apikey/rotate",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"apikey",
+						"rotate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Revoke Admin API Key",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Generate timestamp and nonce",
+							"const timestamp = new Date().toISOString();",
+							"const nonce = Math.random().toString(36).substring(2, 15);",
+							"",
+							"// Get admin API secret from environment",
+							"const adminApiSecret = pm.environment.get('adminApiSecret');",
+							"if (!adminApiSecret) {",
+							"    console.error('Admin API Secret not found in environment');",
+							"    return;",
+							"}",
+							"",
+							"// Get admin API key from environment",
+							"const adminApiKey = pm.environment.get('adminApiKey');",
+							"if (!adminApiKey) {",
+							"    console.error('Admin API Key not found in environment');",
+							"    return;",
+							"}",
+							"",
+							"// Create data string to sign with pipe separators",
+							"const data = `${timestamp}|${nonce}|${adminApiKey}`;",
+							"",
+							"// Generate HMAC-SHA256 signature",
+							"const signature = CryptoJS.HmacSHA256(data, adminApiSecret).toString(CryptoJS.enc.Base64);",
+							"",
+							"// Set headers",
+							"pm.request.headers.add({ key: 'X-API-Key', value: adminApiKey });",
+							"pm.request.headers.add({ key: 'X-Timestamp', value: timestamp });",
+							"pm.request.headers.add({ key: 'X-Nonce', value: nonce });",
+							"pm.request.headers.add({ key: 'X-Signature', value: signature });",
+							"",
+							"console.log('Using Admin API Key:', adminApiKey);",
+							"console.log('Generated Timestamp:', timestamp);",
+							"console.log('Generated Nonce:', nonce);",
+							"console.log('Generated Signature:', signature);"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Clear adminApiKey and adminApiSecret on revoke",
+							"pm.environment.unset('adminApiKey');",
+							"pm.environment.unset('adminApiSecret');",
+							"console.log('Cleared adminApiKey and adminApiSecret from environment');",
+							"console.log('Admin API Key has been revoked successfully');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"serviceName\": \"{{serviceName}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/admin/apikey/revoke",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"apikey",
+						"revoke"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5292",
+			"type": "string"
+		},
+		{
+			"key": "adminSecret",
+			"value": "your-local-admin-secret",
+			"type": "string"
+		},
+		{
+			"key": "serviceName",
+			"value": "scheduleforger",
+			"type": "string"
+		},
+		{
+			"key": "adminApiKey",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "adminApiSecret",
+			"value": "",
+			"type": "string"
+		}
+	]
+} 

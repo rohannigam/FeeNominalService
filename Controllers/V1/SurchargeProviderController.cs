@@ -249,38 +249,28 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Getting surcharge providers for merchant: {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
-                
-                // Validate merchant ID from URL matches authenticated merchant
+                // Allow admin-scope keys to read any merchant's providers
+                var scopeClaim = User.FindFirst("Scope")?.Value;
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
-                if (string.IsNullOrEmpty(authenticatedMerchantId))
+                if (scopeClaim != "admin")
                 {
-                    return BadRequest(ApiErrorResponse.MerchantIdMismatch());
+                    // For merchants, enforce merchantId claim check
+                    if (string.IsNullOrEmpty(authenticatedMerchantId))
+                    {
+                        return BadRequest(new { message = "Merchant ID not found in claims" });
+                    }
+                    if (authenticatedMerchantId != merchantId)
+                    {
+                        _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", merchantId, authenticatedMerchantId);
+                        return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
+                    }
                 }
-
-                if (authenticatedMerchantId != merchantId)
-                {
-                    _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", 
-                        merchantId, authenticatedMerchantId);
-                    return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
-                }
-
-                // Get all providers created by this merchant (with optional includeDeleted parameter)
                 var providers = await _surchargeProviderService.GetByMerchantIdAsync(merchantId, includeDeleted);
-                return Ok(providers.ToResponse());
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogWarning(ex, "Invalid operation while getting providers for merchant {MerchantId}", merchantId);
-                return BadRequest(new ApiErrorResponse(
-                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Provider.PROVIDER_NOT_FOUND),
-                    SurchargeErrorCodes.Provider.PROVIDER_NOT_FOUND,
-                    ex.Message
-                ));
+                return Ok(providers.Select(p => p.ToResponse()));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting surcharge providers for merchant: {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting all providers for merchant {MerchantId}", merchantId);
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }
@@ -296,56 +286,32 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Getting surcharge provider by ID: {ProviderId} for merchant: {MerchantId}", id, merchantId);
-                
-                // Validate merchant ID from URL matches authenticated merchant
+                // Allow admin-scope keys to read any merchant's provider
+                var scopeClaim = User.FindFirst("Scope")?.Value;
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
-                if (string.IsNullOrEmpty(authenticatedMerchantId))
+                if (scopeClaim != "admin")
                 {
-                    return BadRequest(ApiErrorResponse.MerchantIdMismatch());
+                    // For merchants, enforce merchantId claim check
+                    if (string.IsNullOrEmpty(authenticatedMerchantId))
+                    {
+                        return BadRequest(new { message = "Merchant ID not found in claims" });
+                    }
+                    if (authenticatedMerchantId != merchantId)
+                    {
+                        _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", merchantId, authenticatedMerchantId);
+                        return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
+                    }
                 }
-
-                if (authenticatedMerchantId != merchantId)
-                {
-                    _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", 
-                        merchantId, authenticatedMerchantId);
-                    return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
-                }
-
-                // Get provider and verify it was created by this merchant
                 var provider = await _surchargeProviderService.GetByIdAsync(id);
                 if (provider == null)
                 {
                     return NotFound(ApiErrorResponse.ProviderNotFound(id.ToString()));
                 }
-
-                // Verify the provider was created by this merchant
-                if (provider.CreatedBy != merchantId)
-                {
-                    _logger.LogWarning("Unauthorized access attempt: Merchant {MerchantId} tried to access provider {ProviderId} created by {ProviderCreator}", 
-                        merchantId, id, provider.CreatedBy);
-                    return StatusCode(403, ApiErrorResponse.UnauthorizedAccess());
-                }
-
                 return Ok(provider.ToResponse());
-            }
-            catch (KeyNotFoundException ex)
-            {
-                _logger.LogWarning(ex, "Provider not found: {ProviderId} for merchant {MerchantId}", id, merchantId);
-                return NotFound(ApiErrorResponse.ProviderNotFound(id.ToString()));
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogWarning(ex, "Invalid operation while getting provider {ProviderId} for merchant {MerchantId}", id, merchantId);
-                return BadRequest(new ApiErrorResponse(
-                    SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Provider.PROVIDER_NOT_FOUND),
-                    SurchargeErrorCodes.Provider.PROVIDER_NOT_FOUND,
-                    ex.Message
-                ));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting surcharge provider by ID: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                _logger.LogError(ex, "Error getting provider by ID {ProviderId} for merchant {MerchantId}", id, merchantId);
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }

@@ -18,15 +18,18 @@ namespace FeeNominalService.Services
         private readonly IAmazonSecretsManager _secretsManager;
         private readonly ILogger<AwsSecretsManagerService> _logger;
         private readonly ApiKeyConfiguration _settings;
+        private readonly SecretNameFormatter _secretNameFormatter;
 
         public AwsSecretsManagerService(
             IAmazonSecretsManager secretsManager,
             ILogger<AwsSecretsManagerService> logger,
-            IOptions<ApiKeyConfiguration> settings)
+            IOptions<ApiKeyConfiguration> settings,
+            SecretNameFormatter secretNameFormatter)
         {
             _secretsManager = secretsManager;
             _logger = logger;
             _settings = settings.Value;
+            _secretNameFormatter = secretNameFormatter;
         }
 
         public async Task<string?> GetSecretAsync(string secretName)
@@ -158,95 +161,13 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<string?> GetApiKeyAsync(string merchantId)
-        {
-            try
-            {
-                var secretName = $"{_settings.SecretName}/{merchantId}";
-                var request = new GetSecretValueRequest
-                {
-                    SecretId = secretName
-                };
-
-                var response = await _secretsManager.GetSecretValueAsync(request);
-                var secret = JsonSerializer.Deserialize<Dictionary<string, string>>(response.SecretString);
-                
-                return secret?["ApiKey"] ?? throw new InvalidOperationException("API key not found in secret");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving API key for merchant {MerchantId}", merchantId);
-                throw;
-            }
-        }
-
-        public async Task<IEnumerable<ApiKeyInfo>> GetApiKeysAsync(string merchantId)
-        {
-            try
-            {
-                var secretName = $"{_settings.SecretName}/{merchantId}";
-                var request = new GetSecretValueRequest
-                {
-                    SecretId = secretName
-                };
-
-                var response = await _secretsManager.GetSecretValueAsync(request);
-                var secret = JsonSerializer.Deserialize<Dictionary<string, string>>(response.SecretString);
-                
-                if (secret == null)
-                {
-                    return Enumerable.Empty<ApiKeyInfo>();
-                }
-
-                return new List<ApiKeyInfo>
-                {
-                    new ApiKeyInfo
-                    {
-                        ApiKey = secret["ApiKey"],
-                        Status = secret.GetValueOrDefault("Status", "ACTIVE"),
-                        CreatedAt = DateTime.Parse(secret.GetValueOrDefault("CreatedAt", DateTime.UtcNow.ToString())),
-                        LastRotatedAt = secret.ContainsKey("LastRotatedAt") ? DateTime.Parse(secret["LastRotatedAt"]) : null,
-                        RevokedAt = secret.ContainsKey("RevokedAt") ? DateTime.Parse(secret["RevokedAt"]) : null,
-                        IsRevoked = secret.GetValueOrDefault("IsRevoked", "false").ToLower() == "true",
-                        IsExpired = secret.ContainsKey("ExpiresAt") && DateTime.Parse(secret["ExpiresAt"]) < DateTime.UtcNow
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", merchantId);
-                return Enumerable.Empty<ApiKeyInfo>();
-            }
-        }
-
-        public async Task<string?> GetApiKeyByIdAsync(string merchantId, string apiKeyId)
-        {
-            try
-            {
-                var secretName = $"{_settings.SecretName}/{merchantId}/{apiKeyId}";
-                var request = new GetSecretValueRequest
-                {
-                    SecretId = secretName
-                };
-
-                var response = await _secretsManager.GetSecretValueAsync(request);
-                var secret = JsonSerializer.Deserialize<Dictionary<string, string>>(response.SecretString);
-                
-                return secret?["ApiKey"];
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving API key {ApiKeyId} for merchant {MerchantId}", apiKeyId, merchantId);
-                return null;
-            }
-        }
-
         public async Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
         {
             try
             {
-                var storedApiKey = await GetApiKeyAsync(merchantId);
-                return storedApiKey == apiKey;
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
+                var secret = await GetSecretAsync<ApiKeySecret>(secretName);
+                return secret != null && secret.ApiKey == apiKey;
             }
             catch (Exception ex)
             {
@@ -259,7 +180,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
                 var secret = await GetSecretAsync<ApiKeySecret>(secretName);
                 
                 if (secret == null || secret.ApiKey != apiKey)

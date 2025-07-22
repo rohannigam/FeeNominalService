@@ -15,9 +15,11 @@ namespace FeeNominalService.Models.SurchargeProvider
         [Column("surcharge_provider_config_id")]
         public Guid Id { get; set; }
 
-        [Required]
+        [Column("scope")]
+        public string Scope { get; set; } = "merchant";
+
         [Column("merchant_id")]
-        public Guid MerchantId { get; set; }
+        public Guid? MerchantId { get; set; }
 
         [Required]
         [Column("surcharge_provider_id")]

@@ -15,15 +15,18 @@ namespace FeeNominalService.Controllers
         private readonly ILogger<MockController> _logger;
         private readonly IWebHostEnvironment _environment;
         private readonly IAwsSecretsManagerService _secretsManager;
+        private readonly SecretNameFormatter _secretNameFormatter;
 
         public MockController(
             ILogger<MockController> logger, 
             IWebHostEnvironment environment,
-            IAwsSecretsManagerService secretsManager)
+            IAwsSecretsManagerService secretsManager,
+            SecretNameFormatter secretNameFormatter)
         {
             _logger = logger;
             _environment = environment;
             _secretsManager = secretsManager;
+            _secretNameFormatter = secretNameFormatter;
         }
 
         [HttpPost("onboarding/apikey/initial-generate")]
@@ -46,8 +49,8 @@ namespace FeeNominalService.Controllers
                 }
 
                 // Store in the mock secrets manager
-                var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
                 var merchantIdGuid = Guid.Parse(merchantId);
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantIdGuid, apiKey);
                 var secretValue = new ApiKeySecret
                 {
                     ApiKey = apiKey,
@@ -85,7 +88,8 @@ namespace FeeNominalService.Controllers
                     return BadRequest(new { error = "API key and merchant ID are required" });
                 }
 
-                var secretName = $"feenominal/merchants/{merchantId}/apikeys/{apiKey}";
+                var merchantIdGuid = Guid.Parse(merchantId);
+                var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantIdGuid, apiKey);
                 var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 
                 if (secret == null)

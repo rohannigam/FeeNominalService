@@ -15,9 +15,9 @@ namespace FeeNominalService.Models.ApiKey
         public string ApiKey { get; set; } = string.Empty;
 
         /// <summary>
-        /// The merchant that owns this API key
+        /// The merchant that owns this API key (null for admin keys)
         /// </summary>
-        public Guid MerchantId { get; set; }
+        public Guid? MerchantId { get; set; }
 
         /// <summary>
         /// Optional description of the API key
@@ -83,5 +83,15 @@ namespace FeeNominalService.Models.ApiKey
         /// Metadata about the onboarding, update, or rotation event
         /// </summary>
         public OnboardingMetadata? OnboardingMetadata { get; set; }
+
+        /// <summary>
+        /// The scope of the API key (merchant or admin)
+        /// </summary>
+        public string Scope { get; set; } = "merchant";
+
+        /// <summary>
+        /// Whether this is an admin API key
+        /// </summary>
+        public bool IsAdmin { get; set; }
     }
 } 
