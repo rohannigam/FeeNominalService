@@ -19,15 +19,14 @@ public class RequireSurchargeCancelIdentifiersAttribute : ValidationAttribute
         {
             return ValidationResult.Success;
         }
-        // If ProviderTransactionId is provided, require CorrelationId, ProviderType, ProviderCode
+        // If ProviderTransactionId is provided, require CorrelationId and ProviderCode (ProviderType is optional)
         if (!string.IsNullOrWhiteSpace(request.ProviderTransactionId))
         {
             if (string.IsNullOrWhiteSpace(request.CorrelationId))
                 return new ValidationResult("CorrelationId is required if ProviderTransactionId is provided.");
-            if (string.IsNullOrWhiteSpace(request.ProviderType))
-                return new ValidationResult("ProviderType is required if ProviderTransactionId is provided.");
             if (string.IsNullOrWhiteSpace(request.ProviderCode))
                 return new ValidationResult("ProviderCode is required if ProviderTransactionId is provided.");
+            // ProviderType is optional
             return ValidationResult.Success;
         }
         return new ValidationResult("Either surchargeTransactionId or all of providerTransactionId, correlationId, providerType, and providerCode must be provided.");

@@ -18,7 +18,7 @@ public class RequireSurchargeSaleIdentifiersAttribute : ValidationAttribute
         {
             return ValidationResult.Success;
         }
-        // Otherwise, require CorrelationId, ProviderCode, ProviderType
+        // Otherwise, require CorrelationId, ProviderCode
         if (string.IsNullOrWhiteSpace(request.CorrelationId))
         {
             return new ValidationResult("CorrelationId is required if SurchargeTransactionId is not provided.");
@@ -27,10 +27,7 @@ public class RequireSurchargeSaleIdentifiersAttribute : ValidationAttribute
         {
             return new ValidationResult("ProviderCode is required if SurchargeTransactionId is not provided.");
         }
-        if (string.IsNullOrWhiteSpace(request.ProviderType))
-        {
-            return new ValidationResult("ProviderType is required if SurchargeTransactionId is not provided.");
-        }
+        // ProviderType is optional
         return ValidationResult.Success;
     }
 }
