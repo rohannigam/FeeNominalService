@@ -1,12 +1,12 @@
 /*
-Migration: V1_0_0_99__create_api_key_secrets_table.sql
+Migration: M1_0_0_99__create_api_key_secrets_table.sql
 Description: Creates and manages the api_key_secrets table and all related indexes, constraints, and triggers.
 NOTE: This migration is for LOCAL/DEV ONLY. Exclude or comment out for production deployments.
 */
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting V1_0_0_99__create_api_key_secrets_table migration (DEV/LOCAL ONLY)...';
+    RAISE NOTICE 'Starting M1_0_0_99__create_api_key_secrets_table migration (DEV/LOCAL ONLY)...';
 END $$;
 
 -- Set search path
@@ -95,5 +95,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed V1_0_0_99__create_api_key_secrets_table migration (DEV/LOCAL ONLY)';
+    RAISE NOTICE 'Completed M1_0_0_99__create_api_key_secrets_table migration (DEV/LOCAL ONLY)';
 END $$; 

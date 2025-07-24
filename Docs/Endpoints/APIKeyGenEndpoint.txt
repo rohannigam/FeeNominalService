@@ -23,6 +23,7 @@ This endpoint is used to generate additional API keys for existing merchants. Un
 ```json
 {
     "merchantId": "guid",              // Required, internal merchant ID
+    "name": "string",                  // Optional, unique per merchant, max 100 chars
     "description": "string",           // Optional, max 500 chars
     "rateLimit": 1000,                // Optional, range 1-10000
     "allowedEndpoints": [             // Optional
@@ -273,3 +274,9 @@ graph TD
 - **Signature Formula:** The signature must be generated as follows: `"{timestamp}|{nonce}|{merchantId}|{apiKey}"` using HMAC-SHA256 with the API secret.
 - **Merchant Ownership:** API keys and secrets are strictly bound to the merchant they were issued to. They cannot be used to access resources for other merchants.
 - **Secret Handling:** Secrets are only returned at creation and are masked in all logs (only the first and last four characters are shown). Secrets are never returned in plaintext after creation. 
+
+## Onboarding Timestamp
+- Onboarding timestamp is now stored during initial API key generation.
+
+## Name/Description
+- There is now a clear distinction between the `name` and `description` fields for API keys. The `name` can be set uniquely per request. 

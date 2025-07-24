@@ -22,20 +22,26 @@ namespace FeeNominalService.Controllers.V1
     public class SurchargeProviderController : ControllerBase
     {
         private readonly ISurchargeProviderService _surchargeProviderService;
+        private readonly ISurchargeProviderConfigService _surchargeProviderConfigService;
         private readonly ICredentialValidationService _credentialValidationService;
         private readonly SurchargeProviderValidationSettings _validationSettings;
         private readonly ILogger<SurchargeProviderController> _logger;
+        private readonly IAuditService _auditService;
 
         public SurchargeProviderController(
             ISurchargeProviderService surchargeProviderService,
+            ISurchargeProviderConfigService surchargeProviderConfigService,
             ICredentialValidationService credentialValidationService,
             SurchargeProviderValidationSettings validationSettings,
-            ILogger<SurchargeProviderController> logger)
+            ILogger<SurchargeProviderController> logger,
+            IAuditService auditService)
         {
             _surchargeProviderService = surchargeProviderService;
+            _surchargeProviderConfigService = surchargeProviderConfigService;
             _credentialValidationService = credentialValidationService;
             _validationSettings = validationSettings;
             _logger = logger;
+            _auditService = auditService;
         }
 
         /// <summary>
@@ -132,6 +138,32 @@ namespace FeeNominalService.Controllers.V1
                     // Otherwise, just create the provider
                     result = await _surchargeProviderService.CreateAsync(provider);
                 }
+
+                // Audit log: provider creation
+                var auditProvider = new {
+                    result.Id,
+                    result.Name,
+                    result.Code,
+                    result.Description,
+                    result.BaseUrl,
+                    result.AuthenticationType,
+                    result.CredentialsSchema,
+                    result.StatusId,
+                    result.CreatedBy,
+                    result.UpdatedBy,
+                    result.CreatedAt,
+                    result.UpdatedAt
+                };
+                await _auditService.LogAuditAsync(
+                    entityType: "SurchargeProvider",
+                    entityId: result.Id,
+                    action: "Create",
+                    userId: merchantId,
+                    fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
+                    {
+                        { "FullObject", (null, JsonSerializer.Serialize(auditProvider)) }
+                    }
+                );
 
                 // Log successful creation
                 _logger.LogInformation("Successfully created surcharge provider: {ProviderId} ({ProviderName}) for merchant: {MerchantId}", 
@@ -427,12 +459,134 @@ namespace FeeNominalService.Controllers.V1
                 existingProvider.UpdatedBy = merchantId;
 
                 var result = await _surchargeProviderService.UpdateAsync(existingProvider);
-                
+
+                // Audit log: provider update
+                var oldProviderAudit = new {
+                    existingProvider.Id,
+                    existingProvider.Name,
+                    existingProvider.Code,
+                    existingProvider.Description,
+                    existingProvider.BaseUrl,
+                    existingProvider.AuthenticationType,
+                    existingProvider.CredentialsSchema,
+                    existingProvider.StatusId,
+                    existingProvider.CreatedBy,
+                    existingProvider.UpdatedBy,
+                    existingProvider.CreatedAt,
+                    existingProvider.UpdatedAt
+                };
+                var updatedProviderAudit = new {
+                    result.Id,
+                    result.Name,
+                    result.Code,
+                    result.Description,
+                    result.BaseUrl,
+                    result.AuthenticationType,
+                    result.CredentialsSchema,
+                    result.StatusId,
+                    result.CreatedBy,
+                    result.UpdatedBy,
+                    result.CreatedAt,
+                    result.UpdatedAt
+                };
+                await _auditService.LogAuditAsync(
+                    entityType: "SurchargeProvider",
+                    entityId: result.Id,
+                    action: "Update",
+                    userId: merchantId,
+                    fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
+                    {
+                        { "FullObject", (JsonSerializer.Serialize(oldProviderAudit), JsonSerializer.Serialize(updatedProviderAudit)) }
+                    }
+                );
+
+                // If a new configuration is provided, update or create the config as appropriate
+                SurchargeProviderConfig? updatedOrNewConfig = null;
+                if (request.Configuration != null)
+                {
+                    // Validate configuration
+                    if (!request.ValidateConfiguration(out var configErrors, _validationSettings))
+                    {
+                        return BadRequest(ApiErrorResponse.InvalidConfiguration(configErrors));
+                    }
+
+                    // Validate credentials if provided
+                    if (request.Configuration.Credentials != null)
+                    {
+                        var credentialsValidation = ValidateCredentials(request.Configuration.Credentials);
+                        if (!credentialsValidation.IsValid)
+                        {
+                            return BadRequest(ApiErrorResponse.InvalidCredentials(credentialsValidation.Errors));
+                        }
+                    }
+
+                    // Check for an existing active config for this provider
+                    var configs = await _surchargeProviderConfigService.GetByProviderIdAsync(id);
+                    var activeConfig = configs.FirstOrDefault(c => c.IsActive);
+
+                    if (activeConfig != null)
+                    {
+                        // Update the existing active config
+                        bool changed = false;
+                        if (activeConfig.ConfigName != request.Configuration.ConfigName) { activeConfig.ConfigName = request.Configuration.ConfigName; changed = true; }
+                        if (activeConfig.IsPrimary != request.Configuration.IsPrimary) { activeConfig.IsPrimary = request.Configuration.IsPrimary; changed = true; }
+                        if (activeConfig.Timeout != request.Configuration.Timeout) { activeConfig.Timeout = request.Configuration.Timeout; changed = true; }
+                        if (activeConfig.RetryCount != request.Configuration.RetryCount) { activeConfig.RetryCount = request.Configuration.RetryCount; changed = true; }
+                        if (activeConfig.RetryDelay != request.Configuration.RetryDelay) { activeConfig.RetryDelay = request.Configuration.RetryDelay; changed = true; }
+                        if (activeConfig.RateLimit != request.Configuration.RateLimit) { activeConfig.RateLimit = request.Configuration.RateLimit; changed = true; }
+                        if (activeConfig.RateLimitPeriod != request.Configuration.RateLimitPeriod) { activeConfig.RateLimitPeriod = request.Configuration.RateLimitPeriod; changed = true; }
+                        if (request.Configuration.Metadata != null) {
+                            var newMeta = JsonSerializer.SerializeToDocument(request.Configuration.Metadata);
+                            if (!JsonSerializer.Serialize(activeConfig.Metadata).Equals(JsonSerializer.Serialize(newMeta))) {
+                                activeConfig.Metadata = newMeta; changed = true;
+                            }
+                        }
+                        if (request.Configuration.Credentials != null) {
+                            var newCreds = JsonSerializer.SerializeToDocument(request.Configuration.Credentials);
+                            if (!JsonSerializer.Serialize(activeConfig.Credentials).Equals(JsonSerializer.Serialize(newCreds))) {
+                                activeConfig.Credentials = newCreds; changed = true;
+                            }
+                        }
+                        if (changed) {
+                            activeConfig.UpdatedAt = DateTime.UtcNow;
+                            activeConfig.UpdatedBy = merchantId;
+                            updatedOrNewConfig = await _surchargeProviderConfigService.UpdateAsync(activeConfig, merchantId);
+                        } else {
+                            updatedOrNewConfig = activeConfig;
+                        }
+                    }
+                    else
+                    {
+                        // No active config exists, create a new one and mark as active
+                        var config = new SurchargeProviderConfig
+                        {
+                            MerchantId = Guid.Parse(merchantId),
+                            ProviderId = id,
+                            ConfigName = request.Configuration.ConfigName,
+                            Credentials = JsonSerializer.SerializeToDocument(request.Configuration.Credentials),
+                            IsActive = true,
+                            IsPrimary = request.Configuration.IsPrimary,
+                            Timeout = request.Configuration.Timeout,
+                            RetryCount = request.Configuration.RetryCount,
+                            RetryDelay = request.Configuration.RetryDelay,
+                            RateLimit = request.Configuration.RateLimit,
+                            RateLimitPeriod = request.Configuration.RateLimitPeriod,
+                            Metadata = request.Configuration.Metadata != null ? JsonSerializer.SerializeToDocument(request.Configuration.Metadata) : null,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow,
+                            CreatedBy = merchantId,
+                            UpdatedBy = merchantId
+                        };
+                        updatedOrNewConfig = await _surchargeProviderConfigService.CreateAsync(config, merchantId);
+                    }
+                }
+
                 // Log successful update
                 _logger.LogInformation("Successfully updated surcharge provider: {ProviderId} ({ProviderName}) for merchant: {MerchantId}", 
                     result.Id, result.Name, merchantId);
 
-                return Ok(result.ToResponse());
+                // Return both the updated provider and updated/new config (if any)
+                return Ok(new { Provider = result.ToResponse(), Config = updatedOrNewConfig });
             }
             catch (KeyNotFoundException ex)
             {
@@ -521,6 +675,32 @@ namespace FeeNominalService.Controllers.V1
                     return NotFound(ApiErrorResponse.ProviderNotFound(id.ToString()));
                 }
 
+                // Audit log: provider deletion
+                var deletedProviderAudit = new {
+                    existingProvider.Id,
+                    existingProvider.Name,
+                    existingProvider.Code,
+                    existingProvider.Description,
+                    existingProvider.BaseUrl,
+                    existingProvider.AuthenticationType,
+                    existingProvider.CredentialsSchema,
+                    existingProvider.StatusId,
+                    existingProvider.CreatedBy,
+                    existingProvider.UpdatedBy,
+                    existingProvider.CreatedAt,
+                    existingProvider.UpdatedAt
+                };
+                await _auditService.LogAuditAsync(
+                    entityType: "SurchargeProvider",
+                    entityId: id,
+                    action: "Delete",
+                    userId: merchantId,
+                    fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
+                    {
+                        { "FullObject", (JsonSerializer.Serialize(deletedProviderAudit), null) }
+                    }
+                );
+
                 // Get the updated provider with DELETED status to return in response
                 // Use includeDeleted: true to get the deleted provider
                 var deletedProvider = await _surchargeProviderService.GetByIdAsync(id, includeDeleted: true);
@@ -607,14 +787,51 @@ namespace FeeNominalService.Controllers.V1
                     return NotFound(ApiErrorResponse.ProviderNotFound(id.ToString()));
                 }
 
-                // Get the updated provider to return in response
-                var restoredProvider = await _surchargeProviderService.GetByIdAsync(id);
-                if (restoredProvider == null)
+                // Audit log: provider restoration
+                var restoredProviderResult = await _surchargeProviderService.GetByIdAsync(id);
+                if (restoredProviderResult == null)
                 {
                     return Ok(new { success = true, message = "Provider restored successfully" });
                 }
-
-                return Ok(restoredProvider.ToResponse());
+                var restoredProviderAuditOld = new {
+                    existingProvider.Id,
+                    existingProvider.Name,
+                    existingProvider.Code,
+                    existingProvider.Description,
+                    existingProvider.BaseUrl,
+                    existingProvider.AuthenticationType,
+                    existingProvider.CredentialsSchema,
+                    existingProvider.StatusId,
+                    existingProvider.CreatedBy,
+                    existingProvider.UpdatedBy,
+                    existingProvider.CreatedAt,
+                    existingProvider.UpdatedAt
+                };
+                var restoredProviderAuditNew = new {
+                    restoredProviderResult.Id,
+                    restoredProviderResult.Name,
+                    restoredProviderResult.Code,
+                    restoredProviderResult.Description,
+                    restoredProviderResult.BaseUrl,
+                    restoredProviderResult.AuthenticationType,
+                    restoredProviderResult.CredentialsSchema,
+                    restoredProviderResult.StatusId,
+                    restoredProviderResult.CreatedBy,
+                    restoredProviderResult.UpdatedBy,
+                    restoredProviderResult.CreatedAt,
+                    restoredProviderResult.UpdatedAt
+                };
+                await _auditService.LogAuditAsync(
+                    entityType: "SurchargeProvider",
+                    entityId: id,
+                    action: "Restore",
+                    userId: merchantId,
+                    fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
+                    {
+                        { "FullObject", (JsonSerializer.Serialize(restoredProviderAuditOld), JsonSerializer.Serialize(restoredProviderAuditNew)) }
+                    }
+                );
+                return Ok(restoredProviderResult.ToResponse());
             }
             catch (Exception ex)
             {

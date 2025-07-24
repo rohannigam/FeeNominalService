@@ -980,3 +980,86 @@ Certainly! Here’s a concise summary of the major work and improvements made ov
 The sale and bulk sale flows are now more flexible, robust, and well-documented. They support both merchant and admin use cases, provide detailed per-transaction results, and ensure data integrity and traceability throughout the workflow.
 
 If you need a more technical or code-focused summary, or want a changelog for a specific file, let me know!
+
+
+
+
+
+
+
+************************************************************************
+7/19/2025 -  Complete Summary: Surcharge Provider restore and update and audit
+************************************************************************
+
+
+Absolutely! Here’s a comprehensive summary of all the changes and improvements made in your codebase over the past 6 hours:
+
+---
+
+## **1. Health & Observability**
+- **Health Endpoint:** Enhanced `/api/health/live` to show binary version, informational version, and build version.
+- **AllowAnonymous Fix:** Ensured `[AllowAnonymous]` endpoints (like health checks) do not trigger authentication or log warnings.
+
+---
+
+## **2. API Key & Onboarding**
+- **Onboarding Timestamp:** Fixed initial API key generation to store `onboardingTimestamp` in the DB.
+- **API Key Naming:** Clarified and implemented distinct `name` and `description` fields for API keys, allowing a unique name from the request.
+
+---
+
+## **3. Error Handling & Validation**
+- **Graceful Error Handling:** Updated Surcharge Auth, Sale, and Cancel endpoints to return 400 Bad Request (not 500) for invalid user inputs.
+- **Postal Code Validation:** Improved Canadian postal code validation and made `postalCode` required for Surcharge Auth.
+- **Country Code Normalization:** Added logic to convert country codes (e.g., "US", "USA") to 3-digit IBANs for InterPayments.
+
+---
+
+## **4. Surcharge Provider Config & Lifecycle**
+- **Soft Delete/Restore:** Confirmed restoring a soft-deleted provider leaves configs inactive by design.
+- **Config Update Logic:** Updated provider update endpoint to:
+  - Update an existing active config if present.
+  - Archive (set `is_active = false`) all previous configs before creating a new active one.
+- **DB Migration:** Added a migration to replace the unique constraint with a partial unique index on `(surcharge_provider_id, merchant_id)` where `is_active = true`.
+
+---
+
+## **5. Audit Logging**
+- **AuditLog Model Fixes:** Fixed column mapping and removed unused fields (`ip_address`, `additional_info`, etc.) to resolve DB errors.
+- **Audit Logging for Providers:** Implemented comprehensive audit logging for SurchargeProvider actions (create, update, delete, restore).
+- **Audit Logging Toggle:** Added config-driven audit logging using an `AuditLogging` section in `appsettings.json` and `appsettings.Development.json`:
+  - Supports global and per-category toggling (currently for `SurchargeProvider` and `MerchantAuditTrail`).
+  - Audit logging is now disabled by default for safety/performance.
+  - Audit logging failures are swallowed to avoid impacting business logic.
+- **MerchantAuditTrail:** Added config-driven toggle for merchant audit trail logging.
+
+---
+
+## **6. Dependency & Migration Management**
+- **Migration File Management:** Moved specific SQL migration files to a `DevOnly` directory as requested.
+- **NuGet Cleanup:** Identified and removed unused packages, and re-added any mistakenly removed ones.
+
+---
+
+## **7. Database Triggers & Future Improvements**
+- **DB Triggers:** Discovered that audit logging may still occur due to database triggers, regardless of appsettings.
+- **Future Improvements File:** Created `future_improvements.txt` to capture:
+  - The idea of a dynamic, DB-level toggle for audit triggers using a config table.
+  - The plan to add thoughtful audit logging for surcharge-related and API key operations.
+
+---
+
+## **8. Miscellaneous**
+- **Nullability & Warnings:** Fixed various nullability warnings and ensured all model properties are correctly initialized.
+- **Refactoring:** Split and refactored code for maintainability and scalability as needed.
+
+---
+
+### **In summary:**
+You now have a more robust, maintainable, and observable system with:
+- Configurable, safe audit logging,
+- Improved error handling and validation,
+- Cleaner DB schema and code,
+- A clear path for future improvements.
+
+If you need a more detailed breakdown by file or want to revisit any specific change, let me know!

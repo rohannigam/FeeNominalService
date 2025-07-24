@@ -25,19 +25,27 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
 
     public (bool IsValid, string? ErrorMessage) ValidateRequest(SurchargeAuthRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.PostalCode))
-            return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.POSTAL_CODE_REQUIRED));
+        // Accept both 2/3-letter and 3-digit IBAN country codes
+        if (string.IsNullOrWhiteSpace(request.Country))
+            return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.COUNTRY_REQUIRED));
 
-        switch (request.Country.ToUpperInvariant())
+        string normalizedCountry = request.Country.Trim().ToUpperInvariant();
+        string ibanCountry = NormalizeCountryToIban(normalizedCountry);
+
+        switch (normalizedCountry)
         {
             case "USA":
             case "US":
-                if (!Regex.IsMatch(request.PostalCode, @"^\d{5}$") && !Regex.IsMatch(request.PostalCode, @"^\d{5}-\d{4}$"))
+            case "840":
+                if (string.IsNullOrWhiteSpace(request.PostalCode) ||
+                    (!Regex.IsMatch(request.PostalCode ?? string.Empty, @"^\d{5}$") && !Regex.IsMatch(request.PostalCode ?? string.Empty, @"^\d{5}-\d{4}$")))
                     return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.POSTAL_CODE_INVALID_US));
                 break;
             case "CAN":
             case "CANADA":
-                if (!Regex.IsMatch(request.PostalCode, @"^[A-Za-z]\d[A-Za-z]\d[A-Za-z]\d$"))
+            case "124":
+                if (string.IsNullOrWhiteSpace(request.PostalCode) ||
+                    !Regex.IsMatch(request.PostalCode ?? string.Empty, @"^[A-Za-z]\d[A-Za-z][ ]?\d[A-Za-z]\d$"))
                     return (false, SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.InterPayments.POSTAL_CODE_INVALID_CANADA));
                 break;
             default:
@@ -46,6 +54,19 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         }
 
         return (true, null);
+    }
+
+    private static string NormalizeCountryToIban(string country)
+    {
+        if (string.IsNullOrWhiteSpace(country)) return country;
+        string c = country.Trim().ToUpperInvariant();
+        return c switch
+        {
+            "US" or "USA" => "840",
+            "CA" or "CAN" or "CANADA" => "124",
+            _ when Regex.IsMatch(c, "^\\d{3}$") => c,
+            _ => c
+        };
     }
 
     private static string GetBaseUrl(SurchargeProviderConfig providerConfig)
@@ -80,7 +101,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
             ["nicn"] = request.BinValue,
             ["processor"] = request.SurchargeProcessor,
             ["amount"] = request.Amount,
-            ["country"] = request.Country,
+            ["country"] = NormalizeCountryToIban(request.Country),
             ["region"] = request.PostalCode,
             ["mTxId"] = request.MerchantTransactionId,
             ["entryMethod"] = request.EntryMethod

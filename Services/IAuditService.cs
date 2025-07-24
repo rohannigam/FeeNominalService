@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Text.Json;
 using FeeNominalService.Models;
+using System.Collections.Generic;
 
 namespace FeeNominalService.Services
 {
@@ -11,12 +12,8 @@ namespace FeeNominalService.Services
             string entityType,
             Guid entityId,
             string action,
-            JsonDocument? oldValues,
-            JsonDocument? newValues,
-            string performedBy,
-            string? ipAddress = null,
-            string? userAgent = null,
-            JsonDocument? additionalInfo = null
+            string? userId = null,
+            Dictionary<string, (string? OldValue, string? NewValue)>? fieldChanges = null
         );
 
         Task<AuditLog[]> GetAuditLogsAsync(

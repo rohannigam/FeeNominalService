@@ -204,6 +204,7 @@ public static class SurchargeErrorCodes
         public const string POSTAL_CODE_REQUIRED = "SURCH_13004";
         public const string POSTAL_CODE_INVALID_US = "SURCH_13005";
         public const string POSTAL_CODE_INVALID_CANADA = "SURCH_13006";
+        public const string COUNTRY_REQUIRED = "SURCH_13007";
     }
 
     /// <summary>
@@ -374,6 +375,7 @@ public static class SurchargeErrorCodes
             InterPayments.POSTAL_CODE_REQUIRED => "Postal code is required for InterPayments",
             InterPayments.POSTAL_CODE_INVALID_US => "Invalid US postal code format",
             InterPayments.POSTAL_CODE_INVALID_CANADA => "Invalid Canadian postal code format",
+            InterPayments.COUNTRY_REQUIRED => "Country is required for InterPayments",
 
             _ => "Unknown error occurred"
         };

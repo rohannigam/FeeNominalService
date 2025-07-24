@@ -1,4 +1,4 @@
-# Surcharge Provider Endpoints
+# SurchargeProvider Endpoints
 
 ## Overview
 This document covers all endpoints related to managing surcharge providers in the system. These endpoints allow for creating, retrieving, updating, and managing surcharge provider configurations with merchant-specific access control.

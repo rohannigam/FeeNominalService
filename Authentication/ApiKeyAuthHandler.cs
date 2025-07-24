@@ -13,6 +13,7 @@ using FeeNominalService.Models.ApiKey;
 using System.Collections.Generic;
 using System.Text.Json;
 using FeeNominalService.Services.AWS;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FeeNominalService.Authentication
 {
@@ -55,6 +56,13 @@ namespace FeeNominalService.Authentication
             try
             {
                 _logger.LogDebug("Starting API key authentication for path: {Path}", Request.Path);
+
+                // Skip authentication for AllowAnonymous endpoints
+                if (Context?.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() != null)
+                {
+                    _logger.LogDebug("Skipping API key authentication for AllowAnonymous endpoint: {Path}", Request.Path);
+                    return AuthenticateResult.NoResult();
+                }
 
                 // Skip authentication for admin API key generation endpoint
                 if (Request.Path.StartsWithSegments("/api/v1/admin/apiKey/generate"))

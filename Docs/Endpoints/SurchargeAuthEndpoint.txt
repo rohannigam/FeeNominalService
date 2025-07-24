@@ -83,6 +83,17 @@ This document describes the `/api/v1/surcharge/auth` endpoint for processing sur
 
 ---
 
+## Error Handling
+- Invalid user input now results in a 400 Bad Request (not 500 Internal Server Error).
+
+## Postal Code Validation
+- `postalCode` is now required and must match the updated Canadian postal code format.
+
+## Country Code Normalization
+- Country codes (e.g., "US", "USA") are normalized to 3-digit IBANs for InterPayments.
+
+---
+
 ## Error Responses
 ### 400 Bad Request
 ```json

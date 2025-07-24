@@ -33,6 +33,7 @@ namespace FeeNominalService.Data
         public DbSet<MerchantAuditTrail> MerchantAuditTrail { get; set; } = null!;
         public DbSet<SupportedProvider> SupportedProviders { get; set; } = null!;
         public DbSet<SurchargeTransaction> SurchargeTransactions { get; set; } = null!;
+        public DbSet<AuditLogDetail> AuditLogDetails { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -214,30 +215,23 @@ namespace FeeNominalService.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id).HasColumnName("audit_log_id");
                 entity.Property(e => e.EntityType).IsRequired().HasMaxLength(50).HasColumnName("entity_type");
-                entity.Property(e => e.Action).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.PerformedBy).IsRequired().HasMaxLength(50).HasColumnName("performed_by");
-                entity.Property(e => e.IpAddress).HasMaxLength(45).HasColumnName("ip_address");
-                entity.Property(e => e.OldValues)
-                    .HasColumnType("jsonb")
-                    .HasColumnName("old_values")
-                    .HasConversion(
-                        v => v == null ? null : JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => v == null ? null : JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())
-                    );
-                entity.Property(e => e.NewValues)
-                    .HasColumnType("jsonb")
-                    .HasColumnName("new_values")
-                    .HasConversion(
-                        v => v == null ? null : JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => v == null ? null : JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())
-                    );
-                entity.Property(e => e.AdditionalInfo)
-                    .HasColumnType("jsonb")
-                    .HasColumnName("additional_info")
-                    .HasConversion(
-                        v => v == null ? null : JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => v == null ? null : JsonSerializer.Deserialize<JsonDocument>(v, new JsonSerializerOptions())
-                    );
+                entity.Property(e => e.Action).IsRequired().HasMaxLength(50).HasColumnName("action");
+                entity.Property(e => e.EntityId).IsRequired().HasColumnName("entity_id");
+                entity.Property(e => e.UserId).HasColumnName("user_id");
+                entity.Property(e => e.CreatedAt).IsRequired().HasColumnName("created_at");
+            });
+
+            // Configure AuditLogDetail
+            modelBuilder.Entity<AuditLogDetail>().ToTable("audit_log_details");
+            modelBuilder.Entity<AuditLogDetail>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasColumnName("detail_id");
+                entity.Property(e => e.AuditLogId).IsRequired().HasColumnName("audit_log_id");
+                entity.Property(e => e.FieldName).IsRequired().HasMaxLength(255).HasColumnName("field_name");
+                entity.Property(e => e.OldValue).HasColumnName("old_value");
+                entity.Property(e => e.NewValue).HasColumnName("new_value");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             });
 
             // Configure AuthenticationAttempt

@@ -68,6 +68,11 @@ namespace FeeNominalService.Controllers.V1
 
                 return Ok(response);
             }
+            catch (FeeNominalService.Exceptions.SurchargeException ex)
+            {
+                _logger.LogWarning(ex, "Surcharge error while processing auth for transaction: {CorrelationId}", request.CorrelationId);
+                return BadRequest(ex.ToErrorResponse());
+            }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Invalid operation while processing surcharge auth for transaction: {CorrelationId}", 
@@ -125,6 +130,11 @@ namespace FeeNominalService.Controllers.V1
                 _logger.LogInformation("Sale Response: {@Response}", response);
 
                 return Ok(response);
+            }
+            catch (FeeNominalService.Exceptions.SurchargeException ex)
+            {
+                _logger.LogWarning(ex, "Surcharge error while processing sale for transaction: {CorrelationId}", request.CorrelationId);
+                return BadRequest(ex.ToErrorResponse());
             }
             catch (InvalidOperationException ex)
             {
@@ -233,6 +243,11 @@ namespace FeeNominalService.Controllers.V1
                     request.CorrelationId, response.SurchargeTransactionId);
 
                 return Ok(response);
+            }
+            catch (FeeNominalService.Exceptions.SurchargeException ex)
+            {
+                _logger.LogWarning(ex, "Surcharge error while processing cancel for transaction: {CorrelationId}", request.CorrelationId);
+                return BadRequest(ex.ToErrorResponse());
             }
             catch (InvalidOperationException ex)
             {

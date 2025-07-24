@@ -150,6 +150,17 @@ namespace FeeNominalService.Services
                     }
                 }
 
+                // Archive all previous configs for this provider/merchant
+                if (config.MerchantId.HasValue)
+                {
+                    var existingConfigs = await _repository.GetByProviderIdAsync(config.ProviderId);
+                    foreach (var oldConfig in existingConfigs.Where(c => c.MerchantId == config.MerchantId && c.IsActive))
+                    {
+                        oldConfig.IsActive = false;
+                        await _repository.UpdateAsync(oldConfig);
+                    }
+                }
+
                 // Set timestamps
                 config.CreatedAt = DateTime.UtcNow;
                 config.UpdatedAt = DateTime.UtcNow;

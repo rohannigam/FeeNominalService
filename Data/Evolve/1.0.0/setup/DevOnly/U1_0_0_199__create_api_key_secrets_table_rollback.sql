@@ -6,7 +6,7 @@ NOTE: This rollback is for DEV/LOCAL ONLY. Exclude or comment out for production
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Starting rollback for V1_0_0_99__create_api_key_secrets_table (DEV/LOCAL ONLY)...';
+    RAISE NOTICE 'Starting rollback for M1_0_0_99__create_api_key_secrets_table (DEV/LOCAL ONLY)...';
 END $$;
 
 -- Set search path
@@ -52,5 +52,5 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Completed rollback for V1_0_0_99__create_api_key_secrets_table (DEV/LOCAL ONLY)';
+    RAISE NOTICE 'Completed rollback for M1_0_0_99__create_api_key_secrets_table (DEV/LOCAL ONLY)';
 END $$; 

@@ -948,3 +948,10 @@ X-Signature: calculated-signature-here
 
 ### Get Health Status
 GET {{FeeNominalService_HostAddress}}/api/v1/health
+
+# Note: Audit logging for SurchargeProvider and MerchantAuditTrail endpoints is now configurable via the AuditLogging section in appsettings.json.
+# If disabled, no audit logs will be written for these actions.
+#
+# Note: Invalid user input for Surcharge Auth, Sale, Cancel endpoints now results in a 400 Bad Request (not 500 Internal Server Error).
+#
+# /api/health/live now returns binary version, informational version, and build version.

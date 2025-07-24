@@ -13,6 +13,7 @@ using FeeNominalService.Repositories;
 using FeeNominalService.Models.ApiKey;
 using System.Text.Json;
 using FeeNominalService.Models.SurchargeProvider;
+using Microsoft.Extensions.Options;
 
 namespace FeeNominalService.Services
 {
@@ -34,6 +35,7 @@ namespace FeeNominalService.Services
         private readonly IMerchantAuditTrailRepository _auditTrailRepository;
         private readonly ISurchargeProviderRepository _surchargeProviderRepository;
         private readonly ISurchargeProviderConfigRepository _surchargeProviderConfigRepository;
+        private readonly IOptionsMonitor<AuditLoggingSettings> _settings;
 
         public MerchantService(
             ApplicationDbContext context,
@@ -41,7 +43,8 @@ namespace FeeNominalService.Services
             IMerchantRepository merchantRepository,
             IMerchantAuditTrailRepository auditTrailRepository,
             ISurchargeProviderRepository surchargeProviderRepository,
-            ISurchargeProviderConfigRepository surchargeProviderConfigRepository)
+            ISurchargeProviderConfigRepository surchargeProviderConfigRepository,
+            IOptionsMonitor<AuditLoggingSettings> settings)
         {
             _context = context;
             _logger = logger;
@@ -49,6 +52,7 @@ namespace FeeNominalService.Services
             _auditTrailRepository = auditTrailRepository;
             _surchargeProviderRepository = surchargeProviderRepository;
             _surchargeProviderConfigRepository = surchargeProviderConfigRepository;
+            _settings = settings;
         }
 
         public async Task<MerchantResponse> CreateMerchantAsync(GenerateInitialApiKeyRequest request, string createdBy)
@@ -417,6 +421,10 @@ namespace FeeNominalService.Services
             string? newValue,
             string performedBy)
         {
+            var config = _settings.CurrentValue;
+            if (!config.Enabled) return;
+            if (config.Endpoints.TryGetValue("MerchantAuditTrail", out var enabled) && !enabled) return;
+
             var auditTrail = new MerchantAuditTrail
             {
                 MerchantAuditTrailId = Guid.NewGuid(),

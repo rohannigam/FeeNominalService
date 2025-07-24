@@ -211,6 +211,17 @@ public class SurchargeException : Exception
             .SetRetryable(true);
     }
 
+    /// <summary>
+    /// Create a surcharge exception for no active provider config
+    /// </summary>
+    public static SurchargeException NoActiveProviderConfig(string providerCode, Guid merchantId)
+    {
+        return new SurchargeException(SurchargeErrorCodes.Provider.PROVIDER_CONFIG_MISSING)
+            .AddContext("ProviderCode", providerCode)
+            .AddContext("MerchantId", merchantId)
+            .SetRetryable(false);
+    }
+
     private static string MapFieldNameToErrorCode(string fieldName)
     {
         return fieldName.ToUpperInvariant() switch

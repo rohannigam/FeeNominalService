@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Models;
 using FeeNominalService.Data;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace FeeNominalService.Services
 {
@@ -13,24 +15,26 @@ namespace FeeNominalService.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<AuditService> _logger;
+        private readonly IOptionsMonitor<AuditLoggingSettings> _settings;
 
-        public AuditService(ApplicationDbContext context, ILogger<AuditService> logger)
+        public AuditService(ApplicationDbContext context, ILogger<AuditService> logger, IOptionsMonitor<AuditLoggingSettings> settings)
         {
             _context = context;
             _logger = logger;
+            _settings = settings;
         }
 
         public async Task LogAuditAsync(
             string entityType,
             Guid entityId,
             string action,
-            JsonDocument? oldValues,
-            JsonDocument? newValues,
-            string performedBy,
-            string? ipAddress = null,
-            string? userAgent = null,
-            JsonDocument? additionalInfo = null)
+            string? userId = null,
+            Dictionary<string, (string? OldValue, string? NewValue)>? fieldChanges = null)
         {
+            var config = _settings.CurrentValue;
+            if (!config.Enabled) return;
+            if (config.Endpoints.TryGetValue(entityType, out var enabled) && !enabled) return;
+
             try
             {
                 var auditLog = new AuditLog
@@ -38,28 +42,40 @@ namespace FeeNominalService.Services
                     EntityType = entityType,
                     EntityId = entityId,
                     Action = action,
-                    OldValues = oldValues,
-                    NewValues = newValues,
-                    PerformedBy = performedBy,
-                    PerformedAt = DateTime.UtcNow,
-                    IpAddress = ipAddress,
-                    UserAgent = userAgent,
-                    AdditionalInfo = additionalInfo
+                    UserId = userId,
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 _context.AuditLogs.Add(auditLog);
                 await _context.SaveChangesAsync();
 
+                if (fieldChanges != null && fieldChanges.Count > 0)
+                {
+                    foreach (var kvp in fieldChanges)
+                    {
+                        var detail = new AuditLogDetail
+                        {
+                            AuditLogId = auditLog.Id,
+                            FieldName = kvp.Key,
+                            OldValue = kvp.Value.OldValue,
+                            NewValue = kvp.Value.NewValue,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.Set<AuditLogDetail>().Add(detail);
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
                 _logger.LogInformation(
-                    "Audit log created for {EntityType} {EntityId}, Action: {Action}, PerformedBy: {PerformedBy}",
-                    entityType, entityId, action, performedBy);
+                    "Audit log created for {EntityType} {EntityId}, Action: {Action}, UserId: {UserId}",
+                    entityType, entityId, action, userId);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
                     "Error creating audit log for {EntityType} {EntityId}, Action: {Action}",
                     entityType, entityId, action);
-                throw;
+                // Swallow exception to avoid impacting main workflow
             }
         }
 
@@ -86,13 +102,13 @@ namespace FeeNominalService.Services
                     query = query.Where(a => a.Action == action);
 
                 if (startDate.HasValue)
-                    query = query.Where(a => a.PerformedAt >= startDate.Value);
+                    query = query.Where(a => a.CreatedAt >= startDate.Value);
 
                 if (endDate.HasValue)
-                    query = query.Where(a => a.PerformedAt <= endDate.Value);
+                    query = query.Where(a => a.CreatedAt <= endDate.Value);
 
                 return await query
-                    .OrderByDescending(a => a.PerformedAt)
+                    .OrderByDescending(a => a.CreatedAt)
                     .Skip(skip)
                     .Take(take)
                     .ToArrayAsync();

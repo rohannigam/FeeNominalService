@@ -1123,7 +1123,7 @@ namespace FeeNominalService.Services
                     MerchantId = merchantId,
                     ExternalMerchantId = merchant.ExternalMerchantId,
                     ExternalMerchantGuid = merchant.ExternalMerchantGuid,
-                    MerchantName = merchant.Name,
+                    MerchantName = merchant.Name ?? string.Empty,
                     Status = merchant.Status?.Code ?? "ACTIVE",
                     ApiKey = apiKey,
                     ApiKeyId = createdApiKey.Id,
@@ -1131,10 +1131,10 @@ namespace FeeNominalService.Services
                     Secret = secret,
                     CreatedAt = apiKeyEntity.CreatedAt,
                     RateLimit = apiKeyEntity.RateLimit,
-                    AllowedEndpoints = apiKeyEntity.AllowedEndpoints!,
-                    Description = apiKeyEntity.Description,
+                    AllowedEndpoints = apiKeyEntity.AllowedEndpoints ?? Array.Empty<string>(),
+                    Description = apiKeyEntity.Description ?? string.Empty,
                     Purpose = apiKeyEntity.Purpose,
-                    OnboardingMetadata = request.OnboardingMetadata
+                    OnboardingMetadata = request.OnboardingMetadata ?? new OnboardingMetadata()
                 };
             }
             catch (Exception ex)

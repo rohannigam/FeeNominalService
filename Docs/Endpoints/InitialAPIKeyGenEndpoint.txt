@@ -22,6 +22,7 @@ This endpoint is used to generate the first API key for a new merchant. It's the
     "externalMerchantId": "string",     // Required, max 50 chars
     "merchantName": "string",           // Required, max 255 chars
     "externalMerchantGuid": "guid",     // Optional
+    "name": "string",                   // Optional, unique per merchant, max 100 chars
     "description": "string",            // Optional, max 500 chars
     "rateLimit": 1000,                 // Optional, range 1-10000
     "allowedEndpoints": [              // Optional

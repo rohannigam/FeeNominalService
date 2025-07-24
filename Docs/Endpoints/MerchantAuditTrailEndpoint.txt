@@ -198,3 +198,7 @@ graph TD
 ## Important Notes
 - **Header Validation:** All required headers are validated in a case-insensitive manner.
 - **Secret Handling:** If any secret fields are referenced, they are masked in all logs (only the first and last four characters are shown) and are never returned after creation. 
+
+## Audit Logging Toggle
+- Merchant audit trail logging can now be enabled/disabled via the `AuditLogging` section in `appsettings.json`.
+- If logging is disabled, no audit trail entries are written. 

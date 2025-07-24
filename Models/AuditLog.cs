@@ -12,35 +12,22 @@ namespace FeeNominalService.Models
         public Guid Id { get; set; }
 
         [Required]
-        [Column(TypeName = "varchar(50)")]
+        [Column("entity_type", TypeName = "varchar(50)")]
         public string EntityType { get; set; } = string.Empty;
 
         [Required]
+        [Column("entity_id")]
         public Guid EntityId { get; set; }
 
         [Required]
-        [Column(TypeName = "varchar(50)")]
+        [Column("action", TypeName = "varchar(50)")]
         public string Action { get; set; } = string.Empty;
 
-        [Column(TypeName = "jsonb")]
-        public JsonDocument? OldValues { get; set; }
-
-        [Column(TypeName = "jsonb")]
-        public JsonDocument? NewValues { get; set; }
+        [Column("user_id", TypeName = "varchar(255)")]
+        public string? UserId { get; set; }
 
         [Required]
-        [Column(TypeName = "varchar(50)")]
-        public string PerformedBy { get; set; } = string.Empty;
-
-        [Required]
-        public DateTime PerformedAt { get; set; }
-
-        [Column(TypeName = "varchar(45)")]
-        public string? IpAddress { get; set; }
-
-        public string? UserAgent { get; set; }
-
-        [Column(TypeName = "jsonb")]
-        public JsonDocument? AdditionalInfo { get; set; }
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 } 
