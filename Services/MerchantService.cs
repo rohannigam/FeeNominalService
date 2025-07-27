@@ -14,6 +14,7 @@ using FeeNominalService.Models.ApiKey;
 using System.Text.Json;
 using FeeNominalService.Models.SurchargeProvider;
 using Microsoft.Extensions.Options;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -62,14 +63,14 @@ namespace FeeNominalService.Services
                 // Check if merchant already exists
                 if (await _merchantRepository.ExistsByExternalMerchantIdAsync(request.ExternalMerchantId))
                 {
-                    _logger.LogWarning("Merchant with external ID {ExternalMerchantId} already exists", request.ExternalMerchantId);
+                    _logger.LogWarning("Merchant with external ID {ExternalMerchantId} already exists", LogSanitizer.SanitizeString(request.ExternalMerchantId));
                     throw new InvalidOperationException($"Merchant with external ID {request.ExternalMerchantId} already exists");
                 }
 
                 if (request.ExternalMerchantGuid.HasValue && 
                     await _merchantRepository.ExistsByExternalMerchantGuidAsync(request.ExternalMerchantGuid.Value))
                 {
-                    _logger.LogWarning("Merchant with external GUID {ExternalMerchantGuid} already exists", request.ExternalMerchantGuid);
+                    _logger.LogWarning("Merchant with external GUID {ExternalMerchantGuid} already exists", LogSanitizer.SanitizeGuid(request.ExternalMerchantGuid));
                     throw new InvalidOperationException($"Merchant with external GUID {request.ExternalMerchantGuid} already exists");
                 }
 
@@ -125,14 +126,14 @@ namespace FeeNominalService.Services
                 // Create audit trail
                 await CreateAuditTrailAsync(merchantId, "UPDATE", "Name", oldName, name, updatedBy);
 
-                _logger.LogInformation("Updated merchant {MerchantId} name from {OldName} to {NewName}", 
-                    merchantId, oldName, name);
+                                _logger.LogInformation("Updated merchant {MerchantId} name from {OldName} to {NewName}",
+                    LogSanitizer.SanitizeGuid(merchantId), LogSanitizer.SanitizeString(oldName), LogSanitizer.SanitizeString(name));
 
                 return updatedMerchant;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error updating merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
@@ -145,7 +146,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", externalMerchantId);
+                _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(externalMerchantId));
                 throw;
             }
         }
@@ -158,7 +159,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", externalMerchantGuid);
+                _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", LogSanitizer.SanitizeGuid(externalMerchantGuid));
                 throw;
             }
         }
@@ -171,7 +172,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving audit trail for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error retrieving audit trail for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
@@ -180,7 +181,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Retrieving merchant with ID {MerchantId}", id);
+                _logger.LogInformation("Retrieving merchant with ID {MerchantId}", LogSanitizer.SanitizeGuid(id));
 
                 var merchant = await _context.Merchants
                     .Include(m => m.Status)
@@ -188,16 +189,16 @@ namespace FeeNominalService.Services
 
                 if (merchant == null)
                 {
-                    _logger.LogWarning("Merchant not found with ID {MerchantId}", id);
+                    _logger.LogWarning("Merchant not found with ID {MerchantId}", LogSanitizer.SanitizeGuid(id));
                     return null;
                 }
 
-                _logger.LogInformation("Successfully retrieved merchant with ID {MerchantId}", id);
+                _logger.LogInformation("Successfully retrieved merchant with ID {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 return merchant;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with ID {MerchantId}", id);
+                _logger.LogError(ex, "Error retrieving merchant with ID {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -206,7 +207,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Updating status for merchant {MerchantId} to status {StatusId}", id, statusId);
+                _logger.LogInformation("Updating status for merchant {MerchantId} to status {StatusId}", LogSanitizer.SanitizeGuid(id), statusId);
 
                 var merchant = await _context.Merchants
                     .Include(m => m.Status)
@@ -214,7 +215,7 @@ namespace FeeNominalService.Services
 
                 if (merchant == null)
                 {
-                    _logger.LogWarning("Merchant not found with ID {MerchantId}", id);
+                    _logger.LogWarning("Merchant not found with ID {MerchantId}", LogSanitizer.SanitizeGuid(id));
                     throw new KeyNotFoundException($"Merchant not found with ID {id}");
                 }
 
@@ -243,15 +244,15 @@ namespace FeeNominalService.Services
                 {
                     _logger.LogInformation("Merchant {MerchantId} reactivated from {OldStatus} to {NewStatus}. " +
                         "Existing providers remain deactivated - merchant must create new providers for security reasons.", 
-                        id, GetStatusName(oldStatusId), status.Code);
+                        LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(GetStatusName(oldStatusId)), LogSanitizer.SanitizeString(status.Code));
                 }
 
-                _logger.LogInformation("Successfully updated status for merchant {MerchantId}", id);
+                _logger.LogInformation("Successfully updated status for merchant {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 return merchant;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating status for merchant {MerchantId}", id);
+                _logger.LogError(ex, "Error updating status for merchant {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -265,7 +266,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Deactivating all providers and configurations for merchant {MerchantId} due to: {Reason}", merchantId, reason);
+                _logger.LogInformation("Deactivating all providers and configurations for merchant {MerchantId} due to: {Reason}", LogSanitizer.SanitizeGuid(merchantId), LogSanitizer.SanitizeString(reason));
 
                 // Get all providers for this merchant
                 var providers = await _surchargeProviderRepository.GetByMerchantIdAsync(merchantId.ToString(), includeDeleted: false);
@@ -278,16 +279,16 @@ namespace FeeNominalService.Services
                     if (success)
                     {
                         providerCount++;
-                        _logger.LogDebug("Soft deleted provider {ProviderId} for merchant {MerchantId}", provider.Id, merchantId);
+                        _logger.LogDebug("Soft deleted provider {ProviderId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(provider.Id), LogSanitizer.SanitizeGuid(merchantId));
                     }
                 }
 
                 _logger.LogInformation("Successfully deactivated {ProviderCount} providers and their configurations for merchant {MerchantId}", 
-                    providerCount, merchantId);
+                    providerCount, LogSanitizer.SanitizeGuid(merchantId));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deactivating providers for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error deactivating providers for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 // Don't throw - we don't want merchant status update to fail if provider deactivation fails
             }
         }
@@ -312,7 +313,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking if merchant {MerchantId} is active", merchantId);
+                _logger.LogError(ex, "Error checking if merchant {MerchantId} is active", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
@@ -326,7 +327,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking if merchant {MerchantId} has active providers", merchantId);
+                _logger.LogError(ex, "Error checking if merchant {MerchantId} has active providers", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
@@ -340,7 +341,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting active provider count for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting active provider count for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
@@ -349,7 +350,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Generating API key for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Generating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 // Verify merchant exists
                 var merchant = await _merchantRepository.GetByIdAsync(merchantId);
@@ -388,7 +389,7 @@ namespace FeeNominalService.Services
                     onboardingMetadata?.AdminUserId ?? "SYSTEM"
                 );
 
-                _logger.LogInformation("Successfully generated API key for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Successfully generated API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 return new ApiKeyInfo
                 {
@@ -408,7 +409,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }

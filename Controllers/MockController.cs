@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using FeeNominalService.Services;
 using FeeNominalService.Models.ApiKey;
 using FeeNominalService.Services.AWS;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Controllers
 {
@@ -64,7 +65,7 @@ namespace FeeNominalService.Controllers
                 };
 
                 await _secretsManager.StoreSecretAsync(secretName, JsonSerializer.Serialize(secretValue));
-                _logger.LogInformation("Stored API key secret for {MerchantId} with key {ApiKey}", merchantId, apiKey);
+                _logger.LogInformation("Stored API key secret for {MerchantId} with key {ApiKey}", LogSanitizer.SanitizeString(merchantId), LogSanitizer.SanitizeString(apiKey));
 
                 return Ok(initialApiKeyData.GetProperty("response"));
             }

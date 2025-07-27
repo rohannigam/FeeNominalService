@@ -36,12 +36,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting provider by ID: {ProviderId}", id);
+                _logger.LogInformation("Getting provider by ID: {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 return await _repository.GetByIdAsync(id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by ID: {ProviderId}", id);
+                _logger.LogError(ex, "Error getting provider by ID: {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -50,12 +50,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting provider by ID: {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
+                _logger.LogInformation("Getting provider by ID: {ProviderId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeGuid(id), includeDeleted);
                 return await _repository.GetByIdAsync(id, includeDeleted);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by ID: {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
+                _logger.LogError(ex, "Error getting provider by ID: {ProviderId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeGuid(id), includeDeleted);
                 throw;
             }
         }
@@ -64,12 +64,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting provider by code {ProviderCode}", code);
+                _logger.LogInformation("Getting provider by code {ProviderCode}", LogSanitizer.SanitizeString(code));
                 return await _repository.GetByCodeAsync(code);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by code {ProviderCode}", code);
+                _logger.LogError(ex, "Error getting provider by code {ProviderCode}", LogSanitizer.SanitizeString(code));
                 throw;
             }
         }
@@ -92,12 +92,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting providers for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Getting providers for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 return await _repository.GetByMerchantIdAsync(merchantId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting providers for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
@@ -106,12 +106,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
+                _logger.LogInformation("Getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeString(merchantId), includeDeleted);
                 return await _repository.GetByMerchantIdAsync(merchantId, includeDeleted);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeString(merchantId), includeDeleted);
                 throw;
             }
         }
@@ -120,12 +120,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting configured providers for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Getting configured providers for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 return await _repository.GetConfiguredProvidersByMerchantIdAsync(merchantId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting configured providers for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting configured providers for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
@@ -134,12 +134,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Checking if merchant {MerchantId} has configuration for provider {ProviderId}", merchantId, providerId);
+                _logger.LogInformation("Checking if merchant {MerchantId} has configuration for provider {ProviderId}", LogSanitizer.SanitizeString(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 return await _repository.HasConfigurationAsync(merchantId, providerId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking configuration for merchant {MerchantId} and provider {ProviderId}", merchantId, providerId);
+                _logger.LogError(ex, "Error checking configuration for merchant {MerchantId} and provider {ProviderId}", LogSanitizer.SanitizeString(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -162,7 +162,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Creating provider {ProviderName} for merchant {MerchantId}", provider.Name, provider.CreatedBy);
+                _logger.LogInformation("Creating provider {ProviderName} for merchant {MerchantId}", LogSanitizer.SanitizeString(provider.Name), LogSanitizer.SanitizeString(provider.CreatedBy));
 
                 // Validate provider code uniqueness for this merchant only
                 if (await _repository.ExistsByCodeAndMerchantAsync(provider.Code, provider.CreatedBy))
@@ -207,7 +207,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating provider {ProviderName} for merchant {MerchantId}", provider.Name, provider.CreatedBy);
+                _logger.LogError(ex, "Error creating provider {ProviderName} for merchant {MerchantId}", LogSanitizer.SanitizeString(provider.Name), LogSanitizer.SanitizeString(provider.CreatedBy));
                 throw;
             }
         }
@@ -216,7 +216,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Creating provider {ProviderName} with configuration for merchant {MerchantId}", provider.Name, merchantId);
+                _logger.LogInformation("Creating provider {ProviderName} with configuration for merchant {MerchantId}", LogSanitizer.SanitizeString(provider.Name), LogSanitizer.SanitizeString(merchantId));
 
                 // First, create the provider
                 var createdProvider = await CreateAsync(provider);
@@ -249,13 +249,13 @@ namespace FeeNominalService.Services
                 createdProvider.Configurations = new List<SurchargeProviderConfig> { savedConfig };
 
                 _logger.LogInformation("Successfully created provider {ProviderId} with configuration {ConfigId} for merchant {MerchantId}", 
-                    createdProvider.Id, savedConfig.Id, merchantId);
+                    LogSanitizer.SanitizeGuid(createdProvider.Id), LogSanitizer.SanitizeGuid(savedConfig.Id), LogSanitizer.SanitizeString(merchantId));
 
                 return createdProvider;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating provider with configuration for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error creating provider with configuration for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
@@ -264,7 +264,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Updating provider {ProviderId} for merchant {MerchantId}", provider.Id, provider.UpdatedBy);
+                _logger.LogInformation("Updating provider {ProviderId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(provider.Id), LogSanitizer.SanitizeString(provider.UpdatedBy));
 
                 // Check if provider exists
                 var existingProvider = await _repository.GetByIdAsync(provider.Id);
@@ -286,7 +286,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating provider {ProviderId} for merchant {MerchantId}", provider.Id, provider.UpdatedBy);
+                _logger.LogError(ex, "Error updating provider {ProviderId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(provider.Id), LogSanitizer.SanitizeString(provider.UpdatedBy));
                 throw;
             }
         }
@@ -295,14 +295,14 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Soft deleting provider {ProviderId}", id);
+                _logger.LogInformation("Soft deleting provider {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 
                 // Use soft delete instead of hard delete
                 return await _repository.SoftDeleteAsync(id, "system");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error soft deleting provider {ProviderId}", id);
+                _logger.LogError(ex, "Error soft deleting provider {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -311,13 +311,13 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Soft deleting provider {ProviderId} by {DeletedBy}", id, deletedBy);
+                _logger.LogInformation("Soft deleting provider {ProviderId} by {DeletedBy}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(deletedBy));
                 
                 return await _repository.SoftDeleteAsync(id, deletedBy);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error soft deleting provider {ProviderId} by {DeletedBy}", id, deletedBy);
+                _logger.LogError(ex, "Error soft deleting provider {ProviderId} by {DeletedBy}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(deletedBy));
                 throw;
             }
         }
@@ -326,13 +326,13 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Restoring provider {ProviderId} by {RestoredBy}", id, restoredBy);
+                _logger.LogInformation("Restoring provider {ProviderId} by {RestoredBy}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(restoredBy));
                 
                 return await _repository.RestoreAsync(id, restoredBy);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error restoring provider {ProviderId} by {RestoredBy}", id, restoredBy);
+                _logger.LogError(ex, "Error restoring provider {ProviderId} by {RestoredBy}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(restoredBy));
                 throw;
             }
         }
@@ -345,7 +345,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking provider existence {ProviderId}", id);
+                _logger.LogError(ex, "Error checking provider existence {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -358,7 +358,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode}", code);
+                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode}", LogSanitizer.SanitizeString(code));
                 throw;
             }
         }
@@ -367,7 +367,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Validating credentials schema for provider {ProviderId}", providerId);
+                _logger.LogInformation("Validating credentials schema for provider {ProviderId}", LogSanitizer.SanitizeGuid(providerId));
 
                 var provider = await _repository.GetByIdAsync(providerId);
                 if (provider == null)
@@ -384,7 +384,7 @@ namespace FeeNominalService.Services
                 var schema = JsonSchema.FromText(provider.CredentialsSchema.RootElement.GetRawText());
                 if (schema == null)
                 {
-                    _logger.LogError("Invalid schema format for provider {ProviderId}", providerId);
+                    _logger.LogError("Invalid schema format for provider {ProviderId}", LogSanitizer.SanitizeGuid(providerId));
                     return false;
                 }
 
@@ -395,18 +395,18 @@ namespace FeeNominalService.Services
                 {
                     _logger.LogWarning(
                         "Credentials validation failed for provider {ProviderId}. Details: {Details}",
-                        providerId,
-                        string.Join(", ", validationResult.Details.Select(d => d.ToString()))
+                        LogSanitizer.SanitizeGuid(providerId),
+                        LogSanitizer.SanitizeString(string.Join(", ", validationResult.Details.Select(d => d.ToString())))
                     );
                     return false;
                 }
 
-                _logger.LogInformation("Credentials validation successful for provider {ProviderId}", providerId);
+                _logger.LogInformation("Credentials validation successful for provider {ProviderId}", LogSanitizer.SanitizeGuid(providerId));
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating credentials schema for provider {ProviderId}", providerId);
+                _logger.LogError(ex, "Error validating credentials schema for provider {ProviderId}", LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -601,12 +601,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting status by code {StatusCode}", code);
+                _logger.LogInformation("Getting status by code {StatusCode}", LogSanitizer.SanitizeString(code));
                 return await _repository.GetStatusByCodeAsync(code);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting status by code {StatusCode}", code);
+                _logger.LogError(ex, "Error getting status by code {StatusCode}", LogSanitizer.SanitizeString(code));
                 throw;
             }
         }

@@ -6,6 +6,7 @@ using FeeNominalService.Services;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Models.Common;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Controllers.V1
 {
@@ -37,7 +38,7 @@ namespace FeeNominalService.Controllers.V1
             try
             {
                 _logger.LogInformation("Processing surcharge auth for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 _logger.LogInformation("Auth Request: {@Request}", request);
 
                 // Validate merchant ID from claims
@@ -45,14 +46,14 @@ namespace FeeNominalService.Controllers.V1
                 if (string.IsNullOrEmpty(merchantIdClaim))
                 {
                     _logger.LogWarning("Merchant ID not found in claims for transaction: {CorrelationId}", 
-                        request.CorrelationId);
+                        LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Merchant ID not found in claims" });
                 }
 
                 if (!Guid.TryParse(merchantIdClaim, out Guid merchantId))
                 {
                     _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId} for transaction: {CorrelationId}", 
-                        merchantIdClaim, request.CorrelationId);
+                        LogSanitizer.SanitizeMerchantId(merchantIdClaim), LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
@@ -63,26 +64,26 @@ namespace FeeNominalService.Controllers.V1
                 // Process the surcharge authorization
                 var response = await _surchargeTransactionService.ProcessAuthAsync(request, merchantId, actor);
 
-                _logger.LogInformation("Successfully processed surcharge auth for transaction: {CorrelationId}, surcharge transaction ID: {SurchargeTransactionId}", request.CorrelationId, response.SurchargeTransactionId);
+                _logger.LogInformation("Successfully processed surcharge auth for transaction: {CorrelationId}, surcharge transaction ID: {SurchargeTransactionId}", LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.SurchargeTransactionId));
                 _logger.LogInformation("Auth Response: {@Response}", response);
 
                 return Ok(response);
             }
             catch (FeeNominalService.Exceptions.SurchargeException ex)
             {
-                _logger.LogWarning(ex, "Surcharge error while processing auth for transaction: {CorrelationId}", request.CorrelationId);
+                _logger.LogWarning(ex, "Surcharge error while processing auth for transaction: {CorrelationId}", LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(ex.ToErrorResponse());
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Invalid operation while processing surcharge auth for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing surcharge auth for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return StatusCode(500, new { message = "An error occurred while processing the surcharge authorization" });
             }
         }
@@ -98,7 +99,7 @@ namespace FeeNominalService.Controllers.V1
             try
             {
                 _logger.LogInformation("Processing surcharge sale for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 _logger.LogInformation("Sale Request: {@Request}", request);
 
                 // Validate merchant ID from claims
@@ -106,14 +107,14 @@ namespace FeeNominalService.Controllers.V1
                 if (string.IsNullOrEmpty(merchantIdClaim))
                 {
                     _logger.LogWarning("Merchant ID not found in claims for transaction: {CorrelationId}", 
-                        request.CorrelationId);
+                        LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Merchant ID not found in claims" });
                 }
 
                 if (!Guid.TryParse(merchantIdClaim, out Guid merchantId))
                 {
                     _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId} for transaction: {CorrelationId}", 
-                        merchantIdClaim, request.CorrelationId);
+                        LogSanitizer.SanitizeMerchantId(merchantIdClaim), LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
@@ -126,26 +127,26 @@ namespace FeeNominalService.Controllers.V1
 
                 _logger.LogInformation("Successfully processed surcharge sale for transaction: {CorrelationId}, " +
                     "surcharge transaction ID: {SurchargeTransactionId}", 
-                    request.CorrelationId, response.SurchargeTransactionId);
+                    LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.SurchargeTransactionId));
                 _logger.LogInformation("Sale Response: {@Response}", response);
 
                 return Ok(response);
             }
             catch (FeeNominalService.Exceptions.SurchargeException ex)
             {
-                _logger.LogWarning(ex, "Surcharge error while processing sale for transaction: {CorrelationId}", request.CorrelationId);
+                _logger.LogWarning(ex, "Surcharge error while processing sale for transaction: {CorrelationId}", LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(ex.ToErrorResponse());
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Invalid operation while processing surcharge sale for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing surcharge sale for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return StatusCode(500, new { message = "An error occurred while processing the surcharge sale" });
             }
         }
@@ -161,21 +162,21 @@ namespace FeeNominalService.Controllers.V1
             try
             {
                 _logger.LogInformation("Processing surcharge refund for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
                 if (string.IsNullOrEmpty(merchantIdClaim))
                 {
                     _logger.LogWarning("Merchant ID not found in claims for transaction: {CorrelationId}", 
-                        request.CorrelationId);
+                        LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Merchant ID not found in claims" });
                 }
 
                 if (!Guid.TryParse(merchantIdClaim, out Guid merchantId))
                 {
                     _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId} for transaction: {CorrelationId}", 
-                        merchantIdClaim, request.CorrelationId);
+                        LogSanitizer.SanitizeMerchantId(merchantIdClaim), LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
@@ -184,20 +185,20 @@ namespace FeeNominalService.Controllers.V1
 
                 _logger.LogInformation("Successfully processed surcharge refund for transaction: {CorrelationId}, " +
                     "refund ID: {RefundId}", 
-                    request.CorrelationId, response.RefundId);
+                    LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.RefundId));
 
                 return Ok(response);
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Invalid operation while processing surcharge refund for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing surcharge refund for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return StatusCode(500, new { message = "An error occurred while processing the surcharge refund" });
             }
         }
@@ -213,21 +214,21 @@ namespace FeeNominalService.Controllers.V1
             try
             {
                 _logger.LogInformation("Processing surcharge cancel for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
                 if (string.IsNullOrEmpty(merchantIdClaim))
                 {
                     _logger.LogWarning("Merchant ID not found in claims for transaction: {CorrelationId}", 
-                        request.CorrelationId);
+                        LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Merchant ID not found in claims" });
                 }
 
                 if (!Guid.TryParse(merchantIdClaim, out Guid merchantId))
                 {
                     _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId} for transaction: {CorrelationId}", 
-                        merchantIdClaim, request.CorrelationId);
+                        LogSanitizer.SanitizeMerchantId(merchantIdClaim), LogSanitizer.SanitizeString(request.CorrelationId));
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
@@ -240,25 +241,25 @@ namespace FeeNominalService.Controllers.V1
 
                 _logger.LogInformation("Successfully processed surcharge cancel for transaction: {CorrelationId}, " +
                     "surcharge transaction ID: {SurchargeTransactionId}", 
-                    request.CorrelationId, response.SurchargeTransactionId);
+                    LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.SurchargeTransactionId));
 
                 return Ok(response);
             }
             catch (FeeNominalService.Exceptions.SurchargeException ex)
             {
-                _logger.LogWarning(ex, "Surcharge error while processing cancel for transaction: {CorrelationId}", request.CorrelationId);
+                _logger.LogWarning(ex, "Surcharge error while processing cancel for transaction: {CorrelationId}", LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(ex.ToErrorResponse());
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Invalid operation while processing surcharge cancel for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing surcharge cancel for transaction: {CorrelationId}", 
-                    request.CorrelationId);
+                    LogSanitizer.SanitizeString(request.CorrelationId));
                 return StatusCode(500, new { message = "An error occurred while processing the surcharge cancellation" });
             }
         }
@@ -310,9 +311,9 @@ namespace FeeNominalService.Controllers.V1
                     }
                 }
 
-                _logger.LogInformation("[AUDIT] Admin {AdminUser} starting bulk sale complete. Count: {Count}", adminUser, request.Sales?.Count ?? 0);
+                _logger.LogInformation("[AUDIT] Admin {AdminUser} starting bulk sale complete. Count: {Count}", LogSanitizer.SanitizeString(adminUser), request.Sales?.Count ?? 0);
                 var response = await _surchargeTransactionService.ProcessBulkSaleCompleteAsync(request);
-                _logger.LogInformation("[AUDIT] Admin {AdminUser} completed bulk sale processing. BatchId: {BatchId}, Success: {SuccessCount}, Failed: {FailureCount}", adminUser, response.BatchId, response.SuccessCount, response.FailureCount);
+                _logger.LogInformation("[AUDIT] Admin {AdminUser} completed bulk sale processing. BatchId: {BatchId}, Success: {SuccessCount}, Failed: {FailureCount}", LogSanitizer.SanitizeString(adminUser), LogSanitizer.SanitizeGuid(response.BatchId), response.SuccessCount, response.FailureCount);
                 return Ok(response);
             }
             catch (InvalidOperationException ex)
@@ -337,27 +338,27 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Getting surcharge transaction by ID: {TransactionId}", id);
+                _logger.LogInformation("Getting surcharge transaction by ID: {TransactionId}", LogSanitizer.SanitizeGuid(id));
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
                 if (string.IsNullOrEmpty(merchantIdClaim))
                 {
-                    _logger.LogWarning("Merchant ID not found in claims for transaction lookup: {TransactionId}", id);
+                    _logger.LogWarning("Merchant ID not found in claims for transaction lookup: {TransactionId}", LogSanitizer.SanitizeGuid(id));
                     return BadRequest(new { message = "Merchant ID not found in claims" });
                 }
 
                 if (!Guid.TryParse(merchantIdClaim, out Guid merchantId))
                 {
                     _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId} for transaction lookup: {TransactionId}", 
-                        merchantIdClaim, id);
+                        LogSanitizer.SanitizeMerchantId(merchantIdClaim), LogSanitizer.SanitizeGuid(id));
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
                 var transaction = await _surchargeTransactionService.GetTransactionByIdAsync(id, merchantId);
                 if (transaction == null)
                 {
-                    _logger.LogWarning("Surcharge transaction not found: {TransactionId} for merchant: {MerchantId}", id, merchantId);
+                    _logger.LogWarning("Surcharge transaction not found: {TransactionId} for merchant: {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeGuid(merchantId));
                     return NotFound(new { message = $"Surcharge transaction with ID {id} not found" });
                 }
 
@@ -365,7 +366,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting surcharge transaction by ID: {TransactionId}", id);
+                _logger.LogError(ex, "Error getting surcharge transaction by ID: {TransactionId}", LogSanitizer.SanitizeGuid(id));
                 return StatusCode(500, new { message = "An error occurred while retrieving the surcharge transaction" });
             }
         }
@@ -399,7 +400,7 @@ namespace FeeNominalService.Controllers.V1
 
                 if (!Guid.TryParse(merchantIdClaim, out Guid merchantId))
                 {
-                    _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId}", merchantIdClaim);
+                    _logger.LogWarning("Invalid merchant ID format in claims: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantIdClaim));
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 

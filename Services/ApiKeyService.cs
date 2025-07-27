@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using FeeNominalService.Data;
 using FeeNominalService.Services.AWS;
 using FeeNominalService.Models.ApiKey.Responses;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -94,7 +95,7 @@ namespace FeeNominalService.Services
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
             if (apiKeyEntity == null)
             {
-                _logger.LogWarning("API key {ApiKey} not found", apiKey);
+                _logger.LogWarning("API key {ApiKey} not found", LogSanitizer.SanitizeString(apiKey));
                 return false;
             }
 
@@ -110,7 +111,7 @@ namespace FeeNominalService.Services
                     apiKeyEntity.UpdatedAt = DateTime.UtcNow;
                     await _apiKeyRepository.UpdateAsync(apiKeyEntity);
                 }
-                _logger.LogWarning("API key {ApiKey} has expired.", apiKey);
+                _logger.LogWarning("API key {ApiKey} has expired.", LogSanitizer.SanitizeString(apiKey));
                 return false;
             }
 
@@ -138,22 +139,22 @@ namespace FeeNominalService.Services
         {
             _logger.LogInformation("=== ADMIN API KEY VALIDATION DEBUG ===");
             _logger.LogInformation("Input parameters: ApiKey={ApiKey}, Timestamp={Timestamp}, Nonce={Nonce}, Signature={Signature}", 
-                apiKey, timestamp, nonce, signature);
+                LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(signature));
 
             // Get admin secret from AWS Secrets Manager
             var adminSecretName = _secretNameFormatter.FormatAdminSecretName(serviceName);
-            _logger.LogInformation("Looking for admin secret with name: {AdminSecretName}", adminSecretName);
+            _logger.LogInformation("Looking for admin secret with name: {AdminSecretName}", LogSanitizer.SanitizeString(adminSecretName));
             
             var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(adminSecretName);
 
             if (secret == null)
             {
-                _logger.LogWarning("Admin secret not found for API key {ApiKey}", apiKey);
+                _logger.LogWarning("Admin secret not found for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                 return false;
             }
 
             _logger.LogInformation("Admin secret found: ApiKey={SecretApiKey}, IsRevoked={IsRevoked}, Status={Status}, Scope={Scope}", 
-                secret.ApiKey, secret.IsRevoked, secret.Status, secret.Scope);
+                LogSanitizer.SanitizeString(secret.ApiKey), secret.IsRevoked, secret.Status, LogSanitizer.SanitizeString(secret.Scope));
 
             // Debug log for secret used in signature calculation (masked)
             if (!string.IsNullOrEmpty(secret.Secret) && secret.Secret.Length > 8)
@@ -163,18 +164,18 @@ namespace FeeNominalService.Services
             }
             else
             {
-                _logger.LogInformation("Using admin secret for signature calculation: {MaskedSecret}", secret.Secret);
+                _logger.LogInformation("Using admin secret for signature calculation: {MaskedSecret}", LogSanitizer.SanitizeString(secret.Secret));
             }
 
             // For admin keys, use empty string as merchant ID in signature
             var merchantIdForSignature = string.Empty;
             _logger.LogInformation("Signature calculation inputs: Secret={MaskedSecret}, Timestamp={Timestamp}, Nonce={Nonce}, MerchantId={MerchantId}, ApiKey={ApiKey}", 
                 secret.Secret.Length > 8 ? $"{secret.Secret.Substring(0, 4)}...{secret.Secret.Substring(secret.Secret.Length - 4)}" : secret.Secret,
-                timestamp, nonce, merchantIdForSignature, apiKey);
+                LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(merchantIdForSignature), LogSanitizer.SanitizeString(apiKey));
 
             var expectedSignature = GenerateSignature(secret.Secret, timestamp, nonce, merchantIdForSignature, apiKey);
-            _logger.LogInformation("Expected signature: {ExpectedSignature}", expectedSignature);
-            _logger.LogInformation("Received signature: {ReceivedSignature}", signature);
+            _logger.LogInformation("Expected signature: {ExpectedSignature}", LogSanitizer.SanitizeString(expectedSignature));
+            _logger.LogInformation("Received signature: {ReceivedSignature}", LogSanitizer.SanitizeString(signature));
             _logger.LogInformation("Signatures match: {SignaturesMatch}", string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase));
             _logger.LogInformation("=== END ADMIN API KEY VALIDATION DEBUG ===");
 
@@ -189,7 +190,7 @@ namespace FeeNominalService.Services
 
             if (secret == null)
             {
-                _logger.LogWarning("Secret not found for API key {ApiKey}", apiKey);
+                _logger.LogWarning("Secret not found for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                 return false;
             }
 
@@ -201,7 +202,7 @@ namespace FeeNominalService.Services
             }
             else
             {
-                _logger.LogDebug("Using secret for signature calculation: {MaskedSecret}", secret.Secret);
+                _logger.LogDebug("Using secret for signature calculation: {MaskedSecret}", LogSanitizer.SanitizeString(secret.Secret));
             }
 
             // Validate signature
@@ -216,7 +217,7 @@ namespace FeeNominalService.Services
         /// <returns>API key information</returns>
         public async Task<ApiKeyInfo> GetApiKeyAsync(string merchantId)
         {
-            _logger.LogInformation("Getting API key info for merchant {MerchantId}", merchantId);
+            _logger.LogInformation("Getting API key info for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
 
             // Check if merchant exists
             var merchantGuid = Guid.Parse(merchantId);
@@ -279,13 +280,13 @@ namespace FeeNominalService.Services
         /// <returns>Updated API key information</returns>
         public async Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request, OnboardingMetadata onboardingMetadata)
         {
-            _logger.LogInformation("Updating API key for merchant {MerchantId}", request.MerchantId);
+            _logger.LogInformation("Updating API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(request.MerchantId));
 
             // 1. First check if merchant exists
             var merchant = await _merchantRepository.GetByIdAsync(Guid.Parse(request.MerchantId));
             if (merchant == null)
             {
-                _logger.LogWarning("Merchant {MerchantId} not found during API key update", request.MerchantId);
+                _logger.LogWarning("Merchant {MerchantId} not found during API key update", LogSanitizer.SanitizeMerchantId(request.MerchantId));
                 throw new KeyNotFoundException($"Merchant {request.MerchantId} not found");
             }
 
@@ -293,21 +294,21 @@ namespace FeeNominalService.Services
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(request.ApiKey);
             if (apiKeyEntity == null)
             {
-                _logger.LogWarning("API key {ApiKey} not found", request.ApiKey);
+                _logger.LogWarning("API key {ApiKey} not found", LogSanitizer.SanitizeString(request.ApiKey));
                 throw new KeyNotFoundException($"API key {request.ApiKey} not found");
             }
 
             // 3. Validate the API key belongs to the merchant
             if (apiKeyEntity.MerchantId != merchant.MerchantId)
             {
-                _logger.LogWarning("API key {ApiKey} does not belong to merchant {MerchantId}", request.ApiKey, request.MerchantId);
+                _logger.LogWarning("API key {ApiKey} does not belong to merchant {MerchantId}", LogSanitizer.SanitizeString(request.ApiKey), LogSanitizer.SanitizeMerchantId(request.MerchantId));
                 throw new InvalidOperationException($"API key {request.ApiKey} does not belong to merchant {request.MerchantId}");
             }
 
             // 4. Check if the API key is active
             if (apiKeyEntity.Status != "ACTIVE")
             {
-                _logger.LogWarning("API key {ApiKey} is not active (status: {Status})", request.ApiKey, apiKeyEntity.Status);
+                _logger.LogWarning("API key {ApiKey} is not active (status: {Status})", LogSanitizer.SanitizeString(request.ApiKey), LogSanitizer.SanitizeString(apiKeyEntity.Status));
                 throw new InvalidOperationException($"API key {request.ApiKey} is not active (status: {apiKeyEntity.Status})");
             }
 
@@ -332,7 +333,7 @@ namespace FeeNominalService.Services
                 apiKeyEntity.OnboardingReference = onboardingMetadata.OnboardingReference;
                 apiKeyEntity.OnboardingTimestamp = onboardingMetadata.OnboardingTimestamp == default ? DateTime.UtcNow : onboardingMetadata.OnboardingTimestamp;
                 await _apiKeyRepository.UpdateAsync(apiKeyEntity);
-                _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(request.MerchantId));
 
                 // 6. Get the secret from AWS Secrets Manager using internal merchant ID
                 var secretName = $"feenominal/merchants/{merchant.MerchantId:D}/apikeys/{request.ApiKey}";
@@ -340,7 +341,7 @@ namespace FeeNominalService.Services
                 if (secret == null)
                 {
                     _logger.LogWarning("Secret not found for API key {ApiKey} of merchant {MerchantId}", 
-                        apiKeyEntity.Key, request.MerchantId);
+                        LogSanitizer.SanitizeString(apiKeyEntity.Key), LogSanitizer.SanitizeMerchantId(request.MerchantId));
                     throw new KeyNotFoundException($"Secret not found for API key of merchant {request.MerchantId}");
                 }
 
@@ -369,7 +370,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex) when (ex is not KeyNotFoundException)
             {
-                _logger.LogError(ex, "Error updating API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogError(ex, "Error updating API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(request.MerchantId));
                 throw;
             }
         }
@@ -382,13 +383,13 @@ namespace FeeNominalService.Services
         public async Task<bool> RevokeApiKeyAsync(RevokeApiKeyRequest request)
         {
             _logger.LogInformation("Starting API key revocation process for merchant {MerchantId}, API key {ApiKey}", 
-                request.MerchantId, request.ApiKey);
+                LogSanitizer.SanitizeMerchantId(request.MerchantId), LogSanitizer.SanitizeString(request.ApiKey));
 
             // 1. Validate merchant exists
             var merchant = await _merchantRepository.GetByIdAsync(Guid.Parse(request.MerchantId));
             if (merchant == null)
             {
-                _logger.LogWarning("Merchant {MerchantId} not found during API key revocation", request.MerchantId);
+                _logger.LogWarning("Merchant {MerchantId} not found during API key revocation", LogSanitizer.SanitizeMerchantId(request.MerchantId));
                 throw new KeyNotFoundException($"Merchant {request.MerchantId} not found");
             }
 
@@ -396,14 +397,14 @@ namespace FeeNominalService.Services
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(request.ApiKey);
             if (apiKeyEntity == null)
             {
-                _logger.LogWarning("API key {ApiKey} not found during revocation", request.ApiKey);
+                _logger.LogWarning("API key {ApiKey} not found during revocation", LogSanitizer.SanitizeString(request.ApiKey));
                 throw new KeyNotFoundException($"API key {request.ApiKey} not found");
             }
 
             // 3. Validate API key belongs to merchant
             if (apiKeyEntity.MerchantId != merchant.MerchantId)
             {
-                _logger.LogWarning("API key {ApiKey} does not belong to merchant {MerchantId}", request.ApiKey, request.MerchantId);
+                _logger.LogWarning("API key {ApiKey} does not belong to merchant {MerchantId}", LogSanitizer.SanitizeString(request.ApiKey), LogSanitizer.SanitizeMerchantId(request.MerchantId));
                 throw new InvalidOperationException($"API key {request.ApiKey} does not belong to merchant {request.MerchantId}");
             }
 
@@ -424,14 +425,14 @@ namespace FeeNominalService.Services
                 await _secretsManager.UpdateSecretAsync(secretName, secret); // <-- Use update, not create
             }
 
-            _logger.LogInformation("Successfully revoked API key {ApiKey} for merchant {MerchantId}", request.ApiKey, request.MerchantId);
+            _logger.LogInformation("Successfully revoked API key {ApiKey} for merchant {MerchantId}", LogSanitizer.SanitizeString(request.ApiKey), LogSanitizer.SanitizeMerchantId(request.MerchantId));
             return true;
         }
 
         /// <inheritdoc />
         public async Task<GenerateApiKeyResponse> RotateApiKeyAsync(string merchantId, OnboardingMetadata onboardingMetadata, string apiKey)
         {
-            _logger.LogInformation("Rotating API key for merchant {MerchantId}", merchantId);
+            _logger.LogInformation("Rotating API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
 
             // Get merchant using internal merchant ID
             var merchant = await _merchantRepository.GetByIdAsync(Guid.Parse(merchantId));
@@ -526,7 +527,7 @@ namespace FeeNominalService.Services
         /// <inheritdoc />
         public async Task<IEnumerable<ApiKeyInfo>> GetMerchantApiKeysAsync(string merchantId)
         {
-            _logger.LogInformation("Getting all API keys for merchant {MerchantId}", merchantId);
+            _logger.LogInformation("Getting all API keys for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
 
             var merchant = await _merchantRepository.GetByIdAsync(Guid.Parse(merchantId));
             if (merchant == null)
@@ -577,7 +578,7 @@ namespace FeeNominalService.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to get secret info for API key {ApiKey}, using database info only", apiKey.Key);
+                    _logger.LogWarning(ex, "Failed to get secret info for API key {ApiKey}, using database info only", LogSanitizer.SanitizeString(apiKey.Key));
                     // If we can't get the secret, just use the database info
                     var usageCount = await _context.ApiKeyUsages
                         .Where(u => u.ApiKeyId == apiKey.Id)
@@ -609,14 +610,14 @@ namespace FeeNominalService.Services
                 }
             }
 
-            _logger.LogInformation("Found {Count} API keys for merchant {MerchantId}", result.Count, merchantId);
+            _logger.LogInformation("Found {Count} API keys for merchant {MerchantId}", result.Count, LogSanitizer.SanitizeMerchantId(merchantId));
             return result;
         }
 
         /// <inheritdoc />
         public async Task<ApiKeyInfo> GetApiKeyInfoAsync(string apiKey)
         {
-            _logger.LogInformation("Getting API key info for key {ApiKey}", apiKey);
+            _logger.LogInformation("Getting API key info for key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
 
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
             if (apiKeyEntity == null)
@@ -705,9 +706,9 @@ namespace FeeNominalService.Services
                 data = $"{timestamp}|{nonce}|{merchantId}|{apiKey}";
             }
             _logger.LogInformation("=== SIGNATURE GENERATION DEBUG ===");
-            _logger.LogInformation("Data string being hashed: '{Data}'", data);
+            _logger.LogInformation("Data string being hashed: '{Data}'", LogSanitizer.SanitizeString(data));
             _logger.LogInformation("Data components: Timestamp='{Timestamp}', Nonce='{Nonce}', MerchantId='{MerchantId}', ApiKey='{ApiKey}'", 
-                timestamp, nonce, merchantId, apiKey);
+                LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeString(apiKey));
             _logger.LogInformation("Secret length: {SecretLength}", secret?.Length ?? 0);
             
             if (string.IsNullOrEmpty(secret))
@@ -720,7 +721,7 @@ namespace FeeNominalService.Services
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
             var signature = Convert.ToBase64String(hash);
             
-            _logger.LogInformation("Generated signature: {Signature}", signature);
+            _logger.LogInformation("Generated signature: {Signature}", LogSanitizer.SanitizeString(signature));
             _logger.LogInformation("=== END SIGNATURE GENERATION DEBUG ===");
             
             return signature;
@@ -738,7 +739,7 @@ namespace FeeNominalService.Services
 
         public async Task<GenerateApiKeyResponse> GenerateApiKeyAsync(GenerateApiKeyRequest request)
         {
-            _logger.LogInformation("Generating new API key for merchant {MerchantId}", request.MerchantId);
+            _logger.LogInformation("Generating new API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
 
             // For admin API keys, skip merchant validation
             if (request.IsAdmin)
@@ -783,7 +784,7 @@ namespace FeeNominalService.Services
                 };
                 await _secretsManager.StoreSecretAsync(adminSecretName, JsonSerializer.Serialize(secretValue));
 
-                _logger.LogInformation("Generated admin API key {ApiKeyId}", apiKey.Id);
+                _logger.LogInformation("Generated admin API key {ApiKeyId}", LogSanitizer.SanitizeGuid(apiKey.Id));
 
                 return new GenerateApiKeyResponse
                 {
@@ -887,7 +888,7 @@ namespace FeeNominalService.Services
 
             if (newApiKey.IsAdmin)
             {
-                _logger.LogWarning("Admin/superuser API key generated for merchant {MerchantId} by {AdminUserId}", request.MerchantId, request.OnboardingMetadata?.AdminUserId ?? "admin");
+                _logger.LogWarning("Admin/superuser API key generated for merchant {MerchantId} by {AdminUserId}", LogSanitizer.SanitizeGuid(request.MerchantId), LogSanitizer.SanitizeString(request.OnboardingMetadata?.AdminUserId ?? "admin"));
             }
 
             if (!request.IsAdmin && newApiKey.AllowedEndpoints != null && newApiKey.AllowedEndpoints.Any())
@@ -919,7 +920,7 @@ namespace FeeNominalService.Services
             };
             await _secretsManager.StoreSecretAsync(merchantSecretName, JsonSerializer.Serialize(newSecretValue));
 
-            _logger.LogInformation("Generated new API key {ApiKeyId} for merchant {MerchantId}", newApiKey.Id, merchant.MerchantId);
+            _logger.LogInformation("Generated new API key {ApiKeyId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(newApiKey.Id), LogSanitizer.SanitizeGuid(merchant.MerchantId));
 
             return new GenerateApiKeyResponse
             {
@@ -942,7 +943,7 @@ namespace FeeNominalService.Services
         /// </summary>
         public async Task<ApiKeyResponse> RegenerateSecretAsync(string merchantId)
         {
-            _logger.LogInformation("Regenerating secret for merchant {MerchantId}", merchantId);
+            _logger.LogInformation("Regenerating secret for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
 
             // Get merchant
             var merchant = await _merchantRepository.GetByExternalIdAsync(merchantId);
@@ -1005,7 +1006,7 @@ namespace FeeNominalService.Services
 
             await _apiKeyRepository.CreateAsync(newApiKey);
 
-            _logger.LogInformation("Successfully regenerated secret and created new API key for merchant {MerchantId}", merchantId);
+            _logger.LogInformation("Successfully regenerated secret and created new API key for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
 
             return new ApiKeyResponse
             {
@@ -1025,7 +1026,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Generating initial API key for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Generating initial API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 var merchant = await _merchantRepository.GetByIdAsync(merchantId);
                 if (merchant == null)
@@ -1139,7 +1140,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating initial API key for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error generating initial API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }

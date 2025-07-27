@@ -63,11 +63,11 @@ namespace FeeNominalService.Controllers.V1
             {
                 return BadRequest(new { error = "Missing X-Nonce header." });
             }
-            _logger.LogInformation("Initial API key generate requested with X-Timestamp: {Timestamp}, X-Nonce: {Nonce}", timestamp.ToString(), nonce.ToString());
+            _logger.LogInformation("Initial API key generate requested with X-Timestamp: {Timestamp}, X-Nonce: {Nonce}", LogSanitizer.SanitizeString(timestamp.ToString()), LogSanitizer.SanitizeString(nonce.ToString()));
 
             try
             {
-                _logger.LogInformation("Generating initial API key for merchant {MerchantName}", request.MerchantName);
+                _logger.LogInformation("Generating initial API key for merchant {MerchantName}", LogSanitizer.SanitizeString(request.MerchantName));
 
                 // Create merchant
                 var merchant = await _merchantService.CreateMerchantAsync(request, "SYSTEM");
@@ -107,7 +107,7 @@ namespace FeeNominalService.Controllers.V1
                     OnboardingMetadata = apiKeyResponse.OnboardingMetadata
                 };
 
-                _logger.LogInformation("Successfully generated initial API key for merchant {MerchantId}", merchant.MerchantId);
+                _logger.LogInformation("Successfully generated initial API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchant.MerchantId));
                 return Ok(response);
             }
             catch (InvalidOperationException ex)
@@ -134,7 +134,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Retrieving audit trail for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Retrieving audit trail for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 var auditTrail = await _merchantService.GetMerchantAuditTrailAsync(merchantId);
                 return Ok(new ApiResponse<IEnumerable<MerchantAuditTrail>>
@@ -146,7 +146,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", merchantId);
+                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 return NotFound(new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
                     SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
@@ -154,7 +154,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving audit trail for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error retrieving audit trail for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 return StatusCode(500, new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.AUDIT_TRAIL_FAILED),
                     SurchargeErrorCodes.Onboarding.AUDIT_TRAIL_FAILED
@@ -174,7 +174,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Retrieving merchant with external ID {ExternalMerchantId}", externalMerchantId);
+                _logger.LogInformation("Retrieving merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(externalMerchantId));
 
                 var merchant = await _merchantService.GetByExternalMerchantIdAsync(externalMerchantId);
                 if (merchant == null)
@@ -194,7 +194,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", externalMerchantId);
+                _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(externalMerchantId));
                 return StatusCode(500, new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
                     SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
@@ -214,7 +214,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Retrieving merchant with external GUID {ExternalMerchantGuid}", externalMerchantGuid);
+                _logger.LogInformation("Retrieving merchant with external GUID {ExternalMerchantGuid}", LogSanitizer.SanitizeGuid(externalMerchantGuid));
 
                 var merchant = await _merchantService.GetByExternalMerchantGuidAsync(externalMerchantGuid);
                 if (merchant == null)
@@ -234,7 +234,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", externalMerchantGuid);
+                _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", LogSanitizer.SanitizeGuid(externalMerchantGuid));
                 return StatusCode(500, new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID),
                     SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND_EXTERNAL_ID
@@ -353,11 +353,11 @@ namespace FeeNominalService.Controllers.V1
                 }
 
                 // Get merchant
-                _logger.LogInformation("Retrieving merchant with ID {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Retrieving merchant with ID {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 var merchant = await _merchantService.GetMerchantAsync(request.MerchantId.Value);
                 if (merchant == null)
                 {
-                    _logger.LogWarning("Merchant not found with ID {MerchantId}", request.MerchantId);
+                    _logger.LogWarning("Merchant not found with ID {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                     return NotFound(new ApiErrorResponse(
                         SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND),
                         SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND
@@ -377,14 +377,14 @@ namespace FeeNominalService.Controllers.V1
 
                 // Log claims for debugging
                 var claims = User.Claims.Select(c => $"{c.Type}: {c.Value}");
-                _logger.LogInformation("Claims present: {Claims}", string.Join(", ", claims));
+                _logger.LogInformation("Claims present: {Claims}", LogSanitizer.SanitizeString(string.Join(", ", claims)));
 
                 // Generate API key
                 var apiKeyResponse = await _apiKeyService.GenerateApiKeyAsync(request);
 
                 // Log the response details for debugging
                 _logger.LogInformation("Generated API key response for merchant {MerchantId}: HasApiKey={HasApiKey}, HasSecret={HasSecret}, ExpiresAt={ExpiresAt}", 
-                    request.MerchantId, 
+                    LogSanitizer.SanitizeGuid(request.MerchantId), 
                     !string.IsNullOrEmpty(apiKeyResponse.ApiKey), 
                     !string.IsNullOrEmpty(apiKeyResponse.Secret),
                     apiKeyResponse.ExpiresAt);
@@ -421,7 +421,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return StatusCode(500, new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_GENERATE_FAILED),
                     SurchargeErrorCodes.Onboarding.API_KEY_GENERATE_FAILED
@@ -470,7 +470,7 @@ namespace FeeNominalService.Controllers.V1
             }
             try
             {
-                _logger.LogInformation("Updating API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Updating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
 
                 // Fetch old API key info for audit trail (before the update)
                 var oldApiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(request.ApiKey);
@@ -480,7 +480,7 @@ namespace FeeNominalService.Controllers.V1
                 var updatedApiKeyResponse = await _apiKeyService.UpdateApiKeyAsync(request, request.OnboardingMetadata);
                 if (updatedApiKeyResponse?.ApiKey == null)
                 {
-                    _logger.LogWarning("Failed to update API key for merchant {MerchantId}", request.MerchantId);
+                    _logger.LogWarning("Failed to update API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                     return BadRequest(new ApiErrorResponse(
                         SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_UPDATE_FAILED),
                         SurchargeErrorCodes.Onboarding.API_KEY_UPDATE_FAILED
@@ -500,7 +500,7 @@ namespace FeeNominalService.Controllers.V1
                     );
                 }
 
-                _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return Ok(new ApiResponse<ApiKeyInfo>
                 {
                     Success = true,
@@ -515,7 +515,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogError(ex, "Error updating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return StatusCode(500, "An error occurred while updating the API key");
             }
         }
@@ -558,7 +558,7 @@ namespace FeeNominalService.Controllers.V1
             }
             try
             {
-                _logger.LogInformation("Revoking API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Revoking API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 if (!Guid.TryParse(request.MerchantId, out Guid merchantGuid))
                 {
                     return BadRequest("Invalid merchant ID format");
@@ -585,7 +585,7 @@ namespace FeeNominalService.Controllers.V1
                     );
                 }
 
-                _logger.LogInformation("Successfully revoked API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Successfully revoked API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return Ok(new ApiResponse<ApiKeyRevokeResponse>
                 {
                     Success = true,
@@ -605,7 +605,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error revoking API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogError(ex, "Error revoking API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return StatusCode(500, "An error occurred while revoking the API key");
             }
         }
@@ -620,7 +620,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Retrieving API keys for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Retrieving API keys for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
                     return BadRequest("Invalid merchant ID format");
@@ -631,12 +631,12 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", merchantId);
+                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 return NotFound($"Merchant not found: {merchantId}");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error retrieving API keys for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 return StatusCode(500, "An error occurred while retrieving API keys");
             }
         }
@@ -650,7 +650,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Creating merchant with external ID {ExternalMerchantId}", request.ExternalMerchantId);
+                _logger.LogInformation("Creating merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(request.ExternalMerchantId));
 
                 var createdMerchant = await _merchantService.CreateMerchantAsync(request, "SYSTEM");
                 return CreatedAtAction(
@@ -665,7 +665,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "Invalid operation while creating merchant with external ID {ExternalMerchantId}", request.ExternalMerchantId);
+                _logger.LogWarning(ex, "Invalid operation while creating merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(request.ExternalMerchantId));
                 return BadRequest(new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED),
                     SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED
@@ -673,7 +673,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating merchant with external ID {ExternalMerchantId}", request.ExternalMerchantId);
+                _logger.LogError(ex, "Error creating merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(request.ExternalMerchantId));
                 return StatusCode(500, new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED),
                     SurchargeErrorCodes.Onboarding.MERCHANT_CREATE_FAILED
@@ -697,7 +697,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant {MerchantId}", id);
+                _logger.LogError(ex, "Error retrieving merchant {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 return StatusCode(500, "An error occurred while retrieving the merchant");
             }
         }
@@ -713,12 +713,12 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant or status not found for ID {MerchantId}", id);
+                _logger.LogWarning(ex, "Merchant or status not found for ID {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 return NotFound(ex.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating merchant status for {MerchantId}", id);
+                _logger.LogError(ex, "Error updating merchant status for {MerchantId}", LogSanitizer.SanitizeGuid(id));
                 return StatusCode(500, "An error occurred while updating the merchant status");
             }
         }
@@ -751,7 +751,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error generating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 return StatusCode(500, new { message = "Failed to generate API key", success = false });
             }
         }
@@ -764,7 +764,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Updating merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Updating merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 // Parse onboarding metadata from header
                 var onboardingMetadata = ParseOnboardingMetadata(Request.Headers["X-Onboarding-Metadata"].ToString());
@@ -786,7 +786,7 @@ namespace FeeNominalService.Controllers.V1
                     onboardingMetadata?.AdminUserId ?? "SYSTEM"
                 );
 
-                _logger.LogInformation("Successfully updated merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Successfully updated merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 return Ok(new MerchantResponse
                 {
@@ -802,12 +802,12 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant {MerchantId} not found", merchantId);
+                _logger.LogWarning(ex, "Merchant {MerchantId} not found", LogSanitizer.SanitizeGuid(merchantId));
                 return NotFound(new { error = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error updating merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 return StatusCode(500, new { error = "An error occurred while updating the merchant" });
             }
         }
@@ -853,12 +853,12 @@ namespace FeeNominalService.Controllers.V1
             }
             try
             {
-                _logger.LogInformation("Rotating API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Rotating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
 
                 // Validate the API key exists and belongs to the merchant
                 if (apiKeyInfo == null)
                 {
-                    _logger.LogWarning("API key {ApiKey} not found", request.ApiKey);
+                    _logger.LogWarning("API key {ApiKey} not found", LogSanitizer.SanitizeString(request.ApiKey));
                     return NotFound(new ApiErrorResponse(
                         SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_NOT_FOUND),
                         SurchargeErrorCodes.Onboarding.API_KEY_NOT_FOUND
@@ -868,7 +868,7 @@ namespace FeeNominalService.Controllers.V1
                 // Prevent rotation of revoked key (controller-level check)
                 if (apiKeyInfo.Status == "REVOKED" || apiKeyInfo.IsRevoked)
                 {
-                    _logger.LogWarning("Attempted to rotate a revoked API key: {ApiKey}", request.ApiKey);
+                    _logger.LogWarning("Attempted to rotate a revoked API key: {ApiKey}", LogSanitizer.SanitizeString(request.ApiKey));
                     return BadRequest(new ApiErrorResponse(
                         "Cannot rotate a revoked API key.",
                         SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
@@ -879,7 +879,7 @@ namespace FeeNominalService.Controllers.V1
                 var rotatedApiKeyResponse = await _apiKeyService.RotateApiKeyAsync(request.MerchantId, request.OnboardingMetadata, request.ApiKey);
                 if (rotatedApiKeyResponse == null)
                 {
-                    _logger.LogWarning("Failed to rotate API key for merchant {MerchantId}", request.MerchantId);
+                    _logger.LogWarning("Failed to rotate API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                     return BadRequest(new ApiErrorResponse(
                         SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED),
                         SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
@@ -902,7 +902,7 @@ namespace FeeNominalService.Controllers.V1
                     );
                 }
 
-                _logger.LogInformation("Successfully rotated API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogInformation("Successfully rotated API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return Ok(new ApiResponse<GenerateApiKeyResponse>
                 {
                     Message = "API key rotated successfully",
@@ -912,7 +912,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", request.MerchantId);
+                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return NotFound(new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND),
                     SurchargeErrorCodes.Onboarding.MERCHANT_NOT_FOUND
@@ -920,7 +920,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "Invalid operation during API key rotation for merchant {MerchantId}", request.MerchantId);
+                _logger.LogWarning(ex, "Invalid operation during API key rotation for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return BadRequest(new ApiErrorResponse(
                     ex.Message,
                     SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED
@@ -928,7 +928,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error rotating API key for merchant {MerchantId}", request.MerchantId);
+                _logger.LogError(ex, "Error rotating API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
                 return StatusCode(500, new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED),
                     SurchargeErrorCodes.Onboarding.API_KEY_ROTATE_FAILED

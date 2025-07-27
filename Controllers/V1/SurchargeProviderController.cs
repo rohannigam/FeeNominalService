@@ -55,11 +55,30 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                // Log the request with masked sensitive data
-                var maskedRequest = SensitiveDataMasker.MaskSensitiveData(request);
+                // Log the request with masked sensitive data (excluding CredentialsSchema)
+                var requestForLogging = new {
+                    request.Name,
+                    request.Code,
+                    request.Description,
+                    request.BaseUrl,
+                    request.AuthenticationType,
+                    // request.CredentialsSchema, // Excluded for security - contains sensitive credential information
+                    Configuration = request.Configuration != null ? new {
+                        request.Configuration.ConfigName,
+                        request.Configuration.IsPrimary,
+                        request.Configuration.Timeout,
+                        request.Configuration.RetryCount,
+                        request.Configuration.RetryDelay,
+                        request.Configuration.RateLimit,
+                        request.Configuration.RateLimitPeriod,
+                        // request.Configuration.Credentials, // Excluded for security - contains sensitive credential information
+                        request.Configuration.Metadata
+                    } : null
+                };
+                var maskedRequest = SensitiveDataMasker.MaskSensitiveData(requestForLogging);
                 
                 _logger.LogInformation("Creating surcharge provider for merchant: {MerchantId}. Request:\n{MaskedRequest}", 
-                    merchantId, maskedRequest);
+                    LogSanitizer.SanitizeMerchantId(merchantId), maskedRequest);
 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -71,7 +90,7 @@ namespace FeeNominalService.Controllers.V1
                 if (authenticatedMerchantId != merchantId)
                 {
                     _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", 
-                        merchantId, authenticatedMerchantId);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeMerchantId(authenticatedMerchantId));
                     return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                 }
 
@@ -139,7 +158,7 @@ namespace FeeNominalService.Controllers.V1
                     result = await _surchargeProviderService.CreateAsync(provider);
                 }
 
-                // Audit log: provider creation
+                // Audit log: provider creation (excluding sensitive credentials schema)
                 var auditProvider = new {
                     result.Id,
                     result.Name,
@@ -147,7 +166,7 @@ namespace FeeNominalService.Controllers.V1
                     result.Description,
                     result.BaseUrl,
                     result.AuthenticationType,
-                    result.CredentialsSchema,
+                    // result.CredentialsSchema, // Excluded for security - contains sensitive credential information
                     result.StatusId,
                     result.CreatedBy,
                     result.UpdatedBy,
@@ -161,19 +180,20 @@ namespace FeeNominalService.Controllers.V1
                     userId: merchantId,
                     fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
                     {
-                        { "FullObject", (null, JsonSerializer.Serialize(auditProvider)) }
+                        { "FullObject", (null, JsonSerializer.Serialize(auditProvider)) },
+                        { "CredentialsSchema", (null, "[REDACTED - Contains sensitive credential information]") }
                     }
                 );
 
                 // Log successful creation
                 _logger.LogInformation("Successfully created surcharge provider: {ProviderId} ({ProviderName}) for merchant: {MerchantId}", 
-                    result.Id, result.Name, merchantId);
+                    LogSanitizer.SanitizeGuid(result.Id), LogSanitizer.SanitizeString(result.Name), LogSanitizer.SanitizeMerchantId(merchantId));
 
                 return Ok(result.ToResponse());
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "Invalid operation while creating provider for merchant {MerchantId}", merchantId);
+                _logger.LogWarning(ex, "Invalid operation while creating provider for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 
                 if (ex.Message.Contains("maximum number of providers"))
                 {
@@ -208,7 +228,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Key not found while creating provider for merchant {MerchantId}", merchantId);
+                _logger.LogWarning(ex, "Key not found while creating provider for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return BadRequest(new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Provider.PROVIDER_NOT_FOUND),
                     SurchargeErrorCodes.Provider.PROVIDER_NOT_FOUND,
@@ -217,7 +237,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (ArgumentException ex)
             {
-                _logger.LogWarning(ex, "Invalid argument while creating provider for merchant {MerchantId}", merchantId);
+                _logger.LogWarning(ex, "Invalid argument while creating provider for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return BadRequest(new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Validation.INVALID_DATA),
                     SurchargeErrorCodes.Validation.INVALID_DATA,
@@ -226,7 +246,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (JsonException ex)
             {
-                _logger.LogWarning(ex, "JSON parsing error while creating provider for merchant {MerchantId}", merchantId);
+                _logger.LogWarning(ex, "JSON parsing error while creating provider for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return BadRequest(new ApiErrorResponse(
                     SurchargeErrorCodes.GetErrorMessage(SurchargeErrorCodes.Validation.INVALID_DATA),
                     SurchargeErrorCodes.Validation.INVALID_DATA,
@@ -235,7 +255,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error creating surcharge provider for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Unexpected error creating surcharge provider for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }
@@ -299,7 +319,7 @@ namespace FeeNominalService.Controllers.V1
                     }
                     if (authenticatedMerchantId != merchantId)
                     {
-                        _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", merchantId, authenticatedMerchantId);
+                        _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeMerchantId(authenticatedMerchantId));
                         return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                     }
                 }
@@ -308,7 +328,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting all providers for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting all providers for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }
@@ -336,7 +356,7 @@ namespace FeeNominalService.Controllers.V1
                     }
                     if (authenticatedMerchantId != merchantId)
                     {
-                        _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", merchantId, authenticatedMerchantId);
+                        _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeMerchantId(authenticatedMerchantId));
                         return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                     }
                 }
@@ -349,7 +369,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by ID {ProviderId} for merchant {MerchantId}", id, merchantId);
+                _logger.LogError(ex, "Error getting provider by ID {ProviderId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }
@@ -366,10 +386,19 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                // Log the request with masked sensitive data
-                var maskedRequest = SensitiveDataMasker.MaskSensitiveData(request);
+                // Log the request with masked sensitive data (excluding CredentialsSchema)
+                var requestForLogging = new {
+                    request.Name,
+                    request.Code,
+                    request.Description,
+                    request.BaseUrl,
+                    request.AuthenticationType,
+                    // request.CredentialsSchema, // Excluded for security - contains sensitive credential information
+                    request.StatusCode
+                };
+                var maskedRequest = SensitiveDataMasker.MaskSensitiveData(requestForLogging);
                 _logger.LogInformation("Updating surcharge provider: {ProviderId} for merchant: {MerchantId}. Request:\n{MaskedRequest}", 
-                    id, merchantId, maskedRequest);
+                    LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId), maskedRequest);
 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -396,7 +425,7 @@ namespace FeeNominalService.Controllers.V1
                 if (existingProvider.CreatedBy != merchantId)
                 {
                     _logger.LogWarning("Unauthorized update attempt: Merchant {MerchantId} tried to update provider {ProviderId} created by {ProviderCreator}", 
-                        merchantId, id, existingProvider.CreatedBy);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(existingProvider.CreatedBy));
                     return StatusCode(403, ApiErrorResponse.UnauthorizedAccess());
                 }
 
@@ -468,7 +497,7 @@ namespace FeeNominalService.Controllers.V1
                     existingProvider.Description,
                     existingProvider.BaseUrl,
                     existingProvider.AuthenticationType,
-                    existingProvider.CredentialsSchema,
+                    // existingProvider.CredentialsSchema, // Excluded for security - contains sensitive credential information
                     existingProvider.StatusId,
                     existingProvider.CreatedBy,
                     existingProvider.UpdatedBy,
@@ -482,7 +511,7 @@ namespace FeeNominalService.Controllers.V1
                     result.Description,
                     result.BaseUrl,
                     result.AuthenticationType,
-                    result.CredentialsSchema,
+                    // result.CredentialsSchema, // Excluded for security - contains sensitive credential information
                     result.StatusId,
                     result.CreatedBy,
                     result.UpdatedBy,
@@ -496,7 +525,8 @@ namespace FeeNominalService.Controllers.V1
                     userId: merchantId,
                     fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
                     {
-                        { "FullObject", (JsonSerializer.Serialize(oldProviderAudit), JsonSerializer.Serialize(updatedProviderAudit)) }
+                        { "FullObject", (JsonSerializer.Serialize(oldProviderAudit), JsonSerializer.Serialize(updatedProviderAudit)) },
+                        { "CredentialsSchema", ("[REDACTED - Contains sensitive credential information]", "[REDACTED - Contains sensitive credential information]") }
                     }
                 );
 
@@ -583,19 +613,19 @@ namespace FeeNominalService.Controllers.V1
 
                 // Log successful update
                 _logger.LogInformation("Successfully updated surcharge provider: {ProviderId} ({ProviderName}) for merchant: {MerchantId}", 
-                    result.Id, result.Name, merchantId);
+                    LogSanitizer.SanitizeGuid(result.Id), LogSanitizer.SanitizeString(result.Name), LogSanitizer.SanitizeMerchantId(merchantId));
 
                 // Return both the updated provider and updated/new config (if any)
                 return Ok(new { Provider = result.ToResponse(), Config = updatedOrNewConfig });
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Provider not found while updating: {ProviderId} for merchant {MerchantId}", id, merchantId);
+                _logger.LogWarning(ex, "Provider not found while updating: {ProviderId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
                 return NotFound(ApiErrorResponse.ProviderNotFound(id.ToString()));
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "Invalid operation while updating provider {ProviderId} for merchant {MerchantId}", id, merchantId);
+                _logger.LogWarning(ex, "Invalid operation while updating provider {ProviderId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
                 if (ex.Message.Contains("already exists"))
                 {
                     return BadRequest(ApiErrorResponse.ProviderCodeExists(request.Code));
@@ -612,7 +642,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating surcharge provider: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                _logger.LogError(ex, "Error updating surcharge provider: {ProviderId} for merchant: {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }
@@ -628,7 +658,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Soft deleting surcharge provider: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                _logger.LogInformation("Soft deleting surcharge provider: {ProviderId} for merchant: {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -655,7 +685,7 @@ namespace FeeNominalService.Controllers.V1
                 if (existingProvider.CreatedBy != merchantId)
                 {
                     _logger.LogWarning("Unauthorized delete attempt: Merchant {MerchantId} tried to delete provider {ProviderId} created by {ProviderCreator}", 
-                        merchantId, id, existingProvider.CreatedBy);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(existingProvider.CreatedBy));
                     return StatusCode(403, ApiErrorResponse.UnauthorizedAccess());
                 }
 
@@ -675,7 +705,7 @@ namespace FeeNominalService.Controllers.V1
                     return NotFound(ApiErrorResponse.ProviderNotFound(id.ToString()));
                 }
 
-                // Audit log: provider deletion
+                // Audit log: provider deletion (excluding sensitive credentials schema)
                 var deletedProviderAudit = new {
                     existingProvider.Id,
                     existingProvider.Name,
@@ -683,7 +713,7 @@ namespace FeeNominalService.Controllers.V1
                     existingProvider.Description,
                     existingProvider.BaseUrl,
                     existingProvider.AuthenticationType,
-                    existingProvider.CredentialsSchema,
+                    // existingProvider.CredentialsSchema, // Excluded for security - contains sensitive credential information
                     existingProvider.StatusId,
                     existingProvider.CreatedBy,
                     existingProvider.UpdatedBy,
@@ -697,7 +727,8 @@ namespace FeeNominalService.Controllers.V1
                     userId: merchantId,
                     fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
                     {
-                        { "FullObject", (JsonSerializer.Serialize(deletedProviderAudit), null) }
+                        { "FullObject", (JsonSerializer.Serialize(deletedProviderAudit), null) },
+                        { "CredentialsSchema", ("[REDACTED - Contains sensitive credential information]", null) }
                     }
                 );
 
@@ -724,7 +755,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error soft deleting surcharge provider: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                _logger.LogError(ex, "Error soft deleting surcharge provider: {ProviderId} for merchant: {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }
@@ -740,7 +771,7 @@ namespace FeeNominalService.Controllers.V1
         {
             try
             {
-                _logger.LogInformation("Restoring surcharge provider: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                _logger.LogInformation("Restoring surcharge provider: {ProviderId} for merchant: {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
 
                 // Validate merchant ID from URL matches authenticated merchant
                 var authenticatedMerchantId = User.FindFirst("MerchantId")?.Value;
@@ -767,7 +798,7 @@ namespace FeeNominalService.Controllers.V1
                 if (existingProvider.CreatedBy != merchantId)
                 {
                     _logger.LogWarning("Unauthorized restore attempt: Merchant {MerchantId} tried to restore provider {ProviderId} created by {ProviderCreator}", 
-                        merchantId, id, existingProvider.CreatedBy);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(existingProvider.CreatedBy));
                     return StatusCode(403, ApiErrorResponse.UnauthorizedAccess());
                 }
 
@@ -800,7 +831,7 @@ namespace FeeNominalService.Controllers.V1
                     existingProvider.Description,
                     existingProvider.BaseUrl,
                     existingProvider.AuthenticationType,
-                    existingProvider.CredentialsSchema,
+                    // existingProvider.CredentialsSchema, // Excluded for security - contains sensitive credential information
                     existingProvider.StatusId,
                     existingProvider.CreatedBy,
                     existingProvider.UpdatedBy,
@@ -814,7 +845,7 @@ namespace FeeNominalService.Controllers.V1
                     restoredProviderResult.Description,
                     restoredProviderResult.BaseUrl,
                     restoredProviderResult.AuthenticationType,
-                    restoredProviderResult.CredentialsSchema,
+                    // restoredProviderResult.CredentialsSchema, // Excluded for security - contains sensitive credential information
                     restoredProviderResult.StatusId,
                     restoredProviderResult.CreatedBy,
                     restoredProviderResult.UpdatedBy,
@@ -828,14 +859,15 @@ namespace FeeNominalService.Controllers.V1
                     userId: merchantId,
                     fieldChanges: new Dictionary<string, (string? OldValue, string? NewValue)>
                     {
-                        { "FullObject", (JsonSerializer.Serialize(restoredProviderAuditOld), JsonSerializer.Serialize(restoredProviderAuditNew)) }
+                        { "FullObject", (JsonSerializer.Serialize(restoredProviderAuditOld), JsonSerializer.Serialize(restoredProviderAuditNew)) },
+                        { "CredentialsSchema", ("[REDACTED - Contains sensitive credential information]", "[REDACTED - Contains sensitive credential information]") }
                     }
                 );
                 return Ok(restoredProviderResult.ToResponse());
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error restoring surcharge provider: {ProviderId} for merchant: {MerchantId}", id, merchantId);
+                _logger.LogError(ex, "Error restoring surcharge provider: {ProviderId} for merchant: {MerchantId}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeMerchantId(merchantId));
                 return StatusCode(500, ApiErrorResponse.InternalServerError());
             }
         }

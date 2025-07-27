@@ -8,6 +8,7 @@ using FeeNominalService.Models;
 using FeeNominalService.Data;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -68,13 +69,13 @@ namespace FeeNominalService.Services
 
                 _logger.LogInformation(
                     "Audit log created for {EntityType} {EntityId}, Action: {Action}, UserId: {UserId}",
-                    entityType, entityId, action, userId);
+                    LogSanitizer.SanitizeString(entityType), LogSanitizer.SanitizeGuid(entityId), LogSanitizer.SanitizeString(action), LogSanitizer.SanitizeString(userId));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
                     "Error creating audit log for {EntityType} {EntityId}, Action: {Action}",
-                    entityType, entityId, action);
+                    LogSanitizer.SanitizeString(entityType), LogSanitizer.SanitizeGuid(entityId), LogSanitizer.SanitizeString(action));
                 // Swallow exception to avoid impacting main workflow
             }
         }

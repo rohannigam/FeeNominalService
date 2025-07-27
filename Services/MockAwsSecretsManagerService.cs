@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using FeeNominalService.Models.ApiKey;
 using FeeNominalService.Services.AWS;
 using System.Text.Json;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -31,7 +32,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving secret {SecretName}", secretName);
+                _logger.LogError(ex, "Error retrieving secret {SecretName}", LogSanitizer.SanitizeString(secretName));
                 return Task.FromResult<string?>(null);
             }
         }
@@ -48,7 +49,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving secret {SecretName}", secretName);
+                _logger.LogError(ex, "Error retrieving secret {SecretName}", LogSanitizer.SanitizeString(secretName));
                 return Task.FromResult<T?>(null);
             }
         }
@@ -62,7 +63,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error storing secret {SecretName}", secretName);
+                _logger.LogError(ex, "Error storing secret {SecretName}", LogSanitizer.SanitizeString(secretName));
                 throw;
             }
         }
@@ -76,7 +77,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating secret {SecretName}", secretName);
+                _logger.LogError(ex, "Error creating secret {SecretName}", LogSanitizer.SanitizeString(secretName));
                 throw;
             }
         }
@@ -90,7 +91,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating secret {SecretName}", secretName);
+                _logger.LogError(ex, "Error updating secret {SecretName}", LogSanitizer.SanitizeString(secretName));
                 throw;
             }
         }
@@ -133,7 +134,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating API key for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error validating API key for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 return Task.FromResult(false);
             }
         }
@@ -158,7 +159,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error revoking API key for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error revoking API key for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
