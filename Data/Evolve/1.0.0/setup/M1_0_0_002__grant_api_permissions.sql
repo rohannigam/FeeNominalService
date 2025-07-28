@@ -1,7 +1,8 @@
 -- M1_0_0_002__grant_api_permissions.sql
 -- Create API user and grant API permissions
 -- This script creates svc_feenominal_api user and grants runtime access
--- FULLY IDEMPOTENT: Can be run multiple times safely
+-- REQUIRES: api_password parameter to be set from secrets manager
+-- USAGE: SET api_password = 'your_secure_password'; \i M1_0_0_002__grant_api_permissions.sql
 
 -- =============================================================================
 -- CONFIGURATION
@@ -21,8 +22,19 @@ END$$;
 DO $$
 DECLARE
     api_username TEXT := current_setting('app.api_username');
-    api_password TEXT := 'api_default_password';
+    api_password TEXT; --e.g. 'api_default_password'. Please set it from your secrets manager before running this script.
 BEGIN
+    -- Get password from parameter - fail if not set or empty
+    BEGIN
+        api_password := current_setting('api_password');
+        IF api_password IS NULL OR api_password = '' THEN
+            RAISE EXCEPTION 'SECURITY ERROR: api_password parameter is not set or empty! Please set it from your secrets manager before running this script.';
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE EXCEPTION 'SECURITY ERROR: api_password parameter is not set! Please set it from your secrets manager before running this script. Usage: SET api_password = ''your_secure_password'';';
+    END;
+    
+    -- Check if user exists and create/update with provided password
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_username) THEN
         EXECUTE format('CREATE USER %I WITH PASSWORD %L', api_username, api_password);
         RAISE NOTICE 'Created API user: %', api_username;

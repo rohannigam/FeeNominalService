@@ -1,7 +1,8 @@
 -- M1_0_0_001__grant_deploy_permissions.sql
 -- Create deployment user and grant deployment permissions
 -- This script creates svc_feenominal_deploy user and grants migration capabilities
--- FULLY IDEMPOTENT: Can be run multiple times safely
+-- REQUIRES: deploy_password parameter to be set from secrets manager
+-- USAGE: SET deploy_password = 'your_secure_password'; \i M1_0_0_001__grant_deploy_permissions.sql
 
 -- =============================================================================
 -- CONFIGURATION
@@ -21,8 +22,19 @@ END$$;
 DO $$
 DECLARE
     deploy_username TEXT := current_setting('app.deploy_username');
-    deploy_password TEXT := 'deploy_default_password';
+    deploy_password TEXT; --e.g. 'deploy_default_password'. Please set it from your secrets manager before running this script.
 BEGIN
+    -- Get password from parameter - fail if not set or empty
+    BEGIN
+        deploy_password := current_setting('deploy_password');
+        IF deploy_password IS NULL OR deploy_password = '' THEN
+            RAISE EXCEPTION 'SECURITY ERROR: deploy_password parameter is not set or empty! Please set it from your secrets manager before running this script.';
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE EXCEPTION 'SECURITY ERROR: deploy_password parameter is not set! Please set it from your secrets manager before running this script. Usage: SET deploy_password = ''your_secure_password'';';
+    END;
+    
+    -- Check if user exists and create/update with provided password
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = deploy_username) THEN
         EXECUTE format('CREATE USER %I WITH PASSWORD %L', deploy_username, deploy_password);
         RAISE NOTICE 'Created deployment user: %', deploy_username;
