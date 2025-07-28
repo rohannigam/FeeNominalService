@@ -164,7 +164,7 @@ namespace FeeNominalService.Services
             }
             else
             {
-                _logger.LogInformation("Using admin secret for signature calculation: {MaskedSecret}", LogSanitizer.SanitizeString(secret.Secret));
+                _logger.LogInformation("Using admin secret for signature calculation: {MaskedSecret}", "[MASKED_SECRET]");
             }
 
             // For admin keys, use empty string as merchant ID in signature
@@ -202,7 +202,7 @@ namespace FeeNominalService.Services
             }
             else
             {
-                _logger.LogDebug("Using secret for signature calculation: {MaskedSecret}", LogSanitizer.SanitizeString(secret.Secret));
+                _logger.LogDebug("Using secret for signature calculation: {MaskedSecret}", "[MASKED_SECRET]");
             }
 
             // Validate signature
@@ -1116,7 +1116,7 @@ namespace FeeNominalService.Services
                 }
                 else
                 {
-                    _logger.LogDebug("Initial API key generated with secret: {MaskedSecret}", secret);
+                    _logger.LogDebug("Initial API key generated with secret: {MaskedSecret}", "[MASKED_SECRET]");
                 }
 
                 return new GenerateInitialApiKeyResponse

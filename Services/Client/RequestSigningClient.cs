@@ -1,7 +1,12 @@
-using System.Security.Cryptography;
+using System;
+using System.Net.Http;
 using System.Text;
-using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using FeeNominalService.Models.ApiKey;
 using FeeNominalService.Models.Client;
+using FeeNominalService.Services.AWS;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services.Client
 {
@@ -14,10 +19,12 @@ namespace FeeNominalService.Services.Client
     public class RequestSigningClient : IRequestSigningClient
     {
         private readonly ILogger<RequestSigningClient> _logger;
+        private readonly IAwsSecretsManagerService _secretsManager;
 
-        public RequestSigningClient(ILogger<RequestSigningClient> logger)
+        public RequestSigningClient(ILogger<RequestSigningClient> logger, IAwsSecretsManagerService secretsManager)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logger = logger;
+            _secretsManager = secretsManager;
         }
 
         public async Task<SignedRequestModel> SignRequestAsync<T>(string merchantId, string secretKey, T requestBody)
@@ -31,7 +38,7 @@ namespace FeeNominalService.Services.Client
                 var nonce = GenerateNonce();
 
                 // Serialize request body
-                var requestBodyJson = JsonSerializer.Serialize(requestBody);
+                var requestBodyJson = System.Text.Json.JsonSerializer.Serialize(requestBody);
 
                 // Create the string to sign
                 var stringToSign = $"{timestamp}:{nonce}:{requestBodyJson}";
@@ -50,7 +57,7 @@ namespace FeeNominalService.Services.Client
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error signing request for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error signing request for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
@@ -83,14 +90,14 @@ namespace FeeNominalService.Services.Client
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating signed request for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error creating signed request for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
 
         private string GenerateNonce()
         {
-            using var rng = RandomNumberGenerator.Create();
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
             var nonceBytes = new byte[16];
             rng.GetBytes(nonceBytes);
             return Convert.ToBase64String(nonceBytes);
@@ -98,7 +105,7 @@ namespace FeeNominalService.Services.Client
 
         private string GenerateSignature(string secretKey, string stringToSign)
         {
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretKey));
+            using var hmac = new System.Security.Cryptography.HMACSHA256(Encoding.UTF8.GetBytes(secretKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign));
             return Convert.ToBase64String(hash);
         }

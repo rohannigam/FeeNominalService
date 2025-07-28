@@ -1,0 +1,2 @@
+Implement a dynamic, database-level toggle for audit logging triggers using a config table checked by the trigger function, allowing runtime enable/disable of audit logging without dropping triggers. 
+Add thoughtful audit logging for surcharge-related and API key operations. 

@@ -11,6 +11,7 @@ using FeeNominalService.Models.Merchant;
 using FeeNominalService.Repositories;
 using FeeNominalService.Services.AWS;
 using System.Collections.Concurrent;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -166,18 +167,18 @@ namespace FeeNominalService.Services
                 var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
                 if (apiKeyEntity == null || apiKeyEntity.Status != "ACTIVE")
                 {
-                    _logger.LogWarning("Invalid or inactive API key: {ApiKey}", apiKey);
+                    _logger.LogWarning("Invalid or inactive API key: {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                     return false;
                 }
-                _logger.LogDebug("Found valid API key: {ApiKey}", apiKey);
+                _logger.LogDebug("Found valid API key: {ApiKey}", LogSanitizer.SanitizeString(apiKey));
 
                 // 3. Get secret from AWS Secrets Manager
                 var secretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, apiKey);
-                _logger.LogDebug("Retrieving secret from AWS: {SecretName}", secretName);
+                _logger.LogDebug("Retrieving secret from AWS: {SecretName}", LogSanitizer.SanitizeString(secretName));
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null || secretData.IsRevoked)
                 {
-                    _logger.LogWarning("Secret not found or revoked for API key: {ApiKey}", apiKey);
+                    _logger.LogWarning("Secret not found or revoked for API key: {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                     return false;
                 }
                 _logger.LogDebug("Successfully retrieved secret from AWS");
@@ -222,13 +223,13 @@ namespace FeeNominalService.Services
                     "Received signature: {ReceivedSignature}\n" +
                     "Expected signature: {ExpectedSignature}\n" +
                     "Match: {IsMatch}",
-                    merchant.MerchantId,
-                    apiKey,
-                    timestamp,
-                    nonce,
-                    requestBody,
-                    signature,
-                    expectedSignature,
+                    LogSanitizer.SanitizeGuid(merchant.MerchantId),
+                    LogSanitizer.SanitizeString(apiKey),
+                    LogSanitizer.SanitizeString(timestamp),
+                    LogSanitizer.SanitizeString(nonce),
+                    LogSanitizer.SanitizeString(requestBody),
+                    LogSanitizer.SanitizeString(signature),
+                    LogSanitizer.SanitizeString(expectedSignature),
                     string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase));
 
                 return string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
@@ -246,15 +247,15 @@ namespace FeeNominalService.Services
             {
                 _logger.LogDebug(
                     "Starting signature generation - MerchantId: {MerchantId}, ApiKey: {ApiKey}, Timestamp: {Timestamp}, Nonce: {Nonce}",
-                    merchantId, apiKey, timestamp, nonce);
+                    LogSanitizer.SanitizeString(merchantId), LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce));
 
                 // 1. Get secret from AWS Secrets Manager
                 var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
-                _logger.LogDebug("Retrieving secret from AWS: {SecretName}", secretName);
+                _logger.LogDebug("Retrieving secret from AWS: {SecretName}", LogSanitizer.SanitizeString(secretName));
                 var secretData = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
                 if (secretData == null)
                 {
-                    _logger.LogError("Secret not found for API key: {ApiKey}", apiKey);
+                    _logger.LogError("Secret not found for API key: {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                     throw new KeyNotFoundException($"Secret not found for API key: {apiKey}");
                 }
                 _logger.LogDebug("Successfully retrieved secret from AWS");

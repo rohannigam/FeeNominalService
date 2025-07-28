@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using FeeNominalService.Models.ApiKey;
 using FeeNominalService.Data;
+using FeeNominalService.Models.ApiKey;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Repositories
 {
@@ -30,7 +32,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting API keys for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting API keys for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
@@ -46,7 +48,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting API keys for scope {Scope}", scope);
+                _logger.LogError(ex, "Error getting API keys for scope {Scope}", LogSanitizer.SanitizeString(scope));
                 throw;
             }
         }
@@ -60,7 +62,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting API key by key {Key}", key);
+                _logger.LogError(ex, "Error getting API key by key {Key}", LogSanitizer.SanitizeString(key));
                 throw;
             }
         }
@@ -87,12 +89,12 @@ namespace FeeNominalService.Repositories
             {
                 _context.ApiKeys.Add(apiKey);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Created API key {ApiKeyId} with scope {Scope}", apiKey.Id, apiKey.Scope);
+                _logger.LogInformation("Created API key {ApiKeyId} with scope {Scope}", LogSanitizer.SanitizeGuid(apiKey.Id), LogSanitizer.SanitizeString(apiKey.Scope));
                 return apiKey;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating API key with scope {Scope}", apiKey.Scope);
+                _logger.LogError(ex, "Error creating API key with scope {Scope}", LogSanitizer.SanitizeString(apiKey.Scope));
                 throw;
             }
         }
@@ -103,12 +105,12 @@ namespace FeeNominalService.Repositories
             {
                 _context.ApiKeys.Update(apiKey);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated API key {ApiKeyId} with scope {Scope}", apiKey.Id, apiKey.Scope);
+                _logger.LogInformation("Updated API key {ApiKeyId} with scope {Scope}", LogSanitizer.SanitizeGuid(apiKey.Id), LogSanitizer.SanitizeString(apiKey.Scope));
                 return apiKey;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating API key {ApiKeyId} with scope {Scope}", apiKey.Id, apiKey.Scope);
+                _logger.LogError(ex, "Error updating API key {ApiKeyId} with scope {Scope}", LogSanitizer.SanitizeGuid(apiKey.Id), LogSanitizer.SanitizeString(apiKey.Scope));
                 throw;
             }
         }

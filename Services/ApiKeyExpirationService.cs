@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using FeeNominalService.Data;
 using Microsoft.EntityFrameworkCore;
 using FeeNominalService.Models.ApiKey;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services
 {
@@ -66,16 +67,16 @@ namespace FeeNominalService.Services
                         {
                             apiKey.Status = ApiKeyStatus.Expired.ToString();
                             apiKey.UpdatedAt = DateTime.UtcNow;
-                            _logger.LogInformation("Marking API key {ApiKey} as expired", key.Key);
+                            _logger.LogInformation("Marking API key {ApiKey} as expired", LogSanitizer.SanitizeString(key.Key));
                         }
                         else
                         {
-                            _logger.LogWarning("API key {ApiKey} not found in database", key.Key);
+                            _logger.LogWarning("API key {ApiKey} not found in database", LogSanitizer.SanitizeString(key.Key));
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error updating API key {ApiKey}", key.Key);
+                        _logger.LogError(ex, "Error updating API key {ApiKey}", LogSanitizer.SanitizeString(key.Key));
                     }
                 }
 

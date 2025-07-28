@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using FeeNominalService.Models.Merchant;
-using FeeNominalService.Data;
 using Microsoft.Extensions.Logging;
-using FeeNominalService.Services;
-using System.Linq;
+using FeeNominalService.Data;
+using FeeNominalService.Models.Merchant;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Repositories
 {
@@ -54,12 +55,12 @@ namespace FeeNominalService.Repositories
 
                 _context.Merchants.Add(merchant);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Created merchant with ID {MerchantId}", merchant.MerchantId);
+                _logger.LogInformation("Created merchant with ID {MerchantId}", LogSanitizer.SanitizeGuid(merchant.MerchantId));
                 return merchant;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating merchant with external ID {ExternalMerchantId}", merchant.ExternalMerchantId);
+                _logger.LogError(ex, "Error creating merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(merchant.ExternalMerchantId));
                 throw;
             }
         }
@@ -74,7 +75,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", externalMerchantId);
+                _logger.LogError(ex, "Error retrieving merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(externalMerchantId));
                 throw;
             }
         }
@@ -89,7 +90,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", externalMerchantGuid);
+                _logger.LogError(ex, "Error retrieving merchant with external GUID {ExternalMerchantGuid}", LogSanitizer.SanitizeGuid(externalMerchantGuid));
                 throw;
             }
         }
@@ -107,12 +108,12 @@ namespace FeeNominalService.Repositories
 
                 _context.Merchants.Update(merchant);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated merchant {MerchantId}", merchant.MerchantId);
+                _logger.LogInformation("Updated merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchant.MerchantId));
                 return merchant;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating merchant {MerchantId}", merchant.MerchantId);
+                _logger.LogError(ex, "Error updating merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchant.MerchantId));
                 throw;
             }
         }
@@ -126,7 +127,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking existence of merchant with external ID {ExternalMerchantId}", externalMerchantId);
+                _logger.LogError(ex, "Error checking existence of merchant with external ID {ExternalMerchantId}", LogSanitizer.SanitizeString(externalMerchantId));
                 throw;
             }
         }
@@ -140,7 +141,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking existence of merchant with external GUID {ExternalMerchantGuid}", externalMerchantGuid);
+                _logger.LogError(ex, "Error checking existence of merchant with external GUID {ExternalMerchantGuid}", LogSanitizer.SanitizeGuid(externalMerchantGuid));
                 throw;
             }
         }
@@ -155,78 +156,63 @@ namespace FeeNominalService.Repositories
                     return false;
                 }
 
-                // Deactivate all providers and their configurations before deleting the merchant
-                await DeactivateAllProvidersForMerchantAsync(merchantId);
+                // Deactivate all provider configurations for this merchant
+                await DeactivateAllProviderConfigsForMerchantAsync(merchantId);
 
+                // Remove the merchant from the database
                 _context.Merchants.Remove(merchant);
                 await _context.SaveChangesAsync();
-                
-                _logger.LogInformation("Successfully deleted merchant {MerchantId} and deactivated all associated providers", merchantId);
+
+                _logger.LogInformation("Successfully deleted merchant {MerchantId} and deactivated all associated provider configurations", LogSanitizer.SanitizeGuid(merchantId));
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error deleting merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
                 throw;
             }
         }
 
-        private async Task DeactivateAllProvidersForMerchantAsync(Guid merchantId)
+        private async Task DeactivateAllProviderConfigsForMerchantAsync(Guid merchantId)
         {
             try
             {
-                _logger.LogInformation("Deactivating all providers and configurations for merchant {MerchantId} due to merchant deletion", merchantId);
+                _logger.LogInformation("Deactivating all provider configurations for merchant {MerchantId} due to merchant deletion", LogSanitizer.SanitizeGuid(merchantId));
 
-                // Get all providers for this merchant
-                var providers = await _context.SurchargeProviders
-                    .Include(p => p.Configurations)
-                    .Where(p => p.CreatedBy == merchantId.ToString() && p.Status.Code != "DELETED")
+                // Get all active provider configurations for this merchant
+                var configs = await _context.SurchargeProviderConfigs
+                    .Where(c => c.MerchantId == merchantId && c.IsActive)
                     .ToListAsync();
 
-                var providerCount = 0;
+                var configCount = 0;
 
-                foreach (var provider in providers)
+                foreach (var config in configs)
                 {
-                    // Get the DELETED status
-                    var deletedStatus = await _context.SurchargeProviderStatuses
-                        .FirstOrDefaultAsync(s => s.Code == "DELETED");
-
-                    if (deletedStatus == null)
+                    try
                     {
-                        _logger.LogWarning("DELETED status not found, skipping provider {ProviderId}", provider.Id);
-                        continue;
+                        // Deactivate the configuration
+                        config.IsActive = false;
+                        config.IsPrimary = false;
+                        config.UpdatedAt = DateTime.UtcNow;
+                        config.UpdatedBy = "SYSTEM";
+
+                        configCount++;
+                        _logger.LogDebug("Deactivated provider config {ConfigId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(config.Id), LogSanitizer.SanitizeGuid(merchantId));
                     }
-
-                    // Update the provider to DELETED status
-                    provider.StatusId = deletedStatus.StatusId;
-                    provider.UpdatedAt = DateTime.UtcNow;
-                    provider.UpdatedBy = "SYSTEM";
-
-                    // Deactivate all provider configurations and unset primary
-                    if (provider.Configurations != null)
+                    catch (Exception ex)
                     {
-                        foreach (var config in provider.Configurations)
-                        {
-                            config.IsActive = false;
-                            config.IsPrimary = false;
-                            config.UpdatedAt = DateTime.UtcNow;
-                            config.UpdatedBy = "SYSTEM";
-                        }
+                        _logger.LogError(ex, "Error deactivating provider config {ConfigId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(config.Id), LogSanitizer.SanitizeGuid(merchantId));
                     }
-
-                    providerCount++;
-                    _logger.LogDebug("Soft deleted provider {ProviderId} for merchant {MerchantId}", provider.Id, merchantId);
                 }
 
                 await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Successfully deactivated {ProviderCount} providers and their configurations for merchant {MerchantId}", 
-                    providerCount, merchantId);
+                _logger.LogInformation("Successfully deactivated {ConfigCount} provider configurations for merchant {MerchantId}",
+                    configCount, LogSanitizer.SanitizeGuid(merchantId));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deactivating providers for merchant {MerchantId}", merchantId);
-                // Don't throw - we don't want merchant deletion to fail if provider deactivation fails
+                _logger.LogError(ex, "Error deactivating provider configurations for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
+                throw;
             }
         }
 
@@ -247,7 +233,7 @@ namespace FeeNominalService.Repositories
         {
             try
             {
-                return await _context.MerchantStatuses.AnyAsync(s => s. MerchantStatusId == statusId);
+                return await _context.MerchantStatuses.AnyAsync(s => s.MerchantStatusId == statusId);
             }
             catch (Exception ex)
             {

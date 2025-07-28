@@ -146,11 +146,11 @@ namespace FeeNominalService.Authentication
                 var (isValidMerchantId, merchantId, merchantIdError) = HeaderValidationHelper.ValidateRequiredHeader(Request.Headers, "X-Merchant-ID");
 
                 _logger.LogInformation("=== HEADER VALIDATION DEBUG ===");
-                _logger.LogInformation("ApiKey: Valid={IsValid}, Value={ApiKey}, Error={Error}", isValidApiKey, apiKey, apiKeyError);
-                _logger.LogInformation("Timestamp: Valid={IsValid}, Value={Timestamp}, Error={Error}", isValidTimestamp, timestamp, timestampError);
-                _logger.LogInformation("Nonce: Valid={IsValid}, Value={Nonce}, Error={Error}", isValidNonce, nonce, nonceError);
-                _logger.LogInformation("Signature: Valid={IsValid}, Value={Signature}, Error={Error}", isValidSignature, signature, signatureError);
-                _logger.LogInformation("MerchantId: Valid={IsValid}, Value={MerchantId}, Error={Error}", isValidMerchantId, merchantId, merchantIdError);
+                _logger.LogInformation("ApiKey: Valid={IsValid}, Value={ApiKey}, Error={Error}", isValidApiKey, LogSanitizer.SanitizeString(apiKey), apiKeyError);
+                _logger.LogInformation("Timestamp: Valid={IsValid}, Value={Timestamp}, Error={Error}", isValidTimestamp, LogSanitizer.SanitizeString(timestamp), timestampError);
+                _logger.LogInformation("Nonce: Valid={IsValid}, Value={Nonce}, Error={Error}", isValidNonce, LogSanitizer.SanitizeString(nonce), nonceError);
+                _logger.LogInformation("Signature: Valid={IsValid}, Value={Signature}, Error={Error}", isValidSignature, LogSanitizer.SanitizeString(signature), signatureError);
+                _logger.LogInformation("MerchantId: Valid={IsValid}, Value={MerchantId}, Error={Error}", isValidMerchantId, LogSanitizer.SanitizeString(merchantId), merchantIdError);
                 _logger.LogInformation("=== END HEADER VALIDATION DEBUG ===");
 
                 if (!isValidApiKey || !isValidTimestamp || !isValidNonce || !isValidSignature)
@@ -177,7 +177,7 @@ namespace FeeNominalService.Authentication
                 var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
                 if (apiKeyEntity == null)
                 {
-                    _logger.LogWarning("API key {ApiKey} not found", apiKey);
+                    _logger.LogWarning("API key {ApiKey} not found", LogSanitizer.SanitizeString(apiKey));
                     return AuthenticateResult.Fail("API key not found");
                 }
 
@@ -249,7 +249,7 @@ namespace FeeNominalService.Authentication
 
                 _logger.LogDebug("API key validation successful for {KeyType} {Identifier}", 
                     isAdminKey ? "admin key" : "merchant", 
-                    isAdminKey ? apiKey : finalMerchantId);
+                    isAdminKey ? LogSanitizer.SanitizeString(apiKey) : LogSanitizer.SanitizeString(finalMerchantId));
 
                 // Update last_used_at timestamp
                 try 
@@ -258,20 +258,20 @@ namespace FeeNominalService.Authentication
                     {
                         apiKeyEntity.LastUsedAt = DateTime.UtcNow;
                         await _apiKeyRepository.UpdateAsync(apiKeyEntity);
-                        _logger.LogDebug("Updated last_used_at for API key {ApiKey}", apiKey);
+                        _logger.LogDebug("Updated last_used_at for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                     }
                 }
                 catch (Exception ex)
                 {
                     // Log but don't fail authentication if we can't update last_used_at
-                    _logger.LogError(ex, "Failed to update last_used_at for API key {ApiKey}", apiKey);
+                    _logger.LogError(ex, "Failed to update last_used_at for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                 }
 
                 // Get API key info to create claims
                 var apiKeyInfo = await _apiKeyService.GetApiKeyInfoAsync(apiKey);
                 if (apiKeyInfo == null)
                 {
-                    _logger.LogWarning("API key info not found for key {ApiKey}", apiKey);
+                    _logger.LogWarning("API key info not found for key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                     return AuthenticateResult.Fail("API key not found");
                 }
 
@@ -328,7 +328,7 @@ namespace FeeNominalService.Authentication
                         var totalRequestCount = await _apiKeyUsageRepository.GetTotalRequestCountAsync(apiKeyEntity.Id, windowStart, windowEnd);
                         if (totalRequestCount > apiKeyEntity.RateLimit)
                         {
-                            _logger.LogWarning("Rate limit exceeded for API key {ApiKey}. Total requests: {TotalRequests}, Rate limit: {RateLimit}", apiKey, totalRequestCount, apiKeyEntity.RateLimit);
+                            _logger.LogWarning("Rate limit exceeded for API key {ApiKey}. Total requests: {TotalRequests}, Rate limit: {RateLimit}", LogSanitizer.SanitizeString(apiKey), totalRequestCount, apiKeyEntity.RateLimit);
                             return AuthenticateResult.Fail("Rate limit exceeded");
                         }
                     }
@@ -336,7 +336,7 @@ namespace FeeNominalService.Authentication
                 catch (Exception ex)
                 {
                     // Log but don't fail authentication if we can't update usage count
-                    _logger.LogError(ex, "Failed to update usage count for API key {ApiKey}", apiKey);
+                    _logger.LogError(ex, "Failed to update usage count for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                 }
 
                 return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));
