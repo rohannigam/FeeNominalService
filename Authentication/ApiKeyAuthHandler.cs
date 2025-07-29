@@ -83,7 +83,7 @@ namespace FeeNominalService.Authentication
                     }
 
                     _logger.LogDebug("Initial generation headers - Timestamp: {Timestamp}, Nonce: {Nonce}", 
-                        initTimestamp, initNonce);
+                        LogSanitizer.SanitizeString(initTimestamp), LogSanitizer.SanitizeString(initNonce));
 
                     // Read request body
                     string initRequestBody;
@@ -94,7 +94,7 @@ namespace FeeNominalService.Authentication
                         Request.Body.Position = 0;
                     }
 
-                    _logger.LogDebug("Initial generation request body: {RequestBody}", initRequestBody);
+                    _logger.LogDebug("Initial generation request body: {RequestBody}", LogSanitizer.SanitizeString(initRequestBody));
 
                     // Validate timestamp and nonce only
                     var isValidInitTimestampAndNonce = _requestSigningService.ValidateTimestampAndNonce(
@@ -132,7 +132,8 @@ namespace FeeNominalService.Authentication
                 _logger.LogInformation("=== AUTHENTICATION HEADERS DEBUG ===");
                 foreach (var header in Request.Headers)
                 {
-                    _logger.LogInformation("Header: {HeaderName} = {HeaderValue}", header.Key, header.Value);
+                    _logger.LogInformation("Header: {HeaderName} = {HeaderValue}", 
+                        LogSanitizer.SanitizeString(header.Key), LogSanitizer.SanitizeString(header.Value));
                 }
                 _logger.LogInformation("=== END AUTHENTICATION HEADERS DEBUG ===");
 
@@ -163,7 +164,7 @@ namespace FeeNominalService.Authentication
                         signatureError
                     }.Where(e => !string.IsNullOrEmpty(e));
 
-                    _logger.LogWarning("Missing or invalid headers: {Errors}", string.Join(", ", errors));
+                    _logger.LogWarning("Missing or invalid headers: {Errors}", LogSanitizer.SanitizeString(string.Join(", ", errors)));
                     return AuthenticateResult.Fail("Missing or invalid headers");
                 }
 
@@ -207,7 +208,7 @@ namespace FeeNominalService.Authentication
                 // Validate timestamp
                 if (!DateTime.TryParse(timestamp, out var requestTime))
                 {
-                    _logger.LogWarning("Invalid timestamp format: {Timestamp}", timestamp);
+                    _logger.LogWarning("Invalid timestamp format: {Timestamp}", LogSanitizer.SanitizeString(timestamp));
                     return AuthenticateResult.Fail("Invalid timestamp format");
                 }
 
@@ -220,12 +221,12 @@ namespace FeeNominalService.Authentication
                 var timeDifference = Math.Abs((currentTime - requestTime).TotalMinutes);
 
                 _logger.LogDebug("Request timestamp: {RequestTime} UTC, Current time: {CurrentTime} UTC, Difference: {Difference} minutes",
-                    requestTime, currentTime, timeDifference);
+                    LogSanitizer.SanitizeString(requestTime.ToString("O")), LogSanitizer.SanitizeString(currentTime.ToString("O")), timeDifference);
 
                 if (timeDifference > 5) // 5 minutes tolerance
                 {
                     _logger.LogWarning("Request timestamp is too old: {RequestTime} UTC, Current time: {CurrentTime} UTC, Difference: {Difference} minutes",
-                        requestTime, currentTime, timeDifference);
+                        LogSanitizer.SanitizeString(requestTime.ToString("O")), LogSanitizer.SanitizeString(currentTime.ToString("O")), timeDifference);
                     return AuthenticateResult.Fail("Request timestamp is too old");
                 }
 
@@ -292,7 +293,7 @@ namespace FeeNominalService.Authentication
                 var principal = new ClaimsPrincipal(identity);
 
                 _logger.LogDebug("Created claims principal with claims: {Claims}", 
-                    string.Join(", ", claims.Select(c => $"{c.Type}: {c.Value}")));
+                    LogSanitizer.SanitizeString(string.Join(", ", claims.Select(c => $"{c.Type}: {c.Value}"))));
 
                 // Usage count tracking
                 try

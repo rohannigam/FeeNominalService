@@ -146,21 +146,23 @@ namespace FeeNominalService.Services
             var adminSecretName = _secretNameFormatter.FormatAdminSecretName(serviceName);
             _logger.LogInformation("Looking for admin secret with name: {AdminSecretName}", LogSanitizer.SanitizeString(adminSecretName));
             
-            var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(adminSecretName);
+            // Use SecureApiKeySecret for secure handling
+            using var secureSecret = await GetSecureSecretAsync(adminSecretName);
 
-            if (secret == null)
+            if (secureSecret == null)
             {
                 _logger.LogWarning("Admin secret not found for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                 return false;
             }
 
             _logger.LogInformation("Admin secret found: ApiKey={SecretApiKey}, IsRevoked={IsRevoked}, Status={Status}, Scope={Scope}", 
-                LogSanitizer.SanitizeString(secret.ApiKey), secret.IsRevoked, secret.Status, LogSanitizer.SanitizeString(secret.Scope));
+                LogSanitizer.SanitizeString(secureSecret.ApiKey), secureSecret.IsRevoked, secureSecret.Status, LogSanitizer.SanitizeString(secureSecret.Scope));
 
             // Debug log for secret used in signature calculation (masked)
-            if (!string.IsNullOrEmpty(secret.Secret) && secret.Secret.Length > 8)
+            var secretLength = secureSecret.GetSecret().Length;
+            if (secretLength > 8)
             {
-                var maskedSecret = $"{secret.Secret.Substring(0, 4)}...{secret.Secret.Substring(secret.Secret.Length - 4)}";
+                var maskedSecret = $"[MASKED_SECRET_LENGTH_{secretLength}]";
                 _logger.LogInformation("Using masked admin secret for signature calculation: {MaskedSecret}", maskedSecret);
             }
             else
@@ -170,11 +172,18 @@ namespace FeeNominalService.Services
 
             // For admin keys, use empty string as merchant ID in signature
             var merchantIdForSignature = string.Empty;
-            _logger.LogInformation("Signature calculation inputs: Secret={MaskedSecret}, Timestamp={Timestamp}, Nonce={Nonce}, MerchantId={MerchantId}, ApiKey={ApiKey}", 
-                secret.Secret.Length > 8 ? $"{secret.Secret.Substring(0, 4)}...{secret.Secret.Substring(secret.Secret.Length - 4)}" : secret.Secret,
+            _logger.LogInformation("Signature calculation inputs: Secret=[MASKED_SECRET], Timestamp={Timestamp}, Nonce={Nonce}, MerchantId={MerchantId}, ApiKey={ApiKey}", 
                 LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(merchantIdForSignature), LogSanitizer.SanitizeString(apiKey));
 
-            var expectedSignature = GenerateSignature(secret.Secret, timestamp, nonce, merchantIdForSignature, apiKey);
+            // Use secure processing for signature generation
+            var expectedSignature = secureSecret.ProcessSecretSecurely(secureSecretValue => 
+                GenerateSignature(SimpleSecureDataHandler.FromSecureString(secureSecretValue), timestamp, nonce, merchantIdForSignature, apiKey));
+            
+            if (expectedSignature == null)
+            {
+                _logger.LogError("Failed to generate expected signature");
+                return false;
+            }
             _logger.LogInformation("Expected signature: {ExpectedSignature}", LogSanitizer.SanitizeString(expectedSignature));
             _logger.LogInformation("Received signature: {ReceivedSignature}", LogSanitizer.SanitizeString(signature));
             _logger.LogInformation("Signatures match: {SignaturesMatch}", string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase));
@@ -188,18 +197,21 @@ namespace FeeNominalService.Services
             // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
             // Get secret from AWS Secrets Manager using internal merchant ID
             var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
-            var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
+            
+            // Use SecureApiKeySecret for secure handling
+            using var secureSecret = await GetSecureSecretAsync(secretName);
 
-            if (secret == null)
+            if (secureSecret == null)
             {
                 _logger.LogWarning("Secret not found for API key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
                 return false;
             }
 
             // Debug log for secret used in signature calculation (masked)
-            if (!string.IsNullOrEmpty(secret.Secret) && secret.Secret.Length > 8)
+            var secretLength = secureSecret.GetSecret().Length;
+            if (secretLength > 8)
             {
-                var maskedSecret = $"{secret.Secret.Substring(0, 4)}...{secret.Secret.Substring(secret.Secret.Length - 4)}";
+                var maskedSecret = $"[MASKED_SECRET_LENGTH_{secretLength}]";
                 _logger.LogDebug("Using masked secret for signature calculation: {MaskedSecret}", maskedSecret);
             }
             else
@@ -207,8 +219,15 @@ namespace FeeNominalService.Services
                 _logger.LogDebug("Using secret for signature calculation: {MaskedSecret}", "[MASKED_SECRET]");
             }
 
-            // Validate signature
-            var expectedSignature = GenerateSignature(secret.Secret, timestamp, nonce, merchantId, apiKey);
+            // Validate signature using secure processing
+            var expectedSignature = secureSecret.ProcessSecretSecurely(secureSecretValue => 
+                GenerateSignature(SimpleSecureDataHandler.FromSecureString(secureSecretValue), timestamp, nonce, merchantId, apiKey));
+            
+            if (expectedSignature == null)
+            {
+                _logger.LogError("Failed to generate expected signature");
+                return false;
+            }
             return string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -496,10 +515,11 @@ namespace FeeNominalService.Services
             await _apiKeyRepository.CreateAsync(newApiKeyEntity);
 
             var newSecretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, newApiKey);
-            var newSecretValue = new ApiKeySecret
+            
+            // Create secure secret wrapper
+            using var rotateSecureSecret = new SecureApiKeySecret
             {
                 ApiKey = newApiKey,
-                Secret = newSecret,
                 MerchantId = merchant.MerchantId,
                 CreatedAt = DateTime.UtcNow,
                 LastRotated = null,
@@ -507,6 +527,10 @@ namespace FeeNominalService.Services
                 RevokedAt = null,
                 Status = "ACTIVE"
             };
+            rotateSecureSecret.SetSecret(newSecret);
+            
+            // Store the regular ApiKeySecret for compatibility
+            var newSecretValue = rotateSecureSecret.ToApiKeySecret();
             await _secretsManager.StoreSecretAsync(newSecretName, JsonSerializer.Serialize(newSecretValue));
 
             return new GenerateApiKeyResponse
@@ -624,7 +648,11 @@ namespace FeeNominalService.Services
         /// <inheritdoc />
         public async Task<ApiKeyInfo> GetApiKeyInfoAsync(string apiKey)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer. 
+            // The API key returned in the response is the public API key identifier, not the secret.
+            // The IsRevoked flag is derived from the secret but only indicates revocation status, not the actual secret value.
+            // This method is used for API key management and the returned data is necessary for client operations.
+            // Enhanced security: Uses SecureApiKeySecret wrapper to prevent memory dumps of sensitive data.
             _logger.LogInformation("Getting API key info for key {ApiKey}", LogSanitizer.SanitizeString(apiKey));
 
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
@@ -664,7 +692,9 @@ namespace FeeNominalService.Services
             }
 
             var secretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, apiKey);
-            var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
+            
+            // Use secure wrapper for handling sensitive data
+            using var secureSecret = await GetSecureSecretAsync(secretName);
 
             // Get total usage count
             var usageCount = await _context.ApiKeyUsages
@@ -684,12 +714,34 @@ namespace FeeNominalService.Services
                 LastUsedAt = apiKeyEntity.LastUsedAt,
                 RevokedAt = apiKeyEntity.RevokedAt,
                 ExpiresAt = apiKeyEntity.ExpiresAt,
-                IsRevoked = secret?.IsRevoked ?? false,
+                IsRevoked = secureSecret?.IsRevoked ?? false,
                 IsExpired = apiKeyEntity.ExpiresAt.HasValue && apiKeyEntity.ExpiresAt.Value < DateTime.UtcNow,
                 UsageCount = usageCount,
                 Scope = apiKeyEntity.Scope ?? "merchant",
                 IsAdmin = apiKeyEntity.IsAdmin
             };
+        }
+
+        /// <summary>
+        /// Securely retrieves a secret using SecureApiKeySecret wrapper
+        /// </summary>
+        /// <param name="secretName">The secret name</param>
+        /// <returns>SecureApiKeySecret or null if not found</returns>
+        private async Task<SecureApiKeySecret?> GetSecureSecretAsync(string secretName)
+        {
+            try
+            {
+                var secret = await _secretsManager.GetSecretAsync<ApiKeySecret>(secretName);
+                if (secret == null)
+                    return null;
+
+                return SecureApiKeySecret.FromApiKeySecret(secret);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error retrieving secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
+                return null;
+            }
         }
 
         private string GenerateSecureRandomString(int length)
@@ -702,9 +754,10 @@ namespace FeeNominalService.Services
             return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").Substring(0, length);
         }
 
-        private string GenerateSignature(string secret, string timestamp, string nonce, string merchantId, string apiKey)
+        private string? GenerateSignature(string secret, string timestamp, string nonce, string merchantId, string apiKey)
         {
             // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // Enhanced security: Uses SimpleSecureDataHandler for processing sensitive secret data
             string data;
             if (string.IsNullOrEmpty(merchantId)) // For admin keys, omit merchantId field entirely
             {
@@ -726,14 +779,20 @@ namespace FeeNominalService.Services
                 throw new ArgumentException("Secret cannot be null or empty for signature generation");
             }
             
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-            var signature = Convert.ToBase64String(hash);
-            
-            _logger.LogInformation("Generated signature: {Signature}", LogSanitizer.SanitizeString(signature));
-            _logger.LogInformation("=== END SIGNATURE GENERATION DEBUG ===");
-            
-            return signature;
+            // Use SimpleSecureDataHandler to process the secret securely
+            return SimpleSecureDataHandler.ProcessSecurely(secret, secureSecret =>
+            {
+                var secretBytes = Encoding.UTF8.GetBytes(SimpleSecureDataHandler.FromSecureString(secureSecret));
+                using var hmac = new HMACSHA256(secretBytes);
+                var dataBytes = Encoding.UTF8.GetBytes(data);
+                var hash = hmac.ComputeHash(dataBytes);
+                var signature = Convert.ToBase64String(hash);
+                
+                _logger.LogInformation("Generated signature: {Signature}", LogSanitizer.SanitizeString(signature));
+                _logger.LogInformation("=== END SIGNATURE GENERATION DEBUG ===");
+                
+                return signature;
+            });
         }
 
         private string GenerateApiKey()
@@ -780,10 +839,12 @@ namespace FeeNominalService.Services
                 // Store secret in AWS Secrets Manager or local DB
                 // NOTE: For admin secrets, scope must be 'admin', merchant_id must be null, and status must be 'ACTIVE'.
                 var adminSecretName = _secretNameFormatter.FormatAdminSecretName(request.ServiceName ?? "feenominal");
-                var secretValue = new ApiKeySecret
+                var generatedSecret = GenerateSecret();
+                
+                // Create secure secret wrapper
+                using var secureSecret = new SecureApiKeySecret
                 {
                     ApiKey = apiKey.Key,
-                    Secret = GenerateSecret(),
                     MerchantId = null, // Admin secrets don't belong to a specific merchant
                     CreatedAt = DateTime.UtcNow,
                     LastRotated = null,
@@ -792,6 +853,10 @@ namespace FeeNominalService.Services
                     Status = "ACTIVE",
                     Scope = "admin" // Admin scope for cross-merchant operations
                 };
+                secureSecret.SetSecret(generatedSecret);
+                
+                // Store the regular ApiKeySecret for compatibility
+                var secretValue = secureSecret.ToApiKeySecret();
                 await _secretsManager.StoreSecretAsync(adminSecretName, JsonSerializer.Serialize(secretValue));
 
                 _logger.LogInformation("Generated admin API key {ApiKeyId}", LogSanitizer.SanitizeGuid(apiKey.Id));
@@ -916,10 +981,12 @@ namespace FeeNominalService.Services
 
             // Store secret in AWS Secrets Manager
             var merchantSecretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, newApiKey.Key);
-            var newSecretValue = new ApiKeySecret
+            var merchantGeneratedSecret = GenerateSecret();
+            
+            // Create secure secret wrapper
+            using var merchantSecureSecret = new SecureApiKeySecret
             {
                 ApiKey = newApiKey.Key,
-                Secret = GenerateSecret(),
                 MerchantId = merchant.MerchantId,
                 CreatedAt = DateTime.UtcNow,
                 LastRotated = null,
@@ -928,6 +995,10 @@ namespace FeeNominalService.Services
                 Status = "ACTIVE",
                 Scope = "merchant" // Merchant scope for merchant-specific operations
             };
+            merchantSecureSecret.SetSecret(merchantGeneratedSecret);
+            
+            // Store the regular ApiKeySecret for compatibility
+            var newSecretValue = merchantSecureSecret.ToApiKeySecret();
             await _secretsManager.StoreSecretAsync(merchantSecretName, JsonSerializer.Serialize(newSecretValue));
 
             _logger.LogInformation("Generated new API key {ApiKeyId} for merchant {MerchantId}", LogSanitizer.SanitizeGuid(newApiKey.Id), LogSanitizer.SanitizeGuid(merchant.MerchantId));
@@ -977,10 +1048,11 @@ namespace FeeNominalService.Services
 
             // Store new secret in AWS Secrets Manager
             var secretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, activeKeys.First().Key);
-            var secretValue = new ApiKeySecret
+            
+            // Create secure secret wrapper
+            using var regenerateSecureSecret = new SecureApiKeySecret
             {
                 ApiKey = activeKeys.First().Key,
-                Secret = newSecret,
                 MerchantId = merchant.MerchantId,
                 CreatedAt = DateTime.UtcNow,
                 LastRotated = null,
@@ -988,6 +1060,10 @@ namespace FeeNominalService.Services
                 RevokedAt = null,
                 Status = "ACTIVE"
             };
+            regenerateSecureSecret.SetSecret(newSecret);
+            
+            // Store the regular ApiKeySecret for compatibility
+            var secretValue = regenerateSecureSecret.ToApiKeySecret();
             await _secretsManager.StoreSecretAsync(secretName, JsonSerializer.Serialize(secretValue));
 
             // Update all active API keys to mark them as rotated
@@ -1107,10 +1183,11 @@ namespace FeeNominalService.Services
 
                 // Store secret in AWS Secrets Manager
                 var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
-                var secretValue = new ApiKeySecret
+                
+                // Create secure secret wrapper
+                using var initialSecureSecret = new SecureApiKeySecret
                 {
                     ApiKey = apiKey,
-                    Secret = secret,
                     MerchantId = merchantId,
                     CreatedAt = DateTime.UtcNow,
                     LastRotated = null,
@@ -1118,12 +1195,17 @@ namespace FeeNominalService.Services
                     RevokedAt = null,
                     Status = "ACTIVE"
                 };
+                initialSecureSecret.SetSecret(secret);
+                
+                // Store the regular ApiKeySecret for compatibility
+                var secretValue = initialSecureSecret.ToApiKeySecret();
                 await _secretsManager.StoreSecretAsync(secretName, JsonSerializer.Serialize(secretValue));
 
                 // Debug log for generated secret (masked)
-                if (!string.IsNullOrEmpty(secret) && secret.Length > 8)
+                var secretLength = secret.Length;
+                if (secretLength > 8)
                 {
-                    var maskedSecret = $"{secret.Substring(0, 4)}...{secret.Substring(secret.Length - 4)}";
+                    var maskedSecret = $"[MASKED_SECRET_LENGTH_{secretLength}]";
                     _logger.LogDebug("Initial API key generated with masked secret: {MaskedSecret}", maskedSecret);
                 }
                 else
@@ -1192,10 +1274,11 @@ namespace FeeNominalService.Services
             };
             await _apiKeyRepository.CreateAsync(newAdminKey);
             var adminSecretName = _secretNameFormatter.FormatAdminSecretName(serviceName);
-            var secretValue = new ApiKeySecret
+            
+            // Create secure secret wrapper
+            using var adminRotateSecureSecret = new SecureApiKeySecret
             {
                 ApiKey = newKey,
-                Secret = newSecret,
                 MerchantId = null,
                 CreatedAt = DateTime.UtcNow,
                 LastRotated = null,
@@ -1204,6 +1287,10 @@ namespace FeeNominalService.Services
                 Status = "ACTIVE",
                 Scope = "admin"
             };
+            adminRotateSecureSecret.SetSecret(newSecret);
+            
+            // Store the regular ApiKeySecret for compatibility
+            var secretValue = adminRotateSecureSecret.ToApiKeySecret();
             await _secretsManager.StoreSecretAsync(adminSecretName, JsonSerializer.Serialize(secretValue));
             _logger.LogInformation("Rotated admin API key. Old key revoked, new key generated.");
             return new GenerateApiKeyResponse

@@ -7,6 +7,7 @@ using FeeNominalService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Models.Common;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Repositories
 {
@@ -35,7 +36,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by ID {ProviderId}", id);
+                _logger.LogError(ex, "Error getting provider by ID {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -62,7 +63,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by ID {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
+                _logger.LogError(ex, "Error getting provider by ID {ProviderId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeGuid(id), includeDeleted);
                 throw;
             }
         }
@@ -79,7 +80,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider by code {ProviderCode}", code);
+                _logger.LogError(ex, "Error getting provider by code {ProviderCode}", LogSanitizer.SanitizeString(code));
                 throw;
             }
         }
@@ -144,7 +145,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting providers for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 throw;
             }
         }
@@ -174,7 +175,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", merchantId, includeDeleted);
+                _logger.LogError(ex, "Error getting providers for merchant {MerchantId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeMerchantId(merchantId), includeDeleted);
                 throw;
             }
         }
@@ -186,7 +187,7 @@ namespace FeeNominalService.Repositories
                 // Convert string merchantId to Guid for database comparison
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return Enumerable.Empty<SurchargeProvider>();
                 }
 
@@ -201,7 +202,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting configured providers for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting configured providers for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 throw;
             }
         }
@@ -213,7 +214,7 @@ namespace FeeNominalService.Repositories
                 // Convert string merchantId to Guid for database comparison
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return false;
                 }
 
@@ -222,7 +223,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking configuration for merchant {MerchantId} and provider {ProviderId}", merchantId, providerId);
+                _logger.LogError(ex, "Error checking configuration for merchant {MerchantId} and provider {ProviderId}", LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -272,7 +273,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error adding provider {ProviderName}", provider.Name);
+                _logger.LogError(ex, "Error adding provider {ProviderName}", LogSanitizer.SanitizeString(provider.Name));
                 throw;
             }
         }
@@ -294,7 +295,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating provider {ProviderId}", provider.Id);
+                _logger.LogError(ex, "Error updating provider {ProviderId}", LogSanitizer.SanitizeGuid(provider.Id));
                 throw;
             }
         }
@@ -314,7 +315,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting provider {ProviderId}", id);
+                _logger.LogError(ex, "Error deleting provider {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -330,7 +331,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking provider existence {ProviderId}", id);
+                _logger.LogError(ex, "Error checking provider existence {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -355,7 +356,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking provider existence {ProviderId} (includeDeleted: {IncludeDeleted})", id, includeDeleted);
+                _logger.LogError(ex, "Error checking provider existence {ProviderId} (includeDeleted: {IncludeDeleted})", LogSanitizer.SanitizeGuid(id), includeDeleted);
                 throw;
             }
         }
@@ -369,7 +370,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode}", code);
+                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode}", LogSanitizer.SanitizeString(code));
                 throw;
             }
         }
@@ -383,7 +384,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode} for merchant {MerchantId}", code, merchantId);
+                _logger.LogError(ex, "Error checking provider existence by code {ProviderCode} for merchant {MerchantId}", LogSanitizer.SanitizeString(code), LogSanitizer.SanitizeMerchantId(merchantId));
                 throw;
             }
         }
@@ -404,14 +405,14 @@ namespace FeeNominalService.Repositories
 
                 if (provider == null)
                 {
-                    _logger.LogWarning("Provider not found for soft delete: {ProviderId}", id);
+                    _logger.LogWarning("Provider not found for soft delete: {ProviderId}", LogSanitizer.SanitizeGuid(id));
                     return false;
                 }
 
                 // Check if already deleted
                 if (provider.Status.Code == "DELETED")
                 {
-                    _logger.LogWarning("Provider is already deleted: {ProviderId}", id);
+                    _logger.LogWarning("Provider is already deleted: {ProviderId}", LogSanitizer.SanitizeGuid(id));
                     return false;
                 }
 
@@ -431,7 +432,7 @@ namespace FeeNominalService.Repositories
 
                 // Debug: Log the status change
                 _logger.LogDebug("Updating provider {ProviderId} status from {OldStatus} to DELETED", 
-                    id, provider.Status?.Code ?? "NULL");
+                    LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(provider.Status?.Code ?? "NULL"));
 
                 // Deactivate all provider configurations and unset primary
                 if (provider.Configurations != null)
@@ -453,14 +454,14 @@ namespace FeeNominalService.Repositories
                     .FirstOrDefaultAsync(p => p.Id == id);
                 
                 _logger.LogDebug("After save, provider {ProviderId} status is: {Status}", 
-                    id, savedProvider?.Status?.Code ?? "NULL");
+                    LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(savedProvider?.Status?.Code ?? "NULL"));
 
-                _logger.LogInformation("Provider {ProviderId} soft deleted by {DeletedBy} and all configs deactivated/unset primary", id, deletedBy);
+                _logger.LogInformation("Provider {ProviderId} soft deleted by {DeletedBy} and all configs deactivated/unset primary", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(deletedBy));
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error soft deleting provider {ProviderId}", id);
+                _logger.LogError(ex, "Error soft deleting provider {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -475,14 +476,14 @@ namespace FeeNominalService.Repositories
 
                 if (provider == null)
                 {
-                    _logger.LogWarning("Provider not found for restore: {ProviderId}", id);
+                    _logger.LogWarning("Provider not found for restore: {ProviderId}", LogSanitizer.SanitizeGuid(id));
                     return false;
                 }
 
                 // Check if currently deleted
                 if (provider.Status.Code != "DELETED")
                 {
-                    _logger.LogWarning("Provider is not deleted: {ProviderId}", id);
+                    _logger.LogWarning("Provider is not deleted: {ProviderId}", LogSanitizer.SanitizeGuid(id));
                     return false;
                 }
 
@@ -502,12 +503,12 @@ namespace FeeNominalService.Repositories
 
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Provider {ProviderId} restored by {RestoredBy}", id, restoredBy);
+                _logger.LogInformation("Provider {ProviderId} restored by {RestoredBy}", LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(restoredBy));
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error restoring provider {ProviderId}", id);
+                _logger.LogError(ex, "Error restoring provider {ProviderId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -523,7 +524,7 @@ namespace FeeNominalService.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting provider count for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting provider count for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 throw;
             }
         }
@@ -556,7 +557,7 @@ namespace FeeNominalService.Repositories
                     await transaction.CommitAsync();
 
                     _logger.LogInformation("Successfully created provider {ProviderId} for merchant {MerchantId} (count: {Count})", 
-                        provider.Id, provider.CreatedBy, currentProviderCount + 1);
+                        LogSanitizer.SanitizeGuid(provider.Id), LogSanitizer.SanitizeMerchantId(provider.CreatedBy), currentProviderCount + 1);
 
                     return provider;
                 }

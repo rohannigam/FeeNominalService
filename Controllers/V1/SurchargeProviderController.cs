@@ -410,7 +410,7 @@ namespace FeeNominalService.Controllers.V1
                 if (authenticatedMerchantId != merchantId)
                 {
                     _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", 
-                        merchantId, authenticatedMerchantId);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeMerchantId(authenticatedMerchantId));
                     return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                 }
 
@@ -435,7 +435,7 @@ namespace FeeNominalService.Controllers.V1
                     _logger.LogDebug("CredentialsSchema is not null, validating...");
                     if (!request.ValidateCredentialsSchema(out var schemaErrors, _validationSettings))
                     {
-                        _logger.LogWarning("Credentials schema validation failed: {Errors}", string.Join(", ", schemaErrors));
+                        _logger.LogWarning("Credentials schema validation failed: {Errors}", LogSanitizer.SanitizeString(string.Join(", ", schemaErrors)));
                         return BadRequest(ApiErrorResponse.InvalidCredentialsSchema(schemaErrors));
                     }
                     _logger.LogDebug("Credentials schema validation passed");
@@ -670,7 +670,7 @@ namespace FeeNominalService.Controllers.V1
                 if (authenticatedMerchantId != merchantId)
                 {
                     _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", 
-                        merchantId, authenticatedMerchantId);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeMerchantId(authenticatedMerchantId));
                     return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                 }
 
@@ -742,13 +742,13 @@ namespace FeeNominalService.Controllers.V1
 
                 // Debug: Log the status we're getting back
                 _logger.LogDebug("Retrieved deleted provider {ProviderId} with status: {Status}", 
-                    id, deletedProvider.Status?.Code ?? "NULL");
+                    LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(deletedProvider.Status?.Code ?? "NULL"));
 
                 // Verify the status is actually DELETED
                 if (deletedProvider.Status?.Code != "DELETED")
                 {
                     _logger.LogWarning("Provider {ProviderId} was soft deleted but status is {Status}, not DELETED", 
-                        id, deletedProvider.Status?.Code ?? "NULL");
+                        LogSanitizer.SanitizeGuid(id), LogSanitizer.SanitizeString(deletedProvider.Status?.Code ?? "NULL"));
                 }
 
                 return Ok(deletedProvider.ToResponse());
@@ -783,7 +783,7 @@ namespace FeeNominalService.Controllers.V1
                 if (authenticatedMerchantId != merchantId)
                 {
                     _logger.LogWarning("Merchant ID mismatch: URL {UrlMerchantId} vs authenticated {AuthMerchantId}", 
-                        merchantId, authenticatedMerchantId);
+                        LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeMerchantId(authenticatedMerchantId));
                     return StatusCode(403, ApiErrorResponse.MerchantIdMismatch());
                 }
 

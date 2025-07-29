@@ -27,12 +27,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting config by ID {ConfigId}", id);
+                _logger.LogInformation("Getting config by ID {ConfigId}", LogSanitizer.SanitizeGuid(id));
                 return await _repository.GetByIdAsync(id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting config by ID {ConfigId}", id);
+                _logger.LogError(ex, "Error getting config by ID {ConfigId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -43,18 +43,18 @@ namespace FeeNominalService.Services
             {
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return null;
                 }
 
                 _logger.LogInformation("Getting primary config for merchant {MerchantId} and provider {ProviderId}", 
-                    merchantId, providerId);
+                    LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 return await _repository.GetPrimaryConfigAsync(merchantGuid, providerId);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting primary config for merchant {MerchantId} and provider {ProviderId}", 
-                    merchantId, providerId);
+                    LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -65,16 +65,16 @@ namespace FeeNominalService.Services
             {
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return Enumerable.Empty<SurchargeProviderConfig>();
                 }
 
-                _logger.LogInformation("Getting configs for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Getting configs for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return await _repository.GetByMerchantIdAsync(merchantGuid);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting configs for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting configs for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 throw;
             }
         }
@@ -83,12 +83,12 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Getting configs for provider {ProviderId}", providerId);
+                _logger.LogInformation("Getting configs for provider {ProviderId}", LogSanitizer.SanitizeGuid(providerId));
                 return await _repository.GetByProviderIdAsync(providerId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting configs for provider {ProviderId}", providerId);
+                _logger.LogError(ex, "Error getting configs for provider {ProviderId}", LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -99,16 +99,16 @@ namespace FeeNominalService.Services
             {
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return Enumerable.Empty<SurchargeProviderConfig>();
                 }
 
-                _logger.LogInformation("Getting active configs for merchant {MerchantId}", merchantId);
+                _logger.LogInformation("Getting active configs for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 return await _repository.GetActiveConfigsAsync(merchantGuid);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting active configs for merchant {MerchantId}", merchantId);
+                _logger.LogError(ex, "Error getting active configs for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                 throw;
             }
         }
@@ -118,7 +118,7 @@ namespace FeeNominalService.Services
             try
             {
                 _logger.LogInformation("Creating config for merchant {MerchantId} and provider {ProviderId}", 
-                    config.MerchantId, config.ProviderId);
+                    LogSanitizer.SanitizeMerchantId(config.MerchantId?.ToString()), LogSanitizer.SanitizeGuid(config.ProviderId));
 
                 // Handle primary config
                 if (config.IsPrimary)
@@ -131,7 +131,7 @@ namespace FeeNominalService.Services
                             existingPrimary.IsPrimary = false;
                             await _repository.UpdateAsync(existingPrimary);
                             _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
-                                requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                                LogSanitizer.SanitizeString(requestor), LogSanitizer.SanitizeGuid(config.Id), LogSanitizer.SanitizeString(config.ConfigName), LogSanitizer.SanitizeGuid(existingPrimary.Id), LogSanitizer.SanitizeString(existingPrimary.ConfigName));
                         }
                     }
                 }
@@ -145,7 +145,7 @@ namespace FeeNominalService.Services
                         {
                             config.IsPrimary = true;
                             _logger.LogInformation("No existing primary config found for merchant {MerchantId}, provider {ProviderId}. Defaulting new config {ConfigId} ('{ConfigName}') to primary.",
-                                config.MerchantId, config.ProviderId, config.Id, config.ConfigName);
+                                LogSanitizer.SanitizeMerchantId(config.MerchantId.ToString()), LogSanitizer.SanitizeGuid(config.ProviderId), LogSanitizer.SanitizeGuid(config.Id), LogSanitizer.SanitizeString(config.ConfigName));
                         }
                     }
                 }
@@ -174,7 +174,7 @@ namespace FeeNominalService.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating config for merchant {MerchantId} and provider {ProviderId}", 
-                    config.MerchantId, config.ProviderId);
+                    LogSanitizer.SanitizeMerchantId(config.MerchantId?.ToString()), LogSanitizer.SanitizeGuid(config.ProviderId));
                 throw;
             }
         }
@@ -183,7 +183,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Updating config {ConfigId}", config.Id);
+                _logger.LogInformation("Updating config {ConfigId}", LogSanitizer.SanitizeGuid(config.Id));
 
                 // Check if config exists
                 var existingConfig = await _repository.GetByIdAsync(config.Id);
@@ -203,7 +203,7 @@ namespace FeeNominalService.Services
                             existingPrimary.IsPrimary = false;
                             await _repository.UpdateAsync(existingPrimary);
                             _logger.LogWarning("[PRIMARY SWITCH] User '{Requestor}' set config {NewConfigId} ('{NewConfigName}') as primary. Previous primary config {OldConfigId} ('{OldConfigName}') demoted to non-primary.",
-                                requestor, config.Id, config.ConfigName, existingPrimary.Id, existingPrimary.ConfigName);
+                                LogSanitizer.SanitizeString(requestor), LogSanitizer.SanitizeGuid(config.Id), LogSanitizer.SanitizeString(config.ConfigName), LogSanitizer.SanitizeGuid(existingPrimary.Id), LogSanitizer.SanitizeString(existingPrimary.ConfigName));
                         }
                     }
                 }
@@ -215,7 +215,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating config {ConfigId}", config.Id);
+                _logger.LogError(ex, "Error updating config {ConfigId}", LogSanitizer.SanitizeGuid(config.Id));
                 throw;
             }
         }
@@ -224,7 +224,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Deleting config {ConfigId}", id);
+                _logger.LogInformation("Deleting config {ConfigId}", LogSanitizer.SanitizeGuid(id));
 
                 // Check if config exists and get its details
                 var config = await _repository.GetByIdAsync(id);
@@ -243,7 +243,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting config {ConfigId}", id);
+                _logger.LogError(ex, "Error deleting config {ConfigId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -256,7 +256,7 @@ namespace FeeNominalService.Services
             try
             {
                 _logger.LogInformation("Promoting next primary config for merchant {MerchantId} and provider {ProviderId} after deleting {DeletedConfigId}", 
-                    merchantId, providerId, deletedConfigId);
+                    LogSanitizer.SanitizeMerchantId(merchantId.ToString()), LogSanitizer.SanitizeGuid(providerId), LogSanitizer.SanitizeGuid(deletedConfigId));
 
                 // Get all active configs for this merchant-provider combination
                 var configs = await _repository.GetByMerchantIdAsync(merchantId);
@@ -270,7 +270,7 @@ namespace FeeNominalService.Services
                 if (nextPrimary != null)
                 {
                     _logger.LogInformation("Promoting config {ConfigId} to primary for merchant {MerchantId} and provider {ProviderId}", 
-                        nextPrimary.Id, merchantId, providerId);
+                        LogSanitizer.SanitizeGuid(nextPrimary.Id), LogSanitizer.SanitizeMerchantId(merchantId.ToString()), LogSanitizer.SanitizeGuid(providerId));
                     
                     nextPrimary.IsPrimary = true;
                     nextPrimary.UpdatedAt = DateTime.UtcNow;
@@ -279,13 +279,13 @@ namespace FeeNominalService.Services
                 else
                 {
                     _logger.LogWarning("No active configs available to promote to primary for merchant {MerchantId} and provider {ProviderId}", 
-                        merchantId, providerId);
+                        LogSanitizer.SanitizeMerchantId(merchantId.ToString()), LogSanitizer.SanitizeGuid(providerId));
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error promoting next primary config for merchant {MerchantId} and provider {ProviderId}", 
-                    merchantId, providerId);
+                    LogSanitizer.SanitizeMerchantId(merchantId.ToString()), LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -298,7 +298,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking config existence {ConfigId}", id);
+                _logger.LogError(ex, "Error checking config existence {ConfigId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -309,7 +309,7 @@ namespace FeeNominalService.Services
             {
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return false;
                 }
 
@@ -318,7 +318,7 @@ namespace FeeNominalService.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error checking active config existence for merchant {MerchantId} and provider {ProviderId}", 
-                    merchantId, providerId);
+                    LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -329,7 +329,7 @@ namespace FeeNominalService.Services
             {
                 if (!Guid.TryParse(merchantId, out Guid merchantGuid))
                 {
-                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", merchantId);
+                    _logger.LogWarning("Invalid merchant ID format: {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
                     return false;
                 }
 
@@ -338,7 +338,7 @@ namespace FeeNominalService.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error checking primary config existence for merchant {MerchantId} and provider {ProviderId}", 
-                    merchantId, providerId);
+                    LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeGuid(providerId));
                 throw;
             }
         }
@@ -351,7 +351,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating last used for config {ConfigId}", id);
+                _logger.LogError(ex, "Error updating last used for config {ConfigId}", LogSanitizer.SanitizeGuid(id));
                 throw;
             }
         }
@@ -360,7 +360,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Validating credentials for config {ConfigId}", configId);
+                _logger.LogInformation("Validating credentials for config {ConfigId}", LogSanitizer.SanitizeGuid(configId));
 
                 var config = await _repository.GetByIdAsync(configId);
                 if (config == null)
@@ -378,7 +378,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating credentials for config {ConfigId}", configId);
+                _logger.LogError(ex, "Error validating credentials for config {ConfigId}", LogSanitizer.SanitizeGuid(configId));
                 throw;
             }
         }
@@ -387,7 +387,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Validating rate limit for config {ConfigId}", configId);
+                _logger.LogInformation("Validating rate limit for config {ConfigId}", LogSanitizer.SanitizeGuid(configId));
 
                 var config = await _repository.GetByIdAsync(configId);
                 if (config == null)
@@ -410,7 +410,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating rate limit for config {ConfigId}", configId);
+                _logger.LogError(ex, "Error validating rate limit for config {ConfigId}", LogSanitizer.SanitizeGuid(configId));
                 throw;
             }
         }
@@ -419,7 +419,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                _logger.LogInformation("Validating timeout for config {ConfigId}", configId);
+                _logger.LogInformation("Validating timeout for config {ConfigId}", LogSanitizer.SanitizeGuid(configId));
 
                 var config = await _repository.GetByIdAsync(configId);
                 if (config == null)
@@ -442,7 +442,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating timeout for config {ConfigId}", configId);
+                _logger.LogError(ex, "Error validating timeout for config {ConfigId}", LogSanitizer.SanitizeGuid(configId));
                 throw;
             }
         }
