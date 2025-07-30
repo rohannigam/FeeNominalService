@@ -16,8 +16,8 @@ namespace FeeNominalService.Services
         Task<IEnumerable<SurchargeProvider>> GetByMerchantIdAsync(string merchantId, bool includeDeleted);
         Task<IEnumerable<SurchargeProvider>> GetConfiguredProvidersByMerchantIdAsync(string merchantId);
         Task<IEnumerable<SurchargeProvider>> GetActiveAsync();
-        Task<SurchargeProvider> CreateAsync(SurchargeProvider provider);
-        Task<SurchargeProvider> CreateWithConfigurationAsync(SurchargeProvider provider, ProviderConfigurationRequest configuration, string merchantId);
+        Task<SurchargeProvider> CreateAsync(SurchargeProvider provider, SecureCredentialsSchema secureCredentialsSchema);
+        Task<SurchargeProvider> CreateWithConfigurationAsync(SurchargeProvider provider, ProviderConfigurationRequest configuration, string merchantId, SecureCredentialsSchema secureCredentialsSchema);
         Task<SurchargeProvider> UpdateAsync(SurchargeProvider provider);
         Task<bool> DeleteAsync(Guid id);
         Task<bool> SoftDeleteAsync(Guid id, string deletedBy);

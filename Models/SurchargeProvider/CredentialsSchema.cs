@@ -23,6 +23,7 @@ namespace FeeNominalService.Models.SurchargeProvider
         public string Description { get; set; } = string.Empty;
 
         [StringLength(100)]
+        [JsonPropertyName("display_name")]
         public string? DisplayName { get; set; }
 
         public bool Required { get; set; } = true;
@@ -30,20 +31,26 @@ namespace FeeNominalService.Models.SurchargeProvider
         public bool Sensitive { get; set; } = false;
 
         [StringLength(1000)]
+        [JsonPropertyName("default_value")]
         public string? DefaultValue { get; set; }
 
         [StringLength(1000)]
         public string? Pattern { get; set; }
 
+        [JsonPropertyName("min_length")]
         public int? MinLength { get; set; }
 
+        [JsonPropertyName("max_length")]
         public int? MaxLength { get; set; }
 
+        [JsonPropertyName("allowed_values")]
         public List<string>? AllowedValues { get; set; }
 
         [StringLength(1000)]
+        [JsonPropertyName("validation_message")]
         public string? ValidationMessage { get; set; }
 
+        [JsonPropertyName("additional_properties")]
         public Dictionary<string, object>? AdditionalProperties { get; set; }
     }
 
@@ -65,11 +72,14 @@ namespace FeeNominalService.Models.SurchargeProvider
         public string Version { get; set; } = "1.0";
 
         [Required]
+        [JsonPropertyName("required_fields")]
         public List<CredentialField> RequiredFields { get; set; } = new();
 
+        [JsonPropertyName("optional_fields")]
         public List<CredentialField>? OptionalFields { get; set; }
 
         [StringLength(1000)]
+        [JsonPropertyName("documentation_url")]
         public string? DocumentationUrl { get; set; }
 
         public Dictionary<string, object>? Metadata { get; set; }

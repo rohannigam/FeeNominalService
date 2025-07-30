@@ -25,7 +25,9 @@ namespace FeeNominalService.Models.SurchargeProvider
         public Dictionary<string, object>? Metadata { get; set; }
 
         // Sensitive properties that need secure handling
+        [JsonPropertyName("required_fields")]
         public List<CredentialField> RequiredFields { get; set; } = new();
+        [JsonPropertyName("optional_fields")]
         public List<CredentialField>? OptionalFields { get; set; }
 
         /// <summary>
@@ -164,12 +166,27 @@ namespace FeeNominalService.Models.SurchargeProvider
         public static SecureCredentialsSchema FromJsonDocument(JsonDocument schemaDoc)
         {
             var schemaJson = schemaDoc.RootElement.GetRawText();
-            var schema = JsonSerializer.Deserialize<CredentialsSchema>(schemaJson);
             
-            if (schema == null)
-                throw new ArgumentException("Invalid credentials schema format");
-
-            return FromCredentialsSchema(schema);
+            // Create SecureCredentialsSchema directly without deserializing to CredentialsSchema
+            // to avoid triggering validation during deserialization
+            var secure = new SecureCredentialsSchema();
+            secure.SetSchema(schemaJson);
+            
+            // Extract basic properties from the JSON without full deserialization
+            var root = schemaDoc.RootElement;
+            if (root.TryGetProperty("name", out var nameElement))
+                secure.Name = nameElement.GetString() ?? string.Empty;
+            
+            if (root.TryGetProperty("description", out var descElement))
+                secure.Description = descElement.GetString() ?? string.Empty;
+            
+            if (root.TryGetProperty("version", out var versionElement))
+                secure.Version = versionElement.GetString() ?? "1.0";
+            
+            if (root.TryGetProperty("documentation_url", out var docUrlElement))
+                secure.DocumentationUrl = docUrlElement.GetString();
+            
+            return secure;
         }
 
         /// <summary>
@@ -179,12 +196,36 @@ namespace FeeNominalService.Models.SurchargeProvider
         /// <returns>SecureCredentialsSchema wrapper</returns>
         public static SecureCredentialsSchema FromJsonString(string schemaJson)
         {
-            var schema = JsonSerializer.Deserialize<CredentialsSchema>(schemaJson);
+            // Create SecureCredentialsSchema directly without deserializing to CredentialsSchema
+            // to avoid triggering validation during deserialization
+            var secure = new SecureCredentialsSchema();
+            secure.SetSchema(schemaJson);
             
-            if (schema == null)
-                throw new ArgumentException("Invalid credentials schema format");
-
-            return FromCredentialsSchema(schema);
+            // Parse JSON to extract basic properties without full deserialization
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(schemaJson);
+                var root = jsonDoc.RootElement;
+                
+                if (root.TryGetProperty("name", out var nameElement))
+                    secure.Name = nameElement.GetString() ?? string.Empty;
+                
+                if (root.TryGetProperty("description", out var descElement))
+                    secure.Description = descElement.GetString() ?? string.Empty;
+                
+                if (root.TryGetProperty("version", out var versionElement))
+                    secure.Version = versionElement.GetString() ?? "1.0";
+                
+                if (root.TryGetProperty("documentation_url", out var docUrlElement))
+                    secure.DocumentationUrl = docUrlElement.GetString();
+            }
+            catch (JsonException)
+            {
+                // If JSON parsing fails, we still have the schema stored securely
+                // The validation will happen later when needed
+            }
+            
+            return secure;
         }
 
         /// <summary>

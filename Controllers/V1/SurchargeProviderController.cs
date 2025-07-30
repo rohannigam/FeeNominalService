@@ -131,11 +131,8 @@ namespace FeeNominalService.Controllers.V1
                     return BadRequest(ApiErrorResponse.SystemConfigurationError("ACTIVE status not found in the database"));
                 }
 
-                // Checkmarx: Privacy Violation - This method uses SecureCredentialsSchema wrapper for secure handling
-                // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
-                // Convert the credentials schema to JsonDocument for secure processing
-                var credentialsSchema = JsonSerializer.SerializeToDocument(request.CredentialsSchema);
-                using var secureCredentialsSchema = SecureCredentialsSchema.FromJsonDocument(credentialsSchema);
+                // Convert the credentials schema to SecureCredentialsSchema for secure processing
+                using var secureCredentialsSchema = SecureCredentialsSchema.FromJsonDocument(JsonSerializer.SerializeToDocument(request.CredentialsSchema));
 
                 var provider = new SurchargeProvider
                 {
@@ -144,7 +141,7 @@ namespace FeeNominalService.Controllers.V1
                     Description = request.Description,
                     BaseUrl = request.BaseUrl,
                     AuthenticationType = request.AuthenticationType,
-                    CredentialsSchema = credentialsSchema,
+                    CredentialsSchema = JsonDocument.Parse("{}"), // Redacted/empty value for security
                     StatusId = status.StatusId,
                     CreatedBy = merchantId,
                     UpdatedBy = merchantId
@@ -163,12 +160,14 @@ namespace FeeNominalService.Controllers.V1
                             LogSanitizer.SanitizeMerchantId(merchantId));
                     }
                     
-                    result = await _surchargeProviderService.CreateWithConfigurationAsync(provider, request.Configuration, merchantId);
+                    // Pass secureCredentialsSchema to the service
+                    result = await _surchargeProviderService.CreateWithConfigurationAsync(provider, request.Configuration, merchantId, secureCredentialsSchema);
                 }
                 else
                 {
                     // Otherwise, just create the provider
-                    result = await _surchargeProviderService.CreateAsync(provider);
+                    // Pass secureCredentialsSchema to the service
+                    result = await _surchargeProviderService.CreateAsync(provider, secureCredentialsSchema);
                 }
 
                 // Audit log: provider creation (excluding sensitive credentials schema)

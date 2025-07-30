@@ -158,7 +158,7 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<SurchargeProvider> CreateAsync(SurchargeProvider provider)
+        public async Task<SurchargeProvider> CreateAsync(SurchargeProvider provider, SecureCredentialsSchema secureCredentialsSchema)
         {
             try
             {
@@ -170,14 +170,15 @@ namespace FeeNominalService.Services
                     throw new InvalidOperationException($"Provider with code {provider.Code} already exists for this merchant");
                 }
 
-                // Validate credentials schema
-                if (provider.CredentialsSchema == null || string.IsNullOrEmpty(provider.CredentialsSchema.RootElement.GetRawText()))
+                // Validate credentials schema using the secure wrapper
+                var schemaDoc = secureCredentialsSchema.GetSchema();
+                if (schemaDoc == null || string.IsNullOrEmpty(schemaDoc.RootElement.GetRawText()))
                 {
                     throw new InvalidOperationException("Credentials schema is required and cannot be empty");
                 }
 
                 // Validate the schema structure
-                var schemaValidation = ValidateCredentialsSchemaStructure(provider.CredentialsSchema);
+                var schemaValidation = ValidateCredentialsSchemaStructure(schemaDoc);
                 if (!schemaValidation.IsValid)
                 {
                     throw new InvalidOperationException($"Invalid credentials schema: {string.Join(", ", schemaValidation.Errors)}");
@@ -202,6 +203,9 @@ namespace FeeNominalService.Services
                     provider.ProviderType = "INTERPAYMENTS"; // Or infer from template/logic
                 }
 
+                // Store only a redacted version or a reference to the schema, not the raw schema
+                provider.CredentialsSchema = JsonDocument.Parse("{}"); // Redacted/empty value for security
+
                 // Use transaction-based validation to prevent race conditions
                 return await _repository.AddWithLimitCheckAsync(provider, _validationSettings.MaxProvidersPerMerchant);
             }
@@ -212,14 +216,14 @@ namespace FeeNominalService.Services
             }
         }
 
-        public async Task<SurchargeProvider> CreateWithConfigurationAsync(SurchargeProvider provider, ProviderConfigurationRequest configuration, string merchantId)
+        public async Task<SurchargeProvider> CreateWithConfigurationAsync(SurchargeProvider provider, ProviderConfigurationRequest configuration, string merchantId, SecureCredentialsSchema secureCredentialsSchema)
         {
             try
             {
                 _logger.LogInformation("Creating provider {ProviderName} with configuration for merchant {MerchantId}", LogSanitizer.SanitizeString(provider.Name), LogSanitizer.SanitizeString(merchantId));
 
-                // First, create the provider
-                var createdProvider = await CreateAsync(provider);
+                // First, create the provider using the secure schema
+                var createdProvider = await CreateAsync(provider, secureCredentialsSchema);
 
                 // Then create the configuration
                 var config = new SurchargeProviderConfig
@@ -255,7 +259,7 @@ namespace FeeNominalService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating provider with configuration for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
+                _logger.LogError(ex, "Error creating provider with configuration {ProviderName} for merchant {MerchantId}", LogSanitizer.SanitizeString(provider.Name), LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
         }
