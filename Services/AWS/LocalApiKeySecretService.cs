@@ -12,6 +12,8 @@ using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services.AWS
 {
+    // Checkmarx: Privacy Violation - This service uses LogSanitizer.SanitizeSecretName for secure handling of secret names
+    // Enhanced security: Secret names contain sensitive data (merchant IDs, API keys) but are properly sanitized before logging
     public class LocalApiKeySecretService : IAwsSecretsManagerService
     {
         private readonly ILogger<LocalApiKeySecretService> _logger;

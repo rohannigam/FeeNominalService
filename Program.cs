@@ -87,6 +87,9 @@ builder.Services.AddSingleton<SecretNameFormatter>();
 builder.Services.Configure<SurchargeProviderValidationSettings>(builder.Configuration.GetSection("SurchargeProviderValidation"));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<SurchargeProviderValidationSettings>>().Value);
 
+// Configure Audit Logging settings
+builder.Services.Configure<AuditLoggingSettings>(builder.Configuration.GetSection("AuditLogging"));
+
 // Add AWS Secrets Manager
 builder.Services.AddAWSService<IAmazonSecretsManager>();
 
