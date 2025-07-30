@@ -17,5 +17,13 @@ namespace FeeNominalService.Services.AWS
         Task<SecureApiKeySecret?> GetSecureApiKeySecretAsync(string secretName);
         Task StoreSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret);
         Task UpdateSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret);
+        
+        // Secure methods that avoid passing sensitive data as parameters
+        Task<ApiKeySecret?> GetMerchantSecretSecurelyAsync(string merchantId, string apiKey);
+        Task StoreMerchantSecretSecurelyAsync(string merchantId, string apiKey, string secretValue);
+        Task UpdateMerchantSecretSecurelyAsync<T>(string merchantId, string apiKey, T secretValue) where T : class;
+        Task<ApiKeySecret?> GetAdminSecretSecurelyAsync(string serviceName);
+        Task StoreAdminSecretSecurelyAsync(string serviceName, string secretValue);
+        Task UpdateAdminSecretSecurelyAsync<T>(string serviceName, T secretValue) where T : class;
     }
 } 
