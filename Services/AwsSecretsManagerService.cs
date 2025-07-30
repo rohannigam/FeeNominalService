@@ -292,7 +292,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely retrieves merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -317,7 +317,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely updates merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>

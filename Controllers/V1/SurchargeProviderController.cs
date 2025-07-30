@@ -15,7 +15,7 @@ using System.Linq;
 
 namespace FeeNominalService.Controllers.V1
 {
-    // Checkmarx: Privacy Violation - This controller uses SecureCredentialsSchema wrapper for secure handling of credentials schema data
+    // This controller uses SecureCredentialsSchema wrapper for secure handling of credentials schema data
     // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps and exposure
     [ApiController]
     [Route("api/v1/merchants/{merchantId}/surcharge-providers")]
@@ -491,7 +491,7 @@ namespace FeeNominalService.Controllers.V1
                 // Only update credentials schema if provided
                 if (request.CredentialsSchema != null)
                 {
-                    // Checkmarx: Privacy Violation - This method uses SecureCredentialsSchema wrapper for secure handling
+                    // This method uses SecureCredentialsSchema wrapper for secure handling
                     // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
                     using var secureCredentialsSchema = SecureCredentialsSchema.FromJsonDocument(JsonSerializer.SerializeToDocument(request.CredentialsSchema));
                     var updateCredentialsSchema = JsonSerializer.SerializeToDocument(request.CredentialsSchema);

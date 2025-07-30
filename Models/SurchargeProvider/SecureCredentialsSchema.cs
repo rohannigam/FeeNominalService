@@ -9,7 +9,7 @@ namespace FeeNominalService.Models.SurchargeProvider
 {
     /// <summary>
     /// Secure wrapper for CredentialsSchema using SecureString to prevent memory dumps
-    /// Checkmarx: Privacy Violation - This class uses SecureString for secure handling of credentials schema data
+    /// This class uses SecureString for secure handling of credentials schema data
     /// Enhanced security: Uses SecureString and proper disposal to prevent memory dumps and exposure
     /// </summary>
     public class SecureCredentialsSchema : IDisposable

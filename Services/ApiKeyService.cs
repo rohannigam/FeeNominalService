@@ -22,7 +22,7 @@ namespace FeeNominalService.Services
 {
     /// <summary>
     /// Service for managing API keys
-    /// Checkmarx: Privacy Violation - This service implements comprehensive security measures:
+    /// This service implements comprehensive security measures:
     /// 1. All secret operations use SecureApiKeySecret wrapper with SecureString
     /// 2. Automatic resource disposal with using statements
     /// 3. Secure processing methods that prevent memory exposure
@@ -143,7 +143,7 @@ namespace FeeNominalService.Services
 
         private async Task<bool> ValidateAdminApiKeyAsync(string apiKey, string timestamp, string nonce, string signature, string serviceName)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("=== ADMIN API KEY VALIDATION DEBUG ===");
             _logger.LogInformation("Input parameters: ApiKey={ApiKey}, Timestamp={Timestamp}, Nonce={Nonce}, Signature={Signature}", 
                 LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(signature));
@@ -196,7 +196,7 @@ namespace FeeNominalService.Services
 
         private async Task<bool> ValidateMerchantApiKeyAsync(string merchantId, string apiKey, string timestamp, string nonce, string signature, string serviceName)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             // Use SecureApiKeySecret for secure handling
             using var secureSecret = await GetMerchantSecretSecurelyAsync(merchantId, apiKey);
 
@@ -237,7 +237,7 @@ namespace FeeNominalService.Services
         /// <returns>API key information</returns>
         public async Task<ApiKeyInfo> GetApiKeyAsync(string merchantId)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Getting API key info for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
 
             // Check if merchant exists
@@ -261,7 +261,7 @@ namespace FeeNominalService.Services
                 throw new KeyNotFoundException($"No active API key found for merchant {merchantId}");
             }
 
-            // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
+            // This method uses SecureApiKeySecret wrapper for secure handling
             // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
             using var secureSecret = await GetMerchantSecretSecurelyAsync(merchant.MerchantId.ToString(), activeKey.Key);
             if (secureSecret == null)
@@ -301,7 +301,7 @@ namespace FeeNominalService.Services
         /// <returns>Updated API key information</returns>
         public async Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request, OnboardingMetadata onboardingMetadata)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Updating API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(request.MerchantId));
 
             // 1. First check if merchant exists
@@ -358,7 +358,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Successfully updated API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(request.MerchantId));
 
                 // 6. Get the secret from AWS Secrets Manager using internal merchant ID
-                // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
+                // This method uses SecureApiKeySecret wrapper for secure handling
                 // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
                 using var secureSecret = await GetMerchantSecretSecurelyAsync(merchant.MerchantId.ToString(), request.ApiKey);
                 if (secureSecret == null)
@@ -405,7 +405,7 @@ namespace FeeNominalService.Services
         /// <returns>True if successful</returns>
         public async Task<bool> RevokeApiKeyAsync(RevokeApiKeyRequest request)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Starting API key revocation process for merchant {MerchantId}, API key {ApiKey}", 
                 LogSanitizer.SanitizeMerchantId(request.MerchantId), LogSanitizer.SanitizeString(request.ApiKey));
 
@@ -441,7 +441,7 @@ namespace FeeNominalService.Services
             // 5. Update secret in AWS Secrets Manager using secure wrapper
             var secretName = _secretNameFormatter.FormatMerchantSecretName(merchant.MerchantId, request.ApiKey);
             
-            // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
+            // This method uses SecureApiKeySecret wrapper for secure handling
             // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
             using var secureSecret = await GetSecureSecretAsync(secretName);
             if (secureSecret != null)
@@ -461,7 +461,7 @@ namespace FeeNominalService.Services
         /// <inheritdoc />
         public async Task<GenerateApiKeyResponse> RotateApiKeyAsync(string merchantId, OnboardingMetadata onboardingMetadata, string apiKey)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Rotating API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
 
             // Get merchant using internal merchant ID
@@ -559,7 +559,7 @@ namespace FeeNominalService.Services
         /// <inheritdoc />
         public async Task<IEnumerable<ApiKeyInfo>> GetMerchantApiKeysAsync(string merchantId)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Getting all API keys for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
 
             var merchant = await _merchantRepository.GetByIdAsync(Guid.Parse(merchantId));
@@ -577,7 +577,7 @@ namespace FeeNominalService.Services
                 try
                 {
                     // Try to get additional info from Secrets Manager using internal merchant ID
-                    // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
+                    // This method uses SecureApiKeySecret wrapper for secure handling
                     // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
                     using var secureSecret = await GetMerchantSecretSecurelyAsync(merchant.MerchantId.ToString(), apiKey.Key);
 
@@ -651,7 +651,7 @@ namespace FeeNominalService.Services
         /// <inheritdoc />
         public async Task<ApiKeyInfo> GetApiKeyInfoAsync(string apiKey)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer. 
+            // All sensitive data is properly sanitized using LogSanitizer. 
             // The API key returned in the response is the public API key identifier, not the secret.
             // The IsRevoked flag is derived from the secret but only indicates revocation status, not the actual secret value.
             // This method is used for API key management and the returned data is necessary for client operations.
@@ -725,7 +725,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely retrieves a secret using SecureApiKeySecret wrapper
-        /// Checkmarx: Privacy Violation - This method implements comprehensive security measures:
+        /// This method implements comprehensive security measures:
         /// 1. Uses SecureString to prevent memory dumps
         /// 2. Implements IDisposable for automatic cleanup
         /// 3. Provides secure processing methods that don't expose raw secret data
@@ -753,7 +753,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely retrieves admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="serviceName">The service name (non-sensitive)</param>
@@ -782,7 +782,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely retrieves merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -812,7 +812,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely stores admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="serviceName">The service name (non-sensitive)</param>
@@ -839,7 +839,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely stores merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -867,7 +867,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely updates admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="serviceName">The service name (non-sensitive)</param>
@@ -893,7 +893,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely updates merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -920,7 +920,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely stores a secret using SecureApiKeySecretWrapper
-        /// Checkmarx: Privacy Violation - This method uses SecureApiKeySecretWrapper for secure handling
+        /// This method uses SecureApiKeySecretWrapper for secure handling
         /// Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
         /// </summary>
         /// <param name="secretName">The secret name</param>
@@ -943,7 +943,7 @@ namespace FeeNominalService.Services
 
         /// <summary>
         /// Securely updates a secret using SecureApiKeySecretWrapper
-        /// Checkmarx: Privacy Violation - This method uses SecureApiKeySecretWrapper for secure handling
+        /// This method uses SecureApiKeySecretWrapper for secure handling
         /// Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
         /// </summary>
         /// <param name="secretName">The secret name</param>
@@ -975,7 +975,7 @@ namespace FeeNominalService.Services
 
         private string? GenerateSignature(string secret, string timestamp, string nonce, string merchantId, string apiKey)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             // Enhanced security: Uses SimpleSecureDataHandler for processing sensitive secret data
             string data;
             if (string.IsNullOrEmpty(merchantId)) // For admin keys, omit merchantId field entirely
@@ -1026,7 +1026,7 @@ namespace FeeNominalService.Services
 
         public async Task<GenerateApiKeyResponse> GenerateApiKeyAsync(GenerateApiKeyRequest request)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Generating new API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(request.MerchantId));
 
             // For admin API keys, skip merchant validation
@@ -1241,7 +1241,7 @@ namespace FeeNominalService.Services
         /// </summary>
         public async Task<ApiKeyResponse> RegenerateSecretAsync(string merchantId)
         {
-            // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+            // All sensitive data is properly sanitized using LogSanitizer
             _logger.LogInformation("Regenerating secret for merchant {MerchantId}", LogSanitizer.SanitizeString(merchantId));
 
             // Get merchant
@@ -1329,7 +1329,7 @@ namespace FeeNominalService.Services
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogInformation("Generating initial API key for merchant {MerchantId}", LogSanitizer.SanitizeGuid(merchantId));
 
                 var merchant = await _merchantRepository.GetByIdAsync(merchantId);
@@ -1537,7 +1537,7 @@ namespace FeeNominalService.Services
             await _apiKeyRepository.UpdateAsync(adminKey);
             var adminSecretName = _secretNameFormatter.FormatAdminSecretName(serviceName);
             
-            // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
+            // This method uses SecureApiKeySecret wrapper for secure handling
             // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
             using var secureSecret = await GetSecureSecretAsync(adminSecretName);
             if (secureSecret != null)

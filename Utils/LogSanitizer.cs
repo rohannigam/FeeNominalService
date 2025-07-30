@@ -5,7 +5,7 @@ namespace FeeNominalService.Utils
 {
     /// <summary>
     /// Utility class for sanitizing input data before logging to prevent Log Forging attacks
-    /// Checkmarx: This class provides comprehensive input sanitization for logging
+    /// This class provides comprehensive input sanitization for logging
     /// </summary>
     public static class LogSanitizer
     {
@@ -15,7 +15,7 @@ namespace FeeNominalService.Utils
         
         /// <summary>
         /// Sanitizes a merchant ID for logging by validating it's a proper GUID format
-        /// Checkmarx: Privacy Violation - This method properly sanitizes merchant IDs
+        /// This method properly sanitizes merchant IDs
         /// </summary>
         /// <param name="merchantId">The merchant ID to sanitize</param>
         /// <returns>Sanitized merchant ID or "[INVALID_MERCHANT_ID]" if invalid</returns>
@@ -36,7 +36,7 @@ namespace FeeNominalService.Utils
 
         /// <summary>
         /// Sanitizes a GUID for logging
-        /// Checkmarx: Privacy Violation - This method properly sanitizes GUIDs
+        /// This method properly sanitizes GUIDs
         /// </summary>
         /// <param name="guid">The GUID to sanitize</param>
         /// <returns>Sanitized GUID or "[INVALID_GUID]" if invalid</returns>
@@ -57,7 +57,7 @@ namespace FeeNominalService.Utils
 
         /// <summary>
         /// Sanitizes a GUID for logging
-        /// Checkmarx: Privacy Violation - This method properly sanitizes GUIDs
+        /// This method properly sanitizes GUIDs
         /// </summary>
         /// <param name="guid">The GUID to sanitize</param>
         /// <returns>Sanitized GUID or "[NULL_GUID]" if null</returns>
@@ -71,7 +71,7 @@ namespace FeeNominalService.Utils
 
         /// <summary>
         /// Sanitizes a string for logging by removing control characters and validating format
-        /// Checkmarx: Privacy Violation - This method properly sanitizes strings for logging
+        /// This method properly sanitizes strings for logging
         /// </summary>
         /// <param name="input">The string to sanitize</param>
         /// <returns>Sanitized string</returns>
@@ -92,7 +92,7 @@ namespace FeeNominalService.Utils
 
         /// <summary>
         /// Sanitizes a secret name for logging - more restrictive validation
-        /// Checkmarx: Privacy Violation - This method properly sanitizes secret names
+        /// This method properly sanitizes secret names
         /// </summary>
         /// <param name="secretName">The secret name to sanitize</param>
         /// <returns>Sanitized secret name or "[INVALID_SECRET_NAME]" if invalid</returns>
@@ -113,7 +113,7 @@ namespace FeeNominalService.Utils
 
         /// <summary>
         /// Checks if a string contains dangerous patterns that could be used for log injection
-        /// Checkmarx: Log Forging - This method detects dangerous patterns
+        /// This method detects dangerous patterns
         /// </summary>
         /// <param name="input">The input string</param>
         /// <returns>True if dangerous patterns are found</returns>
@@ -135,7 +135,7 @@ namespace FeeNominalService.Utils
 
         /// <summary>
         /// Removes control characters that could be used for log injection
-        /// Checkmarx: Log Forging - This method removes dangerous control characters
+        /// This method removes dangerous control characters
         /// </summary>
         /// <param name="input">The input string</param>
         /// <returns>String with control characters removed</returns>

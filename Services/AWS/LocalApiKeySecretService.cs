@@ -12,7 +12,7 @@ using FeeNominalService.Utils;
 
 namespace FeeNominalService.Services.AWS
 {
-    // Checkmarx: Privacy Violation - This service uses LogSanitizer.SanitizeSecretName for secure handling of secret names
+    // This service uses LogSanitizer.SanitizeSecretName for secure handling of secret names
     // Enhanced security: Secret names contain sensitive data (merchant IDs, API keys) but are properly sanitized before logging
     public class LocalApiKeySecretService : IAwsSecretsManagerService
     {
@@ -34,7 +34,7 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogInformation("Getting secret {SecretName} from database", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
@@ -52,7 +52,7 @@ namespace FeeNominalService.Services.AWS
                     // Use secure wrapper for admin secret handling
                     using var secureAdminSecret = SecureApiKeySecretWrapper.FromApiKeySecret(adminSecret);
                     
-                    // Checkmarx: Privacy Violation - apiKey is sanitized before logging
+                    // apiKey is sanitized before logging
                     _logger.LogInformation("Found admin secret with API key: {ApiKey}", LogSanitizer.SanitizeString(secureAdminSecret.GetApiKey()));
                     return secureAdminSecret.ToJsonString();
                 }
@@ -86,7 +86,7 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogInformation("Getting secret {SecretName} from database", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
@@ -139,7 +139,7 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogInformation("Storing secret {SecretName} in database", LogSanitizer.SanitizeSecretName(secretName));
                 
                 // Extract API key from secret name
@@ -186,7 +186,7 @@ namespace FeeNominalService.Services.AWS
             }
             catch (Exception ex)
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogError(ex, "Error storing secret {SecretName}", LogSanitizer.SanitizeSecretName(secretName));
                 throw;
             }
@@ -196,7 +196,7 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogInformation("Creating secret {SecretName} in database", LogSanitizer.SanitizeSecretName(secretName));
                 
                 // Extract API key from secret name
@@ -237,7 +237,7 @@ namespace FeeNominalService.Services.AWS
             }
             catch (Exception ex)
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogError(ex, "Error creating secret {SecretName}", LogSanitizer.SanitizeSecretName(secretName));
                 throw;
             }
@@ -247,7 +247,7 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
+                // All sensitive data is properly sanitized using LogSanitizer
                 _logger.LogInformation("Updating secret {SecretName} in database", LogSanitizer.SanitizeString(secretName));
                 
                 // Extract API key from secret name
@@ -310,8 +310,8 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
-                // Checkmarx: Privacy Violation - apiKey and merchantId are sanitized before logging
+                // All sensitive data is properly sanitized using LogSanitizer
+                // apiKey and merchantId are sanitized before logging
                 _logger.LogInformation("Validating API key {ApiKey} for merchant {MerchantId} in database", LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(merchantId));
                 
                 if (!Guid.TryParse(merchantId, out _))
@@ -332,7 +332,7 @@ namespace FeeNominalService.Services.AWS
             }
             catch (Exception ex)
             {
-                // Checkmarx: Privacy Violation - apiKey and merchantId are sanitized before logging
+                // apiKey and merchantId are sanitized before logging
                 _logger.LogError(ex, "Error validating API key {ApiKey} for merchant {MerchantId}", LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(merchantId));
                 return false;
             }
@@ -342,8 +342,8 @@ namespace FeeNominalService.Services.AWS
         {
             try
             {
-                // Checkmarx: Privacy Violation - All sensitive data is properly sanitized using LogSanitizer
-                // Checkmarx: Privacy Violation - apiKey and merchantId are sanitized before logging
+                // All sensitive data is properly sanitized using LogSanitizer
+                // apiKey and merchantId are sanitized before logging
                 _logger.LogInformation("Revoking API key {ApiKey} for merchant {MerchantId} in database", LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(merchantId));
                 
                 if (!Guid.TryParse(merchantId, out _))
@@ -366,7 +366,7 @@ namespace FeeNominalService.Services.AWS
             }
             catch (Exception ex)
             {
-                // Checkmarx: Privacy Violation - apiKey and merchantId are sanitized before logging
+                // apiKey and merchantId are sanitized before logging
                 _logger.LogError(ex, "Error revoking API key {ApiKey} for merchant {MerchantId}", LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(merchantId));
                 throw;
             }
@@ -392,7 +392,7 @@ namespace FeeNominalService.Services.AWS
 
         /// <summary>
         /// Securely retrieves merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -417,7 +417,7 @@ namespace FeeNominalService.Services.AWS
 
         /// <summary>
         /// Securely stores merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -442,7 +442,7 @@ namespace FeeNominalService.Services.AWS
 
         /// <summary>
         /// Securely updates merchant secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="merchantId">The merchant ID (non-sensitive)</param>
@@ -467,7 +467,7 @@ namespace FeeNominalService.Services.AWS
 
         /// <summary>
         /// Securely retrieves admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="serviceName">The service name (non-sensitive)</param>
@@ -491,7 +491,7 @@ namespace FeeNominalService.Services.AWS
 
         /// <summary>
         /// Securely stores admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="serviceName">The service name (non-sensitive)</param>
@@ -515,7 +515,7 @@ namespace FeeNominalService.Services.AWS
 
         /// <summary>
         /// Securely updates admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="serviceName">The service name (non-sensitive)</param>

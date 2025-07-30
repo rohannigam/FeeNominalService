@@ -21,7 +21,7 @@ namespace FeeNominalService.Controllers.V1
         public string ServiceName { get; set; } = "default";
     }
 
-    // Checkmarx: Privacy Violation - This controller uses SecureApiKeySecret wrapper for secure handling of admin secrets
+    // This controller uses SecureApiKeySecret wrapper for secure handling of admin secrets
     // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps and exposure
     [ApiController]
     [Route("api/v1/admin")]
@@ -45,7 +45,7 @@ namespace FeeNominalService.Controllers.V1
         /// <summary>
         /// Generates a global admin/superuser API key (cross-merchant access, only for bulk sale complete)
         /// </summary>
-        // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
+        // This method uses SecureApiKeySecret wrapper for secure handling
         // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
         [HttpPost("apiKey/generate")]
         [AllowAnonymous]
@@ -75,7 +75,7 @@ namespace FeeNominalService.Controllers.V1
             // Extract serviceName from request (required for multi-admin-key support)
             var serviceName = request.Purpose?.ToLowerInvariant() ?? "default";
             
-            // Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+            // This method uses a secure approach to avoid passing sensitive data
             // Enhanced security: Instead of passing secret names containing sensitive data, we use a service-based approach
             // that internally handles the secret name formatting and retrieval without exposing sensitive data
             _logger.LogInformation("Looking up admin secret for service: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
@@ -171,7 +171,7 @@ namespace FeeNominalService.Controllers.V1
 
         /// <summary>
         /// Securely retrieves admin secret without exposing sensitive data in method parameters
-        /// Checkmarx: Privacy Violation - This method uses a secure approach to avoid passing sensitive data
+        /// This method uses a secure approach to avoid passing sensitive data
         /// Enhanced security: Secret name formatting is handled internally without exposing sensitive data
         /// </summary>
         /// <param name="secretsManager">The secrets manager service</param>
@@ -184,7 +184,7 @@ namespace FeeNominalService.Controllers.V1
                 // Build the secret name internally without exposing it to the calling method
                 var secretName = _secretNameFormatter.FormatAdminSecretName(serviceName);
                 
-                // Checkmarx: Privacy Violation - Secret name is only used internally and not logged or exposed
+                // Secret name is only used internally and not logged or exposed
                 // Enhanced security: The secret name is handled securely within this private method
                 return await secretsManager.GetSecureApiKeySecretAsync(secretName);
             }

@@ -7,7 +7,7 @@ namespace FeeNominalService.Utils
 {
     /// <summary>
     /// Simple secure handler for sensitive data using SecureString (without ProtectedData)
-    /// Checkmarx: This class provides secure handling of sensitive data to prevent memory dumps
+    /// This class provides secure handling of sensitive data to prevent memory dumps
     /// </summary>
     public static class SimpleSecureDataHandler
     {

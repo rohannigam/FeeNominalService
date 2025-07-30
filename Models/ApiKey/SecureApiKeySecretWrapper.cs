@@ -7,7 +7,7 @@ namespace FeeNominalService.Models.ApiKey
 {
     /// <summary>
     /// Secure wrapper for ApiKeySecret objects using SecureString to prevent memory dumps
-    /// Checkmarx: Privacy Violation - This class uses SecureString for secure handling of API key secrets
+    /// This class uses SecureString for secure handling of API key secrets
     /// Enhanced security: Uses SecureString and proper disposal to prevent memory dumps and exposure
     /// </summary>
     public class SecureApiKeySecretWrapper : IDisposable
