@@ -14,5 +14,8 @@ namespace FeeNominalService.Services.AWS
         Task<IEnumerable<T>> GetAllSecretsAsync<T>() where T : class;
         Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey);
         Task RevokeApiKeyAsync(string merchantId, string apiKey);
+        Task<SecureApiKeySecret?> GetSecureApiKeySecretAsync(string secretName);
+        Task StoreSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret);
+        Task UpdateSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret);
     }
 } 

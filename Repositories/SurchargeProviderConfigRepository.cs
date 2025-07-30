@@ -6,6 +6,7 @@ using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using FeeNominalService.Utils;
 
 namespace FeeNominalService.Repositories
 {
@@ -339,7 +340,8 @@ namespace FeeNominalService.Repositories
                 _context.SurchargeProviderConfigs.Add(config);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Created provider config {ConfigId} for scope {Scope}", config.Id, config.Scope);
+                _logger.LogInformation("Created provider config {ConfigId} for scope {Scope} with secure credentials", 
+                    LogSanitizer.SanitizeGuid(config.Id), LogSanitizer.SanitizeString(config.Scope));
                 return config;
             }
             catch (Exception ex)

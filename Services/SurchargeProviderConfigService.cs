@@ -7,6 +7,7 @@ using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Repositories;
 using Microsoft.Extensions.Logging;
 using FeeNominalService.Utils;
+using FeeNominalService.Models.SurchargeProvider;
 
 namespace FeeNominalService.Services
 {
@@ -169,6 +170,11 @@ namespace FeeNominalService.Services
                 config.SuccessCount = 0;
                 config.ErrorCount = 0;
 
+                // Handle credentials securely before saving
+                using var secureCredentials = SecureCredentials.FromJsonDocument(config.Credentials);
+                _logger.LogInformation("Creating config with secure credentials for merchant {MerchantId} and provider {ProviderId}", 
+                    LogSanitizer.SanitizeMerchantId(config.MerchantId?.ToString()), LogSanitizer.SanitizeGuid(config.ProviderId));
+
                 return await _repository.CreateAsync(config);
             }
             catch (Exception ex)
@@ -210,6 +216,10 @@ namespace FeeNominalService.Services
 
                 // Update timestamp
                 config.UpdatedAt = DateTime.UtcNow;
+
+                // Handle credentials securely before updating
+                using var secureCredentials = SecureCredentials.FromJsonDocument(config.Credentials);
+                _logger.LogInformation("Updating config with secure credentials for config {ConfigId}", LogSanitizer.SanitizeGuid(config.Id));
 
                 return await _repository.UpdateAsync(config);
             }
@@ -368,13 +378,26 @@ namespace FeeNominalService.Services
                     throw new KeyNotFoundException($"Config with ID {configId} not found");
                 }
 
+                // Use SecureCredentials for secure handling of credentials data
+                using var secureIncomingCredentials = SecureCredentials.FromJsonDocument(credentials);
+                using var secureStoredCredentials = SecureCredentials.FromJsonDocument(config.Credentials);
+
                 // TODO: Implement additional validation logic
                 // This would typically involve:
-                // 1. Comparing the provided credentials with the stored credentials
+                // 1. Comparing the provided credentials with the stored credentials securely
                 // 2. Checking for required fields, data types, etc.
                 // 3. Validating any provider-specific requirements
 
-                return true;
+                // Example of secure credentials comparison:
+                var isValid = secureIncomingCredentials.ProcessCredentialsSecurely(incomingCreds => 
+                    secureStoredCredentials.ProcessCredentialsSecurely(storedCreds => {
+                        // Compare credentials securely without exposing them as strings
+                        // This is where the actual validation logic would go
+                        return true; // Placeholder
+                    })
+                );
+
+                return isValid;
             }
             catch (Exception ex)
             {

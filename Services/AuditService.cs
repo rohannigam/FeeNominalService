@@ -55,12 +55,16 @@ namespace FeeNominalService.Services
                 {
                     foreach (var kvp in fieldChanges)
                     {
+                        // Sanitize sensitive field values before storing in audit log
+                        var sanitizedOldValue = IsSensitiveField(kvp.Key) ? "[REDACTED]" : kvp.Value.OldValue;
+                        var sanitizedNewValue = IsSensitiveField(kvp.Key) ? "[REDACTED]" : kvp.Value.NewValue;
+
                         var detail = new AuditLogDetail
                         {
                             AuditLogId = auditLog.Id,
                             FieldName = kvp.Key,
-                            OldValue = kvp.Value.OldValue,
-                            NewValue = kvp.Value.NewValue,
+                            OldValue = sanitizedOldValue,
+                            NewValue = sanitizedNewValue,
                             CreatedAt = DateTime.UtcNow
                         };
                         _context.Set<AuditLogDetail>().Add(detail);
@@ -122,6 +126,33 @@ namespace FeeNominalService.Services
                     entityType, entityId);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Determines if a field name contains sensitive data that should be redacted
+        /// </summary>
+        /// <param name="fieldName">The field name to check</param>
+        /// <returns>True if the field contains sensitive data</returns>
+        private static bool IsSensitiveField(string fieldName)
+        {
+            if (string.IsNullOrEmpty(fieldName))
+                return false;
+
+            var sensitiveFieldNames = new[]
+            {
+                "credentials",
+                "secret",
+                "password",
+                "token",
+                "key",
+                "api_key",
+                "jwt",
+                "authorization",
+                "auth"
+            };
+
+            return sensitiveFieldNames.Any(sensitive => 
+                fieldName.Contains(sensitive, StringComparison.OrdinalIgnoreCase));
         }
     }
 } 

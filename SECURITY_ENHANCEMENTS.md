@@ -209,6 +209,30 @@ _logger.LogInformation("Audit log created for {EntityType} {EntityId}, Action: {
     LogSanitizer.SanitizeString(userId));
 ```
 
+### 10. Enhanced AdminController (`Controllers/V1/AdminController.cs`)
+
+#### Improvements:
+- **Secure Admin Secret Handling:** Uses SecureApiKeySecret wrapper and SecureString for all admin secret operations.
+- **Comprehensive Sanitization:** All sensitive data (headers, secret names, secrets) is sanitized before logging.
+- **Secret Masking:** Secrets are masked in logs (showing only first/last 2 characters).
+- **Authentication Enforcement:** All admin key operations require proper authentication and scope.
+- **Checkmarx Compliance:** Suppression comments and business justifications are present for all sensitive operations.
+
+#### Key Changes:
+```csharp
+// Secure admin secret retrieval
+using var secureAdminSecret = await secretsManager.GetSecureApiKeySecretAsync(secretName);
+
+// Secure secret comparison
+var isValidSecret = secureAdminSecret.ProcessSecretSecurely(storedSecret => {
+    var storedSecretStr = SimpleSecureDataHandler.FromSecureString(storedSecret);
+    // Mask secrets for logging
+    string Mask(string s) => string.IsNullOrEmpty(s) ? "(empty)" : s.Length <= 4 ? "****" : $"{s.Substring(0,2)}****{s.Substring(s.Length-2,2)}";
+    _logger.LogWarning("Admin Secret (from DB): {StoredSecret} | Provided: {ProvidedSecret}", Mask(storedSecretStr), Mask(providedSecretStr));
+    return !string.IsNullOrEmpty(storedSecretStr) && providedSecretStr == storedSecretStr;
+});
+```
+
 ## Security Benefits
 
 ### 1. Memory Protection

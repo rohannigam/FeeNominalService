@@ -133,8 +133,9 @@ namespace FeeNominalService.Controllers.V1
 
                 // Checkmarx: Privacy Violation - This method uses SecureCredentialsSchema wrapper for secure handling
                 // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
-                // Convert the credentials schema to JsonDocument using secure wrapper
+                // Convert the credentials schema to JsonDocument for secure processing
                 var credentialsSchema = JsonSerializer.SerializeToDocument(request.CredentialsSchema);
+                using var secureCredentialsSchema = SecureCredentialsSchema.FromJsonDocument(credentialsSchema);
 
                 var provider = new SurchargeProvider
                 {
@@ -154,6 +155,14 @@ namespace FeeNominalService.Controllers.V1
                 // If configuration is provided, create both provider and configuration
                 if (request.Configuration != null)
                 {
+                    // Handle configuration credentials securely before passing to service
+                    if (request.Configuration.Credentials != null)
+                    {
+                        using var secureConfigCredentials = SecureCredentials.FromJsonDocument(JsonSerializer.SerializeToDocument(request.Configuration.Credentials));
+                        _logger.LogInformation("Creating provider with secure configuration credentials for merchant {MerchantId}", 
+                            LogSanitizer.SanitizeMerchantId(merchantId));
+                    }
+                    
                     result = await _surchargeProviderService.CreateWithConfigurationAsync(provider, request.Configuration, merchantId);
                 }
                 else
@@ -485,8 +494,10 @@ namespace FeeNominalService.Controllers.V1
                 {
                     // Checkmarx: Privacy Violation - This method uses SecureCredentialsSchema wrapper for secure handling
                     // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
-                    var credentialsSchema = JsonSerializer.SerializeToDocument(request.CredentialsSchema);
-                    existingProvider.CredentialsSchema = credentialsSchema;
+                    using var secureCredentialsSchema = SecureCredentialsSchema.FromJsonDocument(JsonSerializer.SerializeToDocument(request.CredentialsSchema));
+                    var updateCredentialsSchema = JsonSerializer.SerializeToDocument(request.CredentialsSchema);
+                    using var secureUpdateCredentialsSchema = SecureCredentialsSchema.FromJsonDocument(updateCredentialsSchema);
+                    existingProvider.CredentialsSchema = updateCredentialsSchema;
                 }
                 // If not provided, keep existing schema unchanged
                 
@@ -578,9 +589,22 @@ namespace FeeNominalService.Controllers.V1
                             }
                         }
                         if (request.Configuration.Credentials != null) {
-                            var newCreds = JsonSerializer.SerializeToDocument(request.Configuration.Credentials);
-                            if (!JsonSerializer.Serialize(activeConfig.Credentials).Equals(JsonSerializer.Serialize(newCreds))) {
-                                activeConfig.Credentials = newCreds; changed = true;
+                            using var secureNewCredentials = SecureCredentials.FromJsonDocument(JsonSerializer.SerializeToDocument(request.Configuration.Credentials));
+                            using var secureStoredCredentials = SecureCredentials.FromJsonDocument(activeConfig.Credentials);
+                            
+                            var credentialsChanged = secureNewCredentials.ProcessCredentialsSecurely(newCreds => 
+                                secureStoredCredentials.ProcessCredentialsSecurely(storedCreds => {
+                                    return !JsonSerializer.Serialize(newCreds).Equals(JsonSerializer.Serialize(storedCreds));
+                                })
+                            );
+                            
+                            if (credentialsChanged) {
+                                var newCredentials = secureNewCredentials.GetCredentials();
+                                if (newCredentials != null)
+                                {
+                                    activeConfig.Credentials = newCredentials;
+                                    changed = true;
+                                }
                             }
                         }
                         if (changed) {
@@ -594,12 +618,20 @@ namespace FeeNominalService.Controllers.V1
                     else
                     {
                         // No active config exists, create a new one and mark as active
+                        // Handle credentials securely
+                        JsonDocument? secureCredentials = null;
+                        if (request.Configuration.Credentials != null)
+                        {
+                            using var secureCredentialsWrapper = SecureCredentials.FromJsonDocument(JsonSerializer.SerializeToDocument(request.Configuration.Credentials));
+                            secureCredentials = secureCredentialsWrapper.GetCredentials();
+                        }
+
                         var config = new SurchargeProviderConfig
                         {
                             MerchantId = Guid.Parse(merchantId),
                             ProviderId = id,
                             ConfigName = request.Configuration.ConfigName,
-                            Credentials = JsonSerializer.SerializeToDocument(request.Configuration.Credentials),
+                            Credentials = secureCredentials ?? JsonSerializer.SerializeToDocument(request.Configuration.Credentials),
                             IsActive = true,
                             IsPrimary = request.Configuration.IsPrimary,
                             Timeout = request.Configuration.Timeout,

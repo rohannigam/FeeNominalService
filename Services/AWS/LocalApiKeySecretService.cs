@@ -49,9 +49,12 @@ namespace FeeNominalService.Services.AWS
                         return null;
                     }
                     
+                    // Use secure wrapper for admin secret handling
+                    using var secureAdminSecret = SecureApiKeySecretWrapper.FromApiKeySecret(adminSecret);
+                    
                     // Checkmarx: Privacy Violation - apiKey is sanitized before logging
-                    _logger.LogInformation("Found admin secret with API key: {ApiKey}", LogSanitizer.SanitizeString(adminSecret.ApiKey));
-                    return JsonSerializer.Serialize(adminSecret);
+                    _logger.LogInformation("Found admin secret with API key: {ApiKey}", LogSanitizer.SanitizeString(secureAdminSecret.GetApiKey()));
+                    return secureAdminSecret.ToJsonString();
                 }
                 
                 // Extract API key from secret name
@@ -65,7 +68,12 @@ namespace FeeNominalService.Services.AWS
                 var secret = await _context.ApiKeySecrets
                     .FirstOrDefaultAsync(s => s.ApiKey == apiKey);
 
-                return secret != null ? JsonSerializer.Serialize(secret) : null;
+                if (secret == null)
+                    return null;
+
+                // Use secure wrapper for secret handling
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
+                return secureSecret.ToJsonString();
             }
             catch (Exception ex)
             {
@@ -93,8 +101,11 @@ namespace FeeNominalService.Services.AWS
                         return null;
                     }
                     
-                    _logger.LogInformation("Found admin secret with API key: {ApiKey}", LogSanitizer.SanitizeString(adminSecret.ApiKey));
-                    return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(adminSecret));
+                    // Use secure wrapper for admin secret handling
+                    using var secureAdminSecret = SecureApiKeySecretWrapper.FromApiKeySecret(adminSecret);
+                    
+                    _logger.LogInformation("Found admin secret with API key: {ApiKey}", LogSanitizer.SanitizeString(secureAdminSecret.GetApiKey()));
+                    return JsonSerializer.Deserialize<T>(secureAdminSecret.ToJsonString());
                 }
                 
                 // Extract API key from secret name
@@ -113,7 +124,9 @@ namespace FeeNominalService.Services.AWS
                     return null;
                 }
 
-                return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(secret));
+                // Use secure wrapper for secret handling
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
+                return JsonSerializer.Deserialize<T>(secureSecret.ToJsonString());
             }
             catch (Exception ex)
             {
@@ -136,11 +149,14 @@ namespace FeeNominalService.Services.AWS
                     throw new ArgumentException($"Invalid secret name format: {secretName}");
                 }
 
+                // Use secure wrapper for secret deserialization
                 var secret = JsonSerializer.Deserialize<ApiKeySecret>(secretValue);
                 if (secret == null)
                 {
                     throw new ArgumentException("Invalid secret value format");
                 }
+
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
 
                 // Check if secret already exists
                 var existingSecret = await _context.ApiKeySecrets
@@ -148,21 +164,22 @@ namespace FeeNominalService.Services.AWS
 
                 if (existingSecret != null)
                 {
-                    // Update existing secret
-                    existingSecret.Secret = secret.Secret;
-                    existingSecret.Status = secret.Status;
-                    existingSecret.IsRevoked = secret.IsRevoked;
-                    existingSecret.RevokedAt = secret.RevokedAt;
-                    existingSecret.LastRotated = secret.LastRotated;
+                    // Update existing secret using secure wrapper
+                    existingSecret.Secret = secureSecret.GetSecret();
+                    existingSecret.Status = secureSecret.Status;
+                    existingSecret.IsRevoked = secureSecret.IsRevoked;
+                    existingSecret.RevokedAt = secureSecret.RevokedAt;
+                    existingSecret.LastRotated = secureSecret.LastRotated;
                     existingSecret.UpdatedAt = DateTime.UtcNow;
                 }
                 else
                 {
-                    // Create new secret
-                    secret.ApiKey = apiKey;
-                    secret.CreatedAt = DateTime.UtcNow;
-                    secret.UpdatedAt = DateTime.UtcNow;
-                    _context.ApiKeySecrets.Add(secret);
+                    // Create new secret using secure wrapper
+                    var newSecret = secureSecret.ToApiKeySecret();
+                    newSecret.ApiKey = apiKey;
+                    newSecret.CreatedAt = DateTime.UtcNow;
+                    newSecret.UpdatedAt = DateTime.UtcNow;
+                    _context.ApiKeySecrets.Add(newSecret);
                 }
 
                 await _context.SaveChangesAsync();
@@ -274,7 +291,19 @@ namespace FeeNominalService.Services.AWS
         public async Task<IEnumerable<T>> GetAllSecretsAsync<T>() where T : class
         {
             var secrets = await _context.ApiKeySecrets.ToListAsync();
-            return secrets.Select(s => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(s))).Where(s => s != null)!;
+            var secureSecrets = new List<T>();
+            
+            foreach (var secret in secrets)
+            {
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
+                var deserialized = JsonSerializer.Deserialize<T>(secureSecret.ToJsonString());
+                if (deserialized != null)
+                {
+                    secureSecrets.Add(deserialized);
+                }
+            }
+            
+            return secureSecrets;
         }
 
         public async Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey)
@@ -294,7 +323,12 @@ namespace FeeNominalService.Services.AWS
                                  var secret = await _context.ApiKeySecrets
                      .FirstOrDefaultAsync(s => s.ApiKey == apiKey && s.MerchantId.ToString() == merchantId && !s.IsRevoked && s.Status == "ACTIVE");
 
-                return secret != null;
+                if (secret == null)
+                    return false;
+
+                // Use secure wrapper for validation
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
+                return secureSecret.Status == "ACTIVE" && !secureSecret.IsRevoked;
             }
             catch (Exception ex)
             {
@@ -334,6 +368,53 @@ namespace FeeNominalService.Services.AWS
             {
                 // Checkmarx: Privacy Violation - apiKey and merchantId are sanitized before logging
                 _logger.LogError(ex, "Error revoking API key {ApiKey} for merchant {MerchantId}", LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(merchantId));
+                throw;
+            }
+        }
+
+        public async Task<SecureApiKeySecret?> GetSecureApiKeySecretAsync(string secretName)
+        {
+            try
+            {
+                var secret = await GetSecretAsync<ApiKeySecret>(secretName);
+                if (secret == null)
+                    return null;
+                // Convert wrapper to SecureApiKeySecret for interface compatibility
+                using var wrapper = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
+                return SecureApiKeySecret.FromApiKeySecret(wrapper.ToApiKeySecret());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error retrieving secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
+                return null;
+            }
+        }
+
+        public async Task StoreSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret)
+        {
+            try
+            {
+                var apiKeySecret = secureSecret.ToApiKeySecret();
+                var jsonString = JsonSerializer.Serialize(apiKeySecret);
+                await StoreSecretAsync(secretName, jsonString);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error storing secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
+                throw;
+            }
+        }
+
+        public async Task UpdateSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret)
+        {
+            try
+            {
+                var apiKeySecret = secureSecret.ToApiKeySecret();
+                await UpdateSecretAsync(secretName, apiKeySecret);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
                 throw;
             }
         }

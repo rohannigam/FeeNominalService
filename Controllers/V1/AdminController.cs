@@ -80,35 +80,21 @@ namespace FeeNominalService.Controllers.V1
 
             _logger.LogInformation("Looking up admin secret: {SecretName}", LogSanitizer.SanitizeString(secretName));
 
-            // Checkmarx: Privacy Violation - This method uses SecureApiKeySecret wrapper for secure handling
-            // Enhanced security: Uses SecureString and proper disposal to prevent memory dumps
-            // Fetch the admin secret from secrets manager using secure wrapper
-            var secretJson = await secretsManager.GetSecretAsync(secretName);
-            if (string.IsNullOrEmpty(secretJson))
+            // Fetch the admin secret securely
+            using var secureAdminSecret = await secretsManager.GetSecureApiKeySecretAsync(secretName);
+            if (secureAdminSecret == null)
             {
                 return StatusCode(403, new { error = $"Admin secret not configured for {serviceName}." });
             }
 
-            // Parse the secret value and create secure wrapper
-            var secretObj = System.Text.Json.JsonSerializer.Deserialize<ApiKeySecret>(secretJson);
-            if (secretObj == null)
-            {
-                return StatusCode(403, new { error = "Invalid admin secret format." });
-            }
-
-            // Create secure wrapper for the admin secret
-            using var secureAdminSecret = SecureApiKeySecret.FromApiKeySecret(secretObj);
             string providedSecretStr = providedSecret.ToString();
-            
             // Use secure processing to compare secrets
             var isValidSecret = secureAdminSecret.ProcessSecretSecurely(storedSecret =>
             {
                 var storedSecretStr = SimpleSecureDataHandler.FromSecureString(storedSecret);
-                
                 // Mask secrets for logging (show only first/last 2 chars)
                 string Mask(string s) => string.IsNullOrEmpty(s) ? "(empty)" : s.Length <= 4 ? "****" : $"{s.Substring(0,2)}****{s.Substring(s.Length-2,2)}";
                 _logger.LogWarning("Admin Secret (from DB): {StoredSecret} | Provided: {ProvidedSecret}", Mask(storedSecretStr), Mask(providedSecretStr));
-                
                 return !string.IsNullOrEmpty(storedSecretStr) && providedSecretStr == storedSecretStr;
             });
 

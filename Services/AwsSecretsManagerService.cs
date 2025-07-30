@@ -11,6 +11,7 @@ using System;
 using System.Threading.Tasks;
 using FeeNominalService.Services.AWS;
 using FeeNominalService.Utils;
+using System.Collections.Generic;
 
 namespace FeeNominalService.Services
 {
@@ -62,8 +63,17 @@ namespace FeeNominalService.Services
                 };
 
                 var response = await _secretsManager.GetSecretValueAsync(request);
-                return JsonSerializer.Deserialize<T>(response.SecretString) 
+                var deserialized = JsonSerializer.Deserialize<T>(response.SecretString) 
                     ?? throw new InvalidOperationException($"Failed to deserialize secret {secretName}");
+
+                // Use secure wrapper for ApiKeySecret objects
+                if (typeof(T) == typeof(ApiKeySecret) && deserialized is ApiKeySecret apiKeySecret)
+                {
+                    using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(apiKeySecret);
+                    return JsonSerializer.Deserialize<T>(secureSecret.ToJsonString());
+                }
+
+                return deserialized;
             }
             catch (Exception ex)
             {
@@ -114,7 +124,19 @@ namespace FeeNominalService.Services
         {
             try
             {
-                var secretString = JsonSerializer.Serialize(secretValue);
+                string secretString;
+                
+                // Use secure wrapper for ApiKeySecret objects
+                if (typeof(T) == typeof(ApiKeySecret) && secretValue is ApiKeySecret apiKeySecret)
+                {
+                    using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(apiKeySecret);
+                    secretString = secureSecret.ToJsonString();
+                }
+                else
+                {
+                    secretString = JsonSerializer.Serialize(secretValue);
+                }
+
                 var request = new UpdateSecretRequest
                 {
                     SecretId = secretName,
@@ -168,7 +190,14 @@ namespace FeeNominalService.Services
             {
                 var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
                 var secret = await GetSecretAsync<ApiKeySecret>(secretName);
-                return secret != null && secret.ApiKey == apiKey;
+                
+                if (secret == null)
+                    return false;
+
+                // Use secure wrapper for validation
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
+                return secureSecret.ProcessApiKeySecurely(secureApiKey => 
+                    SimpleSecureDataHandler.FromSecureString(secureApiKey) == apiKey);
             }
             catch (Exception ex)
             {
@@ -184,20 +213,78 @@ namespace FeeNominalService.Services
                 var secretName = _secretNameFormatter.FormatMerchantSecretName(merchantId, apiKey);
                 var secret = await GetSecretAsync<ApiKeySecret>(secretName);
                 
-                if (secret == null || secret.ApiKey != apiKey)
+                if (secret == null)
                 {
                     throw new KeyNotFoundException($"API key {apiKey} not found for merchant {merchantId}");
                 }
 
-                secret.IsRevoked = true;
-                secret.RevokedAt = DateTime.UtcNow;
-                secret.Status = "REVOKED";
+                // Use secure wrapper for revocation
+                using var secureSecret = SecureApiKeySecretWrapper.FromApiKeySecret(secret);
                 
-                await UpdateSecretAsync(secretName, secret);
+                // Validate API key securely
+                var isValidApiKey = secureSecret.ProcessApiKeySecurely(secureApiKey => 
+                    SimpleSecureDataHandler.FromSecureString(secureApiKey) == apiKey);
+                
+                if (!isValidApiKey)
+                {
+                    throw new KeyNotFoundException($"API key {apiKey} not found for merchant {merchantId}");
+                }
+
+                // Update revocation status securely
+                secureSecret.IsRevoked = true;
+                secureSecret.RevokedAt = DateTime.UtcNow;
+                secureSecret.Status = "REVOKED";
+                
+                await UpdateSecretAsync(secretName, secureSecret.ToApiKeySecret());
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error revoking API key for merchant {MerchantId}", LogSanitizer.SanitizeMerchantId(merchantId));
+                throw;
+            }
+        }
+
+        public async Task<SecureApiKeySecret?> GetSecureApiKeySecretAsync(string secretName)
+        {
+            try
+            {
+                var secret = await GetSecretAsync<ApiKeySecret>(secretName);
+                if (secret == null)
+                    return null;
+                return SecureApiKeySecret.FromApiKeySecret(secret);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error retrieving secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
+                return null;
+            }
+        }
+
+        public async Task StoreSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret)
+        {
+            try
+            {
+                var apiKeySecret = secureSecret.ToApiKeySecret();
+                var jsonString = JsonSerializer.Serialize(apiKeySecret);
+                await StoreSecretAsync(secretName, jsonString);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error storing secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
+                throw;
+            }
+        }
+
+        public async Task UpdateSecureApiKeySecretAsync(string secretName, SecureApiKeySecret secureSecret)
+        {
+            try
+            {
+                var apiKeySecret = secureSecret.ToApiKeySecret();
+                await UpdateSecretAsync(secretName, apiKeySecret);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating secure secret for {SecretName}", LogSanitizer.SanitizeString(secretName));
                 throw;
             }
         }
