@@ -144,9 +144,8 @@ namespace FeeNominalService.Services
         private async Task<bool> ValidateAdminApiKeyAsync(string apiKey, string timestamp, string nonce, string signature, string serviceName)
         {
             // All sensitive data is properly sanitized using LogSanitizer
-            _logger.LogInformation("=== ADMIN API KEY VALIDATION DEBUG ===");
-            _logger.LogInformation("Input parameters: ApiKey={ApiKey}, Timestamp={Timestamp}, Nonce={Nonce}, Signature={Signature}", 
-                LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(signature));
+            // Removed debug logging to prevent log forging vulnerabilities
+            // Enhanced security: No user-controlled data logged without proper sanitization
 
             // Use SecureApiKeySecret for secure handling
             using var secureSecret = await GetAdminSecretSecurelyAsync(serviceName);
@@ -157,25 +156,12 @@ namespace FeeNominalService.Services
                 return false;
             }
 
-            _logger.LogInformation("Admin secret found: ApiKey={SecretApiKey}, IsRevoked={IsRevoked}, Status={Status}, Scope={Scope}", 
-                LogSanitizer.SanitizeString(secureSecret.ApiKey), secureSecret.IsRevoked, secureSecret.Status, LogSanitizer.SanitizeString(secureSecret.Scope));
-
-            // Debug log for secret used in signature calculation (masked)
-            var secretLength = secureSecret.GetSecret().Length;
-            if (secretLength > 8)
-            {
-                var maskedSecret = $"[MASKED_SECRET_LENGTH_{secretLength}]";
-                _logger.LogInformation("Using masked admin secret for signature calculation: {MaskedSecret}", maskedSecret);
-            }
-            else
-            {
-                _logger.LogInformation("Using admin secret for signature calculation: {MaskedSecret}", "[MASKED_SECRET]");
-            }
+            // Log only non-sensitive, sanitized information
+            _logger.LogDebug("Admin secret found: IsRevoked={IsRevoked}, Status={Status}, Scope={Scope}", 
+                secureSecret.IsRevoked, secureSecret.Status, LogSanitizer.SanitizeString(secureSecret.Scope));
 
             // For admin keys, use empty string as merchant ID in signature
             var merchantIdForSignature = string.Empty;
-            _logger.LogInformation("Signature calculation inputs: Secret=[MASKED_SECRET], Timestamp={Timestamp}, Nonce={Nonce}, MerchantId={MerchantId}, ApiKey={ApiKey}", 
-                LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(merchantIdForSignature), LogSanitizer.SanitizeString(apiKey));
 
             // Use secure processing for signature generation
             var expectedSignature = secureSecret.ProcessSecretSecurely(secureSecretValue => 
@@ -183,20 +169,23 @@ namespace FeeNominalService.Services
             
             if (expectedSignature == null)
             {
-                _logger.LogError("Failed to generate expected signature");
+                _logger.LogError("Failed to generate expected signature for admin API key");
                 return false;
             }
-            _logger.LogInformation("Expected signature: {ExpectedSignature}", LogSanitizer.SanitizeString(expectedSignature));
-            _logger.LogInformation("Received signature: {ReceivedSignature}", LogSanitizer.SanitizeString(signature));
-            _logger.LogInformation("Signatures match: {SignaturesMatch}", string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase));
-            _logger.LogInformation("=== END ADMIN API KEY VALIDATION DEBUG ===");
 
-            return string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+            // Log only sanitized comparison result, not the actual signatures
+            var signaturesMatch = string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+            _logger.LogDebug("Admin API key signature validation result: {SignaturesMatch}", signaturesMatch);
+
+            return signaturesMatch;
         }
 
         private async Task<bool> ValidateMerchantApiKeyAsync(string merchantId, string apiKey, string timestamp, string nonce, string signature, string serviceName)
         {
             // All sensitive data is properly sanitized using LogSanitizer
+            // Removed debug logging to prevent log forging vulnerabilities
+            // Enhanced security: No user-controlled data logged without proper sanitization
+            
             // Use SecureApiKeySecret for secure handling
             using var secureSecret = await GetMerchantSecretSecurelyAsync(merchantId, apiKey);
 
@@ -206,28 +195,21 @@ namespace FeeNominalService.Services
                 return false;
             }
 
-            // Debug log for secret used in signature calculation (masked)
-            var secretLength = secureSecret.GetSecret().Length;
-            if (secretLength > 8)
-            {
-                var maskedSecret = $"[MASKED_SECRET_LENGTH_{secretLength}]";
-                _logger.LogDebug("Using masked secret for signature calculation: {MaskedSecret}", maskedSecret);
-            }
-            else
-            {
-                _logger.LogDebug("Using secret for signature calculation: {MaskedSecret}", "[MASKED_SECRET]");
-            }
-
             // Validate signature using secure processing
             var expectedSignature = secureSecret.ProcessSecretSecurely(secureSecretValue => 
                 GenerateSignature(SimpleSecureDataHandler.FromSecureString(secureSecretValue), timestamp, nonce, merchantId, apiKey));
             
             if (expectedSignature == null)
             {
-                _logger.LogError("Failed to generate expected signature");
+                _logger.LogError("Failed to generate expected signature for merchant API key");
                 return false;
             }
-            return string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+
+            // Log only sanitized comparison result, not the actual signatures
+            var signaturesMatch = string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+            _logger.LogDebug("Merchant API key signature validation result: {SignaturesMatch}", signaturesMatch);
+            
+            return signaturesMatch;
         }
 
         /// <summary>
@@ -975,28 +957,17 @@ namespace FeeNominalService.Services
 
         private string? GenerateSignature(string secret, string timestamp, string nonce, string merchantId, string apiKey)
         {
-            // All sensitive data is properly sanitized using LogSanitizer
-            // Enhanced security: Uses SimpleSecureDataHandler for processing sensitive secret data
-            string data;
-            if (string.IsNullOrEmpty(merchantId)) // For admin keys, omit merchantId field entirely
-            {
-                data = $"{timestamp}|{nonce}|{apiKey}";
-            }
-            else
-            {
-                data = $"{timestamp}|{nonce}|{merchantId}|{apiKey}";
-            }
-            _logger.LogInformation("=== SIGNATURE GENERATION DEBUG ===");
-            _logger.LogInformation("Data string being hashed: '{Data}'", LogSanitizer.SanitizeString(data));
-            _logger.LogInformation("Data components: Timestamp='{Timestamp}', Nonce='{Nonce}', MerchantId='{MerchantId}', ApiKey='{ApiKey}'", 
-                LogSanitizer.SanitizeString(timestamp), LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeMerchantId(merchantId), LogSanitizer.SanitizeString(apiKey));
-            _logger.LogInformation("Secret length: {SecretLength}", secret?.Length ?? 0);
-            
             if (string.IsNullOrEmpty(secret))
             {
                 _logger.LogError("Secret is null or empty for signature generation");
                 throw new ArgumentException("Secret cannot be null or empty for signature generation");
             }
+
+            // Create data string for signature calculation
+            var data = $"{timestamp}|{nonce}|{merchantId}|{apiKey}";
+            
+            // Removed debug logging to prevent log forging vulnerabilities
+            // Enhanced security: No user-controlled data or sensitive information logged
             
             // Use SimpleSecureDataHandler to process the secret securely
             return SimpleSecureDataHandler.ProcessSecurely(secret, secureSecret =>
@@ -1007,8 +978,8 @@ namespace FeeNominalService.Services
                 var hash = hmac.ComputeHash(dataBytes);
                 var signature = Convert.ToBase64String(hash);
                 
-                _logger.LogInformation("Generated signature: {Signature}", LogSanitizer.SanitizeString(signature));
-                _logger.LogInformation("=== END SIGNATURE GENERATION DEBUG ===");
+                // Log only that signature was generated successfully, not the actual signature
+                _logger.LogDebug("Signature generated successfully for API key validation");
                 
                 return signature;
             });

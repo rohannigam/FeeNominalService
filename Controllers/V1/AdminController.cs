@@ -75,6 +75,13 @@ namespace FeeNominalService.Controllers.V1
             // Extract serviceName from request (required for multi-admin-key support)
             var serviceName = request.Purpose?.ToLowerInvariant() ?? "default";
             
+            // Validate service name format to prevent log injection
+            if (!IsValidServiceName(serviceName))
+            {
+                _logger.LogWarning("Invalid service name format provided for admin key generation: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+                return BadRequest(new { error = "Invalid service name format." });
+            }
+            
             // This method uses a secure approach to avoid passing sensitive data
             // Enhanced security: Instead of passing secret names containing sensitive data, we use a service-based approach
             // that internally handles the secret name formatting and retrieval without exposing sensitive data
@@ -125,6 +132,23 @@ namespace FeeNominalService.Controllers.V1
             [FromBody] AdminKeyServiceNameRequest req,
             [FromServices] IApiKeyService apiKeyService)
         {
+            // Validate and sanitize user-controlled input to prevent log forging
+            if (req == null)
+            {
+                return BadRequest(new { error = "Request body is required." });
+            }
+
+            var serviceName = req.ServiceName?.Trim() ?? "default";
+            
+            // Validate service name format to prevent log injection
+            if (!IsValidServiceName(serviceName))
+            {
+                _logger.LogWarning("Invalid service name format provided for admin key rotation: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+                return BadRequest(new { error = "Invalid service name format." });
+            }
+
+            _logger.LogInformation("Admin API key rotation requested for service: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+
             // Check if the authenticated key is admin-scope
             var scopeClaim = User.FindFirst("Scope")?.Value;
             if (scopeClaim != "admin")
@@ -136,7 +160,8 @@ namespace FeeNominalService.Controllers.V1
             }
 
             // Rotate the admin key (implementation in service)
-            var response = await apiKeyService.RotateAdminApiKeyAsync(req.ServiceName);
+            var response = await apiKeyService.RotateAdminApiKeyAsync(serviceName);
+            _logger.LogInformation("Admin API key rotated successfully for service: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
             return Ok(response);
         }
 
@@ -149,6 +174,23 @@ namespace FeeNominalService.Controllers.V1
             [FromBody] AdminKeyServiceNameRequest req,
             [FromServices] IApiKeyService apiKeyService)
         {
+            // Validate and sanitize user-controlled input to prevent log forging
+            if (req == null)
+            {
+                return BadRequest(new { error = "Request body is required." });
+            }
+
+            var serviceName = req.ServiceName?.Trim() ?? "default";
+            
+            // Validate service name format to prevent log injection
+            if (!IsValidServiceName(serviceName))
+            {
+                _logger.LogWarning("Invalid service name format provided for admin key revocation: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+                return BadRequest(new { error = "Invalid service name format." });
+            }
+
+            _logger.LogInformation("Admin API key revocation requested for service: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+
             // Check if the authenticated key is admin-scope
             var scopeClaim = User.FindFirst("Scope")?.Value;
             if (scopeClaim != "admin")
@@ -160,7 +202,8 @@ namespace FeeNominalService.Controllers.V1
             }
 
             // Revoke the admin key (implementation in service)
-            var response = await apiKeyService.RevokeAdminApiKeyAsync(req.ServiceName);
+            var response = await apiKeyService.RevokeAdminApiKeyAsync(serviceName);
+            _logger.LogInformation("Admin API key revoked successfully for service: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
             return Ok(new ApiResponse<ApiKeyRevokeResponse>
             {
                 Success = true,
@@ -193,6 +236,22 @@ namespace FeeNominalService.Controllers.V1
                 _logger.LogError(ex, "Error retrieving admin secret for service {ServiceName}", LogSanitizer.SanitizeString(serviceName));
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Validates service name format to prevent log injection and ensure security
+        /// </summary>
+        /// <param name="serviceName">The service name to validate</param>
+        /// <returns>True if the service name is valid</returns>
+        private bool IsValidServiceName(string serviceName)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName))
+                return false;
+
+            // Allow only alphanumeric characters, hyphens, underscores, and dots
+            // This prevents log injection and ensures safe service names
+            var validServiceNamePattern = @"^[a-zA-Z0-9\-_\.]+$";
+            return System.Text.RegularExpressions.Regex.IsMatch(serviceName, validServiceNamePattern);
         }
     }
 } 

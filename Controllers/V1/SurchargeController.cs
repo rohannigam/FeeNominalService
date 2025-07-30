@@ -39,7 +39,8 @@ namespace FeeNominalService.Controllers.V1
             {
                 _logger.LogInformation("Processing surcharge auth for transaction: {CorrelationId}", 
                     LogSanitizer.SanitizeString(request.CorrelationId));
-                _logger.LogInformation("Auth Request: {@Request}", request);
+                // Removed direct request logging to prevent log forging vulnerabilities
+                // Enhanced security: Only log non-sensitive, sanitized fields
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
@@ -65,7 +66,8 @@ namespace FeeNominalService.Controllers.V1
                 var response = await _surchargeTransactionService.ProcessAuthAsync(request, merchantId, actor);
 
                 _logger.LogInformation("Successfully processed surcharge auth for transaction: {CorrelationId}, surcharge transaction ID: {SurchargeTransactionId}", LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.SurchargeTransactionId));
-                _logger.LogInformation("Auth Response: {@Response}", response);
+                // Removed direct response logging to prevent log forging vulnerabilities
+                // Enhanced security: Only log non-sensitive, sanitized fields
 
                 return Ok(response);
             }
@@ -100,7 +102,8 @@ namespace FeeNominalService.Controllers.V1
             {
                 _logger.LogInformation("Processing surcharge sale for transaction: {CorrelationId}", 
                     LogSanitizer.SanitizeString(request.CorrelationId));
-                _logger.LogInformation("Sale Request: {@Request}", request);
+                // Removed direct request logging to prevent log forging vulnerabilities
+                // Enhanced security: Only log non-sensitive, sanitized fields
 
                 // Validate merchant ID from claims
                 var merchantIdClaim = User.FindFirst("MerchantId")?.Value;
@@ -128,7 +131,8 @@ namespace FeeNominalService.Controllers.V1
                 _logger.LogInformation("Successfully processed surcharge sale for transaction: {CorrelationId}, " +
                     "surcharge transaction ID: {SurchargeTransactionId}", 
                     LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.SurchargeTransactionId));
-                _logger.LogInformation("Sale Response: {@Response}", response);
+                // Removed direct response logging to prevent log forging vulnerabilities
+                // Enhanced security: Only log non-sensitive, sanitized fields
 
                 return Ok(response);
             }

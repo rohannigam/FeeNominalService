@@ -232,7 +232,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending sale request to InterPayments");
-            return (false, null, ex.Message);
+            throw new SurchargeException(SurchargeErrorCodes.InterPayments.SEND_REQUEST_FAILED, ex.Message, ex);
         }
 
         var json = await response.Content.ReadAsStringAsync();

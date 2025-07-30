@@ -510,7 +510,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", request.MerchantId);
+                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", LogSanitizer.SanitizeString(request.MerchantId));
                 return NotFound($"Merchant not found: {request.MerchantId}");
             }
             catch (Exception ex)
@@ -600,7 +600,7 @@ namespace FeeNominalService.Controllers.V1
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", request.MerchantId);
+                _logger.LogWarning(ex, "Merchant not found: {MerchantId}", LogSanitizer.SanitizeString(request.MerchantId));
                 return NotFound($"Merchant not found: {request.MerchantId}");
             }
             catch (Exception ex)
