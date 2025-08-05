@@ -42,7 +42,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Getting secret {SecretName} from AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
-                if (secretName == "feenominal/admin/api-key-secret")
+                if (_secretNameFormatter.IsAdminSecretName(secretName))
                 {
                     _logger.LogInformation("Retrieving admin secret from AWS Secrets Manager");
                 }
@@ -70,7 +70,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Getting secret {SecretName} from AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
-                if (secretName == "feenominal/admin/api-key-secret")
+                if (_secretNameFormatter.IsAdminSecretName(secretName))
                 {
                     _logger.LogInformation("Retrieving admin secret from AWS Secrets Manager");
                 }
@@ -108,7 +108,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Storing secret {SecretName} in AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
-                if (secretName == "feenominal/admin/api-key-secret")
+                if (_secretNameFormatter.IsAdminSecretName(secretName))
                 {
                     _logger.LogInformation("Storing admin secret in AWS Secrets Manager");
                 }
@@ -136,7 +136,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Creating secret {SecretName} in AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
-                if (secretName == "feenominal/admin/api-key-secret")
+                if (_secretNameFormatter.IsAdminSecretName(secretName))
                 {
                     _logger.LogInformation("Creating admin secret in AWS Secrets Manager");
                 }
@@ -164,7 +164,7 @@ namespace FeeNominalService.Services
                 _logger.LogInformation("Updating secret {SecretName} in AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
                 
                 // Special handling for admin secrets
-                if (secretName == "feenominal/admin/api-key-secret")
+                if (_secretNameFormatter.IsAdminSecretName(secretName))
                 {
                     _logger.LogInformation("Updating admin secret in AWS Secrets Manager");
                 }
@@ -470,11 +470,7 @@ namespace FeeNominalService.Services
             if (_secretNameFormatter.IsAdminSecretName(secretName))
             {
                 // For admin secrets, return the full service name with suffix
-                var parts = secretName.Split('/');
-                if (parts.Length >= 4 && parts[0] == "feenominal" && parts[1] == "admin" && parts[2] == "apikeys")
-                {
-                    return parts[3]; // Return the full service name with suffix
-                }
+                return _secretNameFormatter.ExtractServiceNameFromAdminSecretName(secretName);
             }
             
             return null;
