@@ -38,6 +38,15 @@ namespace FeeNominalService.Services
         {
             try
             {
+                // All sensitive data is properly sanitized using LogSanitizer
+                _logger.LogInformation("Getting secret {SecretName} from AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
+                
+                // Special handling for admin secrets
+                if (secretName == "feenominal/admin/api-key-secret")
+                {
+                    _logger.LogInformation("Retrieving admin secret from AWS Secrets Manager");
+                }
+
                 var request = new GetSecretValueRequest
                 {
                     SecretId = secretName
@@ -57,6 +66,15 @@ namespace FeeNominalService.Services
         {
             try
             {
+                // All sensitive data is properly sanitized using LogSanitizer
+                _logger.LogInformation("Getting secret {SecretName} from AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
+                
+                // Special handling for admin secrets
+                if (secretName == "feenominal/admin/api-key-secret")
+                {
+                    _logger.LogInformation("Retrieving admin secret from AWS Secrets Manager");
+                }
+
                 var request = new GetSecretValueRequest
                 {
                     SecretId = secretName
@@ -86,6 +104,15 @@ namespace FeeNominalService.Services
         {
             try
             {
+                // All sensitive data is properly sanitized using LogSanitizer
+                _logger.LogInformation("Storing secret {SecretName} in AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
+                
+                // Special handling for admin secrets
+                if (secretName == "feenominal/admin/api-key-secret")
+                {
+                    _logger.LogInformation("Storing admin secret in AWS Secrets Manager");
+                }
+
                 var request = new CreateSecretRequest
                 {
                     Name = secretName,
@@ -105,6 +132,15 @@ namespace FeeNominalService.Services
         {
             try
             {
+                // All sensitive data is properly sanitized using LogSanitizer
+                _logger.LogInformation("Creating secret {SecretName} in AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
+                
+                // Special handling for admin secrets
+                if (secretName == "feenominal/admin/api-key-secret")
+                {
+                    _logger.LogInformation("Creating admin secret in AWS Secrets Manager");
+                }
+
                 var request = new CreateSecretRequest
                 {
                     Name = secretName,
@@ -124,6 +160,15 @@ namespace FeeNominalService.Services
         {
             try
             {
+                // All sensitive data is properly sanitized using LogSanitizer
+                _logger.LogInformation("Updating secret {SecretName} in AWS Secrets Manager", LogSanitizer.SanitizeString(secretName));
+                
+                // Special handling for admin secrets
+                if (secretName == "feenominal/admin/api-key-secret")
+                {
+                    _logger.LogInformation("Updating admin secret in AWS Secrets Manager");
+                }
+
                 string secretString;
                 
                 // Use secure wrapper for ApiKeySecret objects
@@ -407,6 +452,32 @@ namespace FeeNominalService.Services
                 _logger.LogError(ex, "Error updating admin secret for service {ServiceName}", LogSanitizer.SanitizeString(serviceName));
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Extracts API key from secret name using SecretNameFormatter for consistency
+        /// </summary>
+        /// <param name="secretName">The secret name to parse</param>
+        /// <returns>The API key if found, null otherwise</returns>
+        private string? ExtractApiKeyFromSecretName(string secretName)
+        {
+            // Use SecretNameFormatter for consistent parsing
+            if (_secretNameFormatter.IsMerchantSecretName(secretName))
+            {
+                return _secretNameFormatter.ExtractApiKeyFromMerchantSecretName(secretName);
+            }
+            
+            if (_secretNameFormatter.IsAdminSecretName(secretName))
+            {
+                // For admin secrets, return the full service name with suffix
+                var parts = secretName.Split('/');
+                if (parts.Length >= 4 && parts[0] == "feenominal" && parts[1] == "admin" && parts[2] == "apikeys")
+                {
+                    return parts[3]; // Return the full service name with suffix
+                }
+            }
+            
+            return null;
         }
     }
 } 
