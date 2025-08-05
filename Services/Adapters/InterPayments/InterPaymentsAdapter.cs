@@ -255,10 +255,58 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         return (true, doc, null);
     }
 
-    public Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, JsonDocument credentials)
+    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, SurchargeProviderConfig providerConfig)
     {
-        // This method now requires providerConfig to be available elsewhere. If not, throw a NotImplementedException for now.
-        throw new NotImplementedException("ProcessBulkSaleAsync requires providerConfig. Please update the interface or provide providerConfig another way.");
+        var httpClient = _httpClientFactory.CreateClient();
+        
+        // Extract JWT token and token type from provider config credentials
+        var credentials = providerConfig.Credentials;
+        if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
+            return (false, null, "Missing JWT token in provider credentials.");
+        var jwtToken = jwtTokenProp.GetString();
+        var tokenType = "Bearer";
+        if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
+            tokenType = tokenTypeProp.GetString() ?? "Bearer";
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, jwtToken);
+
+        // Get base URL from provider config (not from credentials)
+        var baseUrl = GetBaseUrl(providerConfig);
+
+        // Build bulk sale request payload
+        // For InterPayments bulk sale, we need an array of objects with sTxId
+        var bulkSalePayload = sales
+            .Select(sale => sale.ProviderTransactionId ?? "")
+            .Where(sTxId => !string.IsNullOrEmpty(sTxId))
+            .Select(sTxId => new Dictionary<string, object> { ["sTxId"] = sTxId })
+            .ToList();
+
+        var bulkSaleUrl = baseUrl + "/bulk/sale";
+        _logger.LogInformation("Using InterPayments baseUrl: {BaseUrl}", baseUrl);
+        _logger.LogInformation("Sending InterPayments bulk sale request to: {Url}", bulkSaleUrl);
+        _logger.LogInformation("InterPayments Bulk Sale Request JSON: {Request}", JsonSerializer.Serialize(bulkSalePayload, new JsonSerializerOptions { WriteIndented = true }));
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsJsonAsync(bulkSaleUrl, bulkSalePayload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending bulk sale request to InterPayments");
+            return (false, null, ex.Message);
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("InterPayments Bulk Sale Response JSON: {Response}", json);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("InterPayments bulk sale API returned error: {StatusCode} {Content}", response.StatusCode, json);
+            return (false, null, json);
+        }
+
+        var doc = JsonDocument.Parse(json);
+        return (true, doc, null);
     }
 
     public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
@@ -319,6 +367,67 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("InterPayments cancel API returned error: {StatusCode} {Content}", response.StatusCode, json);
+            return (false, null, json);
+        }
+
+        var doc = JsonDocument.Parse(json);
+        return (true, doc, null);
+    }
+
+    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessRefundAsync(
+        string sTxId,
+        SurchargeProviderConfig providerConfig,
+        decimal amount,
+        string? mTxId = null,
+        string? cardToken = null,
+        List<string>? data = null)
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+        // Extract JWT token and token type from provider config credentials
+        var credentials = providerConfig.Credentials;
+        if (!credentials.RootElement.TryGetProperty("jwt_token", out var jwtTokenProp))
+            return (false, null, "Missing JWT token in provider credentials.");
+        var jwtToken = jwtTokenProp.GetString();
+        var tokenType = "Bearer";
+        if (credentials.RootElement.TryGetProperty("token_type", out var tokenTypeProp))
+            tokenType = tokenTypeProp.GetString() ?? "Bearer";
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, jwtToken);
+
+        // Build request payload according to InterPayments refund API specification
+        var payload = new Dictionary<string, object?>
+        {
+            ["sTxId"] = sTxId,
+            ["amount"] = amount
+        };
+        if (!string.IsNullOrWhiteSpace(mTxId))
+            payload["mTxId"] = mTxId;
+        if (!string.IsNullOrWhiteSpace(cardToken))
+            payload["cardToken"] = cardToken;
+        if (data != null && data.Count > 0)
+            payload["data"] = data;
+
+        var baseUrl = GetBaseUrl(providerConfig);
+        var refundUrl = baseUrl + "/refund";
+        _logger.LogInformation("Using InterPayments baseUrl: {BaseUrl}", baseUrl);
+        _logger.LogInformation("Sending InterPayments refund request to: {Url}", refundUrl);
+        _logger.LogInformation("InterPayments Refund Request JSON: {Request}", JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsJsonAsync(refundUrl, payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending refund request to InterPayments");
+            return (false, null, ex.Message);
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("InterPayments Refund Response JSON: {Response}", json);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("InterPayments refund API returned error: {StatusCode} {Content}", response.StatusCode, json);
             return (false, null, json);
         }
 

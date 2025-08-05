@@ -479,4 +479,21 @@ public class SurchargeTransactionRepository : ISurchargeTransactionRepository
             throw;
         }
     }
+
+    public async Task<List<SurchargeTransaction>> GetRefundsByOriginalTransactionIdAsync(Guid originalTransactionId)
+    {
+        try
+        {
+            return await _context.SurchargeTransactions
+                .Where(t => t.OriginalSurchargeTransId == originalTransactionId && 
+                           t.OperationType == SurchargeOperationType.Refund)
+                .OrderBy(t => t.CreatedAt)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting refund transactions for original transaction {OriginalTransactionId}", originalTransactionId);
+            throw;
+        }
+    }
 }

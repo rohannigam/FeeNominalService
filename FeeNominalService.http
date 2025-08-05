@@ -867,29 +867,52 @@ X-Nonce: {{$guid}}
 X-Signature: calculated-signature-here
 
 {
+  // Option 1: Use surchargeTransactionId (all other fields optional)
+  "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
   "amount": 50.00,
-  "correlationId": "refund-123456",
-  "merchantTransactionId": "refund-987654",
-  "originalTransactionId": "sale-tx-001",
-  "refundReason": "Customer request",
-  "cardToken": "card-token-abc123"
+  "refundReason": "Customer request"
+  // Option 2: Use providerTransactionId, providerCode, correlationId (all required if surchargeTransactionId not provided)
+  // "providerTransactionId": "ip-tx-001",
+  // "providerCode": "INTERPAY",
+  // "correlationId": "refund-123456",
+  // "amount": 50.00,
+  // "merchantTransactionId": "refund-987654",
+  // "refundReason": "Product return",
+  // "cardToken": "token-abc",
+  // "data": ["extra1", "extra2"]
 }
 
 ### Response Example:
 # {
-#   "refundId": "refund-tx-001",
+#   "surchargeTransactionId": "660e8400-e29b-41d4-a716-446655440001",
+#   "originalSurchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+#   "correlationId": "refund-123456",
 #   "refundAmount": 50.00,
 #   "status": "Completed",
-#   "originalTransactionId": "sale-tx-001",
+#   "originalAmount": 100.00,
+#   "refundTransactionFee": 2.50,
+#   "prevRefundedTransactionFees": 0.00,
+#   "originalTransactionFee": 3.50,
+#   "providerCode": "INTERPAYMENTS",
+#   "providerType": "INTERPAYMENTS",
 #   "processedAt": "2025-05-20T04:52:24.803373Z",
 #   "merchantTransactionId": "refund-987654",
 #   "providerTransactionId": "ip-refund-001",
-#   "originalAmount": 100.00,
+#   "originalProviderTransactionId": "ip-sale-001",
 #   "providerResponseCode": "00",
 #   "providerResponseMessage": "Approved",
-#   "metadata": {"key": "value"},
+#   "metadata": {
+#     "refundReason": "Customer request",
+#     "originalTransactionType": "Sale",
+#     "originalTransactionStatus": "Completed",
+#     "originalSaleTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+#     "rootTransactionInChain": "b1e2c3d4-e5f6-7890-abcd-1234567890ef"
+#   },
 #   "error": null
 # }
+#
+# Note: The refund operation creates a new transaction in the DB, linked to the original transaction via originalTransactionId.
+# Refunds are only allowed for completed transactions.
 
 ### --- Surcharge Cancel ---
 POST {{FeeNominalService_HostAddress}}/api/v1/surcharge/cancel

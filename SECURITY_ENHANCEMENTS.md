@@ -507,3 +507,139 @@ private async Task<SecureApiKeySecret?> GetMerchantSecretSecurelyAsync(string me
 - **RequestSigningService:** Added `GetMerchantSecretSecurelyAsync`
 - **LocalApiKeySecretService:** Added `GetMerchantSecretSecurelyAsync`, `StoreMerchantSecretSecurelyAsync`, `UpdateMerchantSecretSecurelyAsync`, `GetAdminSecretSecurelyAsync`, `StoreAdminSecretSecurelyAsync`, `UpdateAdminSecretSecurelyAsync`
 - **IAwsSecretsManagerService Interface:** Updated to include all secure methods for interface compatibility 
+
+## 14. Log Forging Vulnerability Mitigation
+
+### **Summary**
+Addressed potential log forging vulnerabilities in the `ApiKeyService` by removing or properly sanitizing debug logging that contained user-controlled data.
+
+### **Key Changes**
+
+#### **ApiKeyService.cs - Debug Logging Removal**
+- **Removed Debug Logging**: Eliminated extensive debug logging sections that logged user-controlled parameters (timestamp, nonce, signature) without proper sanitization
+- **Enhanced Security**: Replaced verbose debug logging with minimal, sanitized logging that only records essential information
+- **Signature Generation**: Removed debug logging of signature generation process that could expose sensitive information
+
+#### **Specific Fixes Applied**
+
+**Before (Vulnerable):**
+```csharp
+// Log forging vulnerability - user-controlled data logged directly
+_logger.LogInformation("=== ADMIN API KEY VALIDATION DEBUG ===");
+_logger.LogInformation("Input parameters: ApiKey={ApiKey}, Timestamp={Timestamp}, Nonce={Nonce}, Signature={Signature}", 
+    LogSanitizer.SanitizeString(apiKey), LogSanitizer.SanitizeString(timestamp), 
+    LogSanitizer.SanitizeString(nonce), LogSanitizer.SanitizeString(signature));
+
+// Signature generation debug logging
+_logger.LogInformation("Data string being hashed: '{Data}'", LogSanitizer.SanitizeString(data));
+_logger.LogInformation("Generated signature: {Signature}", LogSanitizer.SanitizeString(signature));
+```
+
+**After (Secure):**
+```csharp
+// Removed debug logging to prevent log forging vulnerabilities
+// Enhanced security: No user-controlled data logged without proper sanitization
+
+// Log only sanitized comparison result, not the actual signatures
+var signaturesMatch = string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+_logger.LogDebug("Admin API key signature validation result: {SignaturesMatch}", signaturesMatch);
+
+// Signature generation - minimal logging
+_logger.LogDebug("Signature generated successfully for API key validation");
+```
+
+#### **Validation Methods Updated**
+- **ValidateAdminApiKeyAsync**: Removed verbose debug logging, kept only essential sanitized information
+- **ValidateMerchantApiKeyAsync**: Removed debug logging of secret information and user-controlled data
+- **GenerateSignature**: Removed debug logging of signature generation process and actual signatures
+
+#### **Logging Best Practices Implemented**
+- **User-Controlled Data**: All user-controlled data (timestamps, nonces, signatures) is properly sanitized using `LogSanitizer`
+- **Sensitive Information**: No sensitive information (secrets, signatures) is logged in any form
+- **Debug Information**: Debug logging is minimal and only includes non-sensitive, sanitized data
+- **Error Logging**: Error messages are generic and don't expose sensitive information
+
+### **Security Benefits**
+- **Log Forging Prevention**: Eliminates potential for log injection attacks through user-controlled input
+- **Information Disclosure Prevention**: Prevents sensitive information from being logged
+- **Log Pollution Prevention**: Prevents malicious input from corrupting log files
+- **Compliance**: Ensures logging practices meet security standards
+
+### **Files Modified**
+- `Services/ApiKeyService.cs` - Removed debug logging vulnerabilities
+- `Controllers/V1/AdminController.cs` - Added validation and sanitization for user-controlled request body parameters
+- `Controllers/V1/SurchargeProviderController.cs` - Already properly sanitized (no changes needed)
+
+### **Additional Log Forging Fixes - AdminController**
+
+#### **Request Body Parameter Validation**
+- **AdminKeyServiceNameRequest.ServiceName**: Added validation and sanitization for user-controlled service name from request body
+- **GenerateApiKeyRequest.Purpose**: Added validation and sanitization for user-controlled purpose field from request body
+- **Input Validation**: Implemented `IsValidServiceName()` method to validate service name format and prevent log injection
+
+#### **Specific Fixes Applied**
+
+**Before (Vulnerable):**
+```csharp
+// Log forging vulnerability - user-controlled data from request body logged directly
+var response = await apiKeyService.RotateAdminApiKeyAsync(req.ServiceName);
+
+// User-controlled data flows through without validation
+var serviceName = request.Purpose?.ToLowerInvariant() ?? "default";
+```
+
+**After (Secure):**
+```csharp
+// Validate and sanitize user-controlled input to prevent log forging
+if (req == null)
+{
+    return BadRequest(new { error = "Request body is required." });
+}
+
+var serviceName = req.ServiceName?.Trim() ?? "default";
+
+// Validate service name format to prevent log injection
+if (!IsValidServiceName(serviceName))
+{
+    _logger.LogWarning("Invalid service name format provided for admin key rotation: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+    return BadRequest(new { error = "Invalid service name format." });
+}
+
+_logger.LogInformation("Admin API key rotation requested for service: {ServiceName}", LogSanitizer.SanitizeString(serviceName));
+
+// Use validated and sanitized service name
+var response = await apiKeyService.RotateAdminApiKeyAsync(serviceName);
+```
+
+#### **Service Name Validation Method**
+```csharp
+/// <summary>
+/// Validates service name format to prevent log injection and ensure security
+/// </summary>
+/// <param name="serviceName">The service name to validate</param>
+/// <returns>True if the service name is valid</returns>
+private bool IsValidServiceName(string serviceName)
+{
+    if (string.IsNullOrWhiteSpace(serviceName))
+        return false;
+
+    // Allow only alphanumeric characters, hyphens, underscores, and dots
+    // This prevents log injection and ensures safe service names
+    var validServiceNamePattern = @"^[a-zA-Z0-9\-_\.]+$";
+    return System.Text.RegularExpressions.Regex.IsMatch(serviceName, validServiceNamePattern);
+}
+```
+
+#### **Methods Updated**
+- **RotateAdminApiKey**: Added validation for `req.ServiceName` from request body
+- **RevokeAdminApiKey**: Added validation for `req.ServiceName` from request body  
+- **GenerateAdminApiKey**: Added validation for `request.Purpose` from request body
+
+### **Verification**
+All logging in the API key validation flow now:
+- Uses proper sanitization for any user-controlled data
+- Avoids logging sensitive information (secrets, signatures)
+- Provides minimal, essential logging for debugging and monitoring
+- Follows secure logging best practices
+- **Validates and sanitizes all user-controlled input from request bodies**
+- **Prevents log injection through service name and purpose fields** 

@@ -184,14 +184,23 @@ namespace FeeNominalService.Controllers.V1
                     return BadRequest(new { message = "Invalid merchant ID format" });
                 }
 
+                // Extract API key or user identity for audit
+                var apiKey = User.FindFirst("ApiKey")?.Value;
+                var actor = !string.IsNullOrEmpty(apiKey) ? apiKey : "system";
+
                 // Process the surcharge refund
-                var response = await _surchargeTransactionService.ProcessRefundAsync(request, merchantId);
+                var response = await _surchargeTransactionService.ProcessRefundAsync(request, merchantId, actor);
 
                 _logger.LogInformation("Successfully processed surcharge refund for transaction: {CorrelationId}, " +
                     "refund ID: {RefundId}", 
-                    LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.RefundId));
+                    LogSanitizer.SanitizeString(request.CorrelationId), LogSanitizer.SanitizeGuid(response.SurchargeTransactionId));
 
                 return Ok(response);
+            }
+            catch (FeeNominalService.Exceptions.SurchargeException ex)
+            {
+                _logger.LogWarning(ex, "Surcharge error while processing refund for transaction: {CorrelationId}", LogSanitizer.SanitizeString(request.CorrelationId));
+                return BadRequest(ex.ToErrorResponse());
             }
             catch (InvalidOperationException ex)
             {

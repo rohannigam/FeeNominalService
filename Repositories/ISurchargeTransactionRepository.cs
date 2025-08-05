@@ -102,4 +102,9 @@ public interface ISurchargeTransactionRepository
     /// Gets a surcharge transaction by its ID with provider configuration eager loading
     /// </summary>
     Task<SurchargeTransaction?> GetByIdWithProviderConfigAsync(Guid id);
+
+    /// <summary>
+    /// Gets all refund transactions that point to a specific original transaction ID
+    /// </summary>
+    Task<List<SurchargeTransaction>> GetRefundsByOriginalTransactionIdAsync(Guid originalTransactionId);
 }

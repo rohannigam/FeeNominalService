@@ -1,0 +1,399 @@
+# Surcharge Refund Endpoint Documentation
+
+## Endpoint
+POST /api/v1/surcharge/refund
+
+---
+
+## Overview
+The Surcharge Refund endpoint allows a merchant or service user to refund a previously completed surcharge transaction. Each refund operation creates a new transaction record in the database, always linked to the original transaction for full auditability and traceability. The endpoint supports multiple refunds against the same original transaction and provides comprehensive error handling for InterPayments responses.
+
+---
+
+## Request Fields
+- **surchargeTransactionId** (GUID, optional, preferred): The internal ID of the original surcharge transaction (auth or sale) to refund. If provided, all other fields are optional.
+- **providerTransactionId** (string, optional): The provider's transaction ID (e.g., InterPayments sTxId). If provided, the following fields are required:
+  - **correlationId** (string, required)
+  - **providerCode** (string, required)
+- **correlationId** (string, optional): Correlation identifier for linking related transactions (required if using providerTransactionId).
+- **providerCode** (string, optional): Provider code (required if using providerTransactionId).
+- **amount** (decimal, required): The amount to refund (must be greater than 0).
+- **merchantTransactionId** (string, optional): Merchant's own transaction identifier for the refund.
+- **refundReason** (string, optional): Reason for the refund (e.g., "Customer request", "Product return", etc.).
+- **cardToken** (string, optional): Tokenized card information.
+- **data** (array of string, optional): Additional data for the refund.
+
+### Example Request (Preferred)
+```json
+{
+  "surchargeTransactionId": "b1e2c3d4-e5f6-7890-abcd-1234567890ef",
+  "amount": 50.00,
+  "refundReason": "Customer request"
+}
+```
+
+### Example Request (Provider Transaction)
+```json
+{
+  "providerTransactionId": "ip-tx-001",
+  "correlationId": "refund-123456",
+  "providerCode": "INTERPAY",
+  "amount": 50.00,
+  "merchantTransactionId": "refund-987654",
+  "refundReason": "Product return",
+  "cardToken": "token-abc",
+  "data": ["extra1", "extra2"]
+}
+```
+
+---
+
+## Response Fields
+- **surchargeTransactionId** (GUID): The ID of the new refund transaction.
+- **originalSurchargeTransactionId** (GUID): The original transaction ID being refunded.
+- **correlationId** (string): Correlation identifier for linking related transactions.
+- **merchantTransactionId** (string, optional): Merchant's transaction ID for the refund.
+- **providerTransactionId** (string, optional): Provider's transaction ID for the refund.
+- **originalProviderTransactionId** (string, optional): Original provider transaction ID from the transaction being refunded.
+- **refundAmount** (decimal): The amount that was refunded.
+- **originalAmount** (decimal): The original transaction amount (from the original sale).
+- **refundTransactionFee** (decimal, optional): Fee charged for this refund operation.
+- **prevRefundedTransactionFees** (decimal, optional): Total fees from previous refunds in the chain.
+- **originalTransactionFee** (decimal, optional): Fee from the original sale transaction.
+- **status** (string): Status of the refund operation ("Completed" or "Failed").
+- **providerCode** (string): Provider code for the surcharge provider.
+- **providerType** (string): Provider type for the surcharge provider.
+- **processedAt** (datetime): When the refund was processed.
+- **providerResponseCode** (string, optional): Provider-specific response code.
+- **providerResponseMessage** (string, optional): Provider-specific response message.
+- **metadata** (object, optional): Additional metadata including refund reason and original transaction details.
+- **error** (object, optional): Error details if the operation failed.
+
+### Example Response
+```json
+{
+  "surchargeTransactionId": "660e8400-e29b-41d4-a716-446655440001",
+  "originalSurchargeTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+  "correlationId": "corr-12345",
+  "merchantTransactionId": "refund-987654",
+  "providerTransactionId": "ip-refund-001",
+  "originalProviderTransactionId": "ip-sale-001",
+  "refundAmount": 50.00,
+  "originalAmount": 100.00,
+  "refundTransactionFee": 2.50,
+  "prevRefundedTransactionFees": 0.00,
+  "originalTransactionFee": 3.50,
+  "status": "Completed",
+  "providerCode": "INTERPAYMENTS",
+  "providerType": "INTERPAYMENTS",
+  "processedAt": "2025-05-20T04:52:24.803373Z",
+  "providerResponseCode": "00",
+  "providerResponseMessage": "Approved",
+  "metadata": {
+    "refundReason": "Customer request",
+    "originalTransactionType": "Sale",
+    "originalTransactionStatus": "Completed",
+    "originalSaleTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "rootTransactionInChain": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "error": null
+}
+```
+
+---
+
+## Workflow Diagrams
+
+### Basic Refund Workflow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FeeNominal API
+    participant DB as Database
+    participant IP as InterPayments
+    
+    Client->>API: POST /api/v1/surcharge/refund
+    API->>API: Validate request & authenticate
+    API->>DB: Lookup original transaction
+    DB-->>API: Return original transaction
+    
+    alt Transaction found
+        API->>API: Validate refund amount & status
+        API->>IP: POST /refund with transaction details
+        IP-->>API: Return refund response
+        
+        alt Refund successful
+            API->>DB: Create new refund transaction
+            DB-->>API: Confirm transaction created
+            API-->>Client: Return success response
+        else Refund failed
+            API->>DB: Create failed refund transaction
+            DB-->>API: Confirm transaction created
+            API-->>Client: Return error response
+        end
+    else Transaction not found
+        API-->>Client: Return 400 - Transaction not found
+    end
+```
+
+### Multiple Refunds Workflow
+```mermaid
+graph TD
+    A[Original Sale Transaction] --> B[First Refund Request]
+    A --> C[Second Refund Request]
+    A --> D[Third Refund Request]
+    
+    B --> E[Refund Transaction #1]
+    C --> F[Refund Transaction #2]
+    D --> G[Refund Transaction #3]
+    
+    E --> H[OriginalSurchargeTransId = Original Sale ID]
+    F --> I[OriginalSurchargeTransId = Original Sale ID]
+    G --> J[OriginalSurchargeTransId = Original Sale ID]
+    
+    H --> K[prevRefundedTransactionFees = 0.00]
+    I --> L[prevRefundedTransactionFees = Fee from Refund #1]
+    J --> M[prevRefundedTransactionFees = Fee from Refund #1 + #2]
+    
+    K --> N[originalAmount = Original Sale Amount]
+    L --> O[originalAmount = Original Sale Amount]
+    M --> P[originalAmount = Original Sale Amount]
+```
+
+### Error Handling Workflow
+```mermaid
+flowchart TD
+    A[Refund Request] --> B{Validate Request}
+    B -->|Invalid| C[Return 400 Bad Request]
+    B -->|Valid| D{Lookup Original Transaction}
+    
+    D -->|Not Found| E[Return 400 - Transaction not found]
+    D -->|Found| F{Validate Transaction Status}
+    
+    F -->|Invalid Status| G[Return 400 - Invalid transaction status]
+    F -->|Valid| H[Call InterPayments API]
+    
+    H --> I{InterPayments Response}
+    I -->|HTTP Error| J[Log error & return failure]
+    I -->|HTTP 200| K{Check InterPayments Message}
+    
+    K -->|Warning Message| L[Log warning & populate error field]
+    K -->|Success Message| M[Process successful refund]
+    K -->|Error Message| N[Log error & return failure]
+    
+    L --> O[Create refund transaction with warning]
+    M --> P[Create successful refund transaction]
+    N --> Q[Create failed refund transaction]
+    
+    O --> R[Return response with error details]
+    P --> S[Return success response]
+    Q --> T[Return error response]
+```
+
+---
+
+## Error Handling & InterPayments Integration
+
+### InterPayments Message Handling
+The refund endpoint provides comprehensive handling of InterPayments responses, including:
+
+#### **Warning Messages**
+When InterPayments returns a warning message (even with HTTP 200 OK), the system:
+- **Logs a warning** with transaction details and the InterPayments message
+- **Populates the `error` field** in the response with:
+  ```json
+  {
+    "error": {
+      "code": "INTERPAYMENTS_MESSAGE",
+      "message": "asking for too much refund"
+    }
+  }
+  ```
+- **Creates a refund transaction** in the database with the warning information
+- **Returns HTTP 200** with the structured error details
+
+#### **Common InterPayments Warning Scenarios**
+- **"asking for too much refund"** - Refund amount exceeds available amount
+- **"tooMuchServiceFees"** - Service fees exceed limits
+- **"tooMuchTransactionFess"** - Transaction fees exceed limits
+- **Zero refund fee** - When refund transaction fee is 0 despite requesting a refund
+
+#### **Warning Detection Logic**
+The system automatically detects and logs warnings when:
+1. **Refund transaction fee is 0** when a refund was requested
+2. **Original transaction fee** is less than or equal to previously refunded fees
+3. **InterPayments response message** contains specific warning phrases
+
+### Error Response Structure
+```json
+{
+  "surchargeTransactionId": "660e8400-e29b-41d4-a716-446655440001",
+  "originalSurchargeTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+  "correlationId": "corr-12345",
+  "refundAmount": 50.00,
+  "originalAmount": 100.00,
+  "status": "Failed",
+  "providerCode": "INTERPAYMENTS",
+  "providerType": "INTERPAYMENTS",
+  "processedAt": "2025-05-20T04:52:24.803373Z",
+  "providerResponseCode": "99",
+  "providerResponseMessage": "asking for too much refund",
+  "error": {
+    "code": "INTERPAYMENTS_MESSAGE",
+    "message": "asking for too much refund"
+  }
+}
+```
+
+---
+
+## Multiple Refunds Against Same Transaction
+
+### Overview
+The system supports multiple refunds against the same original surcharge transaction. Each refund creates a new transaction record while maintaining proper linkage and fee tracking.
+
+### Transaction Chain Example
+```
+Original Sale Transaction (ID: 550e8400-e29b-41d4-a716-446655440000)
+├── Amount: $100.00
+├── Fee: $3.50
+└── Status: Completed
+
+├── Refund #1 (ID: 660e8400-e29b-41d4-a716-446655440001)
+│   ├── Refund Amount: $30.00
+│   ├── Refund Fee: $1.50
+│   ├── prevRefundedTransactionFees: $0.00
+│   └── originalAmount: $100.00
+│
+├── Refund #2 (ID: 770e8400-e29b-41d4-a716-446655440002)
+│   ├── Refund Amount: $25.00
+│   ├── Refund Fee: $1.25
+│   ├── prevRefundedTransactionFees: $1.50
+│   └── originalAmount: $100.00
+│
+└── Refund #3 (ID: 880e8400-e29b-41d4-a716-446655440003)
+    ├── Refund Amount: $20.00
+    ├── Refund Fee: $1.00
+    ├── prevRefundedTransactionFees: $2.75
+    └── originalAmount: $100.00
+```
+
+### Response Examples for Multiple Refunds
+
+#### **First Refund Response**
+```json
+{
+  "surchargeTransactionId": "660e8400-e29b-41d4-a716-446655440001",
+  "originalSurchargeTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+  "correlationId": "corr-12345",
+  "refundAmount": 30.00,
+  "originalAmount": 100.00,
+  "refundTransactionFee": 1.50,
+  "prevRefundedTransactionFees": 0.00,
+  "originalTransactionFee": 3.50,
+  "status": "Completed",
+  "providerCode": "INTERPAYMENTS",
+  "providerType": "INTERPAYMENTS",
+  "processedAt": "2025-01-28T10:00:00.000Z",
+  "providerResponseCode": "00",
+  "providerResponseMessage": "Approved",
+  "error": null
+}
+```
+
+#### **Second Refund Response**
+```json
+{
+  "surchargeTransactionId": "770e8400-e29b-41d4-a716-446655440002",
+  "originalSurchargeTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+  "correlationId": "corr-12346",
+  "refundAmount": 25.00,
+  "originalAmount": 100.00,
+  "refundTransactionFee": 1.25,
+  "prevRefundedTransactionFees": 1.50,
+  "originalTransactionFee": 3.50,
+  "status": "Completed",
+  "providerCode": "INTERPAYMENTS",
+  "providerType": "INTERPAYMENTS",
+  "processedAt": "2025-01-28T11:00:00.000Z",
+  "providerResponseCode": "00",
+  "providerResponseMessage": "Approved",
+  "error": null
+}
+```
+
+#### **Third Refund Response**
+```json
+{
+  "surchargeTransactionId": "880e8400-e29b-41d4-a716-446655440003",
+  "originalSurchargeTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+  "correlationId": "corr-12347",
+  "refundAmount": 20.00,
+  "originalAmount": 100.00,
+  "refundTransactionFee": 1.00,
+  "prevRefundedTransactionFees": 2.75,
+  "originalTransactionFee": 3.50,
+  "status": "Completed",
+  "providerCode": "INTERPAYMENTS",
+  "providerType": "INTERPAYMENTS",
+  "processedAt": "2025-01-28T12:00:00.000Z",
+  "providerResponseCode": "00",
+  "providerResponseMessage": "Approved",
+  "error": null
+}
+```
+
+### Key Features for Multiple Refunds
+
+#### **Fee Tracking**
+- **`prevRefundedTransactionFees`**: Cumulative fees from all previous refunds in the chain
+- **`originalTransactionFee`**: Fee from the original sale transaction (always the same)
+- **`refundTransactionFee`**: Fee for the current refund operation
+
+#### **Amount Consistency**
+- **`originalAmount`**: Always reflects the original sale amount, not the refund amount
+- **`refundAmount`**: The specific amount being refunded in this operation
+- **Transaction Chain**: Each refund maintains proper linkage to the original sale
+
+#### **Audit Trail**
+- **Complete History**: All refunds are traceable back to the original transaction
+- **Fee Transparency**: Clear visibility into cumulative fees across all refunds
+- **Status Tracking**: Each refund has its own status and processing timestamp
+
+---
+
+## Notes & Special Behaviors
+- **DB Linkage:** Every refund operation creates a new transaction record, with `OriginalSurchargeTransId` set to the original transaction.
+- **Auditability:** All refund operations are fully auditable and traceable via the original transaction linkage.
+- **Amount Validation:** The refund amount must be greater than 0 and should not exceed the original transaction amount.
+- **Transaction Status:** Only completed transactions can be refunded. The system will validate the original transaction status.
+- **Idempotency:** Multiple refund requests on the same transaction will each create a new refund transaction, but only the first may have an effect at the provider.
+- **Best Practice:** Prefer using `surchargeTransactionId` for refund requests. Use providerTransactionId+correlationId+providerCode only if you do not have the internal ID.
+- **InterPayments Integration:** The endpoint fully integrates with InterPayments refund API, handling both successful responses and warning messages.
+- **Warning Logging:** The system automatically logs warnings for potential refund issues and forwards InterPayments warning messages to the response.
+- **Fee Transparency:** Complete fee tracking across multiple refunds with cumulative fee reporting.
+
+---
+
+## Change History
+- **2024-06:** Endpoint implemented to support refund operations with InterPayments integration. Request/response models updated for flexibility and auditability.
+- **2025-01-28:** Enhanced error handling for InterPayments warning messages, improved fee tracking for multiple refunds, and added comprehensive workflow documentation.
+
+---
+
+## Usage Scenarios
+- Refund a completed surcharge transaction by internal ID (preferred).
+- Refund by provider transaction ID if internal ID is not available (requires extra fields).
+- Audit all refund operations by tracing the original transaction.
+- Handle partial refunds by specifying the refund amount.
+- Process multiple refunds against the same original transaction with proper fee tracking.
+- Handle InterPayments warning messages and error conditions gracefully.
+
+---
+
+## Caveats
+- The refund operation is only supported for InterPayments providers in the current implementation.
+- Refunds are only allowed for completed transactions.
+- The system will validate that the refund amount is reasonable and within acceptable limits.
+- InterPayments warning messages are logged and included in the response but don't necessarily indicate a failed operation.
+- Multiple refunds against the same transaction are supported, but each creates a separate database record for audit purposes. 

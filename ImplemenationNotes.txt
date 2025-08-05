@@ -1525,3 +1525,162 @@ var result = secureSchema.ProcessSchemaSecurely(schema => {
 This implementation addresses the Privacy Violation flags that Checkmarx was identifying for the `credentialsSchema` parameter, providing the same level of security as the `SecureApiKeySecret` implementation.
 
 Summary of SecureApiKeySecret. TODO
+
+************************************************************************
+1/28/2025 - Complete Summary: Bulk Surcharge Sale & Full Refunds Support
+************************************************************************
+
+## **🎯 Major Feature Implementation: Refund Endpoint & Enhanced Bulk Sale**
+
+### **1. 🔄 Refund Endpoint Implementation (`/api/v1/surcharge/refund`)**
+
+#### **Core Functionality**
+- **Flexible Transaction Lookup**: Supports both `surchargeTransactionId` (preferred) or combination of `providerTransactionId`, `correlationId`, and `providerCode`
+- **Complete Refund Workflow**: Full integration with InterPayments `/refund` endpoint
+- **Transaction Chain Support**: Handles multiple refunds against the same original sale transaction
+- **Fee Tracking**: Comprehensive fee reporting including `refundTransactionFee`, `prevRefundedTransactionFees`, `originalTransactionFee`
+
+#### **Response Model Evolution**
+- **Initial Implementation**: Basic refund response with `refundId` and `originalTransactionId`
+- **Enhanced Structure**: Renamed to `surchargeTransactionId` and `originalSurchargeTransactionId` for consistency
+- **Fee Information**: Added detailed fee tracking fields from InterPayments responses
+- **KISS Principle Applied**: Removed calculated fields (`totalRefundedAmount`, `prevRefundedAmounts`, etc.) to report only direct provider data
+- **Error Handling**: Structured `Error` object with `RefundErrorDetails` for consistent error reporting
+
+#### **Key Technical Features**
+- **Original Amount Resolution**: `FindOriginalSaleTransactionAsync` method traverses transaction chain to find initial sale amount
+- **Warning System**: `LogRefundWarningsAsync` detects and logs potential refund issues (zero fees, excessive refunds, InterPayments warnings)
+- **Database Integration**: Creates new `SurchargeTransaction` records for each refund with proper audit fields
+- **Provider Integration**: Full InterPayments adapter support with proper error handling and response mapping
+
+### **2. 🚀 Enhanced Bulk Sale Complete Endpoint**
+
+#### **Parallelization Implementation**
+- **Serial Mode Optimization**: Replaced `foreach` loop with `Task.WhenAll()` and `SemaphoreSlim` for controlled parallel execution
+- **Concurrency Control**: Configurable `MaxConcurrentRequests` setting (default: 10) to prevent provider overload
+- **Helper Methods**: Extracted `ProcessSingleSaleAsync` and `CreateFailedSaleResponse` for maintainable parallel processing
+- **Error Isolation**: Individual sale failures don't affect other sales in the batch
+
+#### **Admin/Cross-Merchant Support**
+- **Admin Scope Validation**: Requires admin API keys with proper scope and `IsAdmin` claims
+- **Cross-Merchant Operations**: Supports processing sales across multiple merchants in single batch
+- **Batch ID Generation**: Automatic unique batch ID generation for tracking and audit purposes
+- **Partial Success Handling**: Each sale result reported individually with status and error details
+
+#### **Enhanced Response Structure**
+- **Per-Sale Details**: Each sale includes complete transaction information (`surchargeTransactionId`, `originalSurchargeTransactionId`, `currentSurchargeTransactionId`)
+- **Fee Reporting**: Accurate `surchargeFee` and `surchargeFeePercent` extraction from referenced transactions
+- **Provider Information**: Complete provider details (`providerCode`, `providerType`, `providerTransactionId`)
+- **Error Granularity**: Individual error messages for each failed sale while maintaining batch success
+
+### **3. 🔧 Technical Improvements & Fixes**
+
+#### **Database & Repository Enhancements**
+- **New Repository Method**: `GetRefundsByOriginalTransactionIdAsync` for tracking refund history
+- **Audit Field Support**: Proper `CreatedBy` and `UpdatedBy` fields for all refund transactions
+- **Transaction Chain Support**: Enhanced lookup methods for original sale transactions
+
+#### **Error Handling & Validation**
+- **Structured Error Responses**: Consistent error format across all surcharge operations
+- **InterPayments Message Forwarding**: Proper handling of InterPayments warning messages in API responses
+- **Connectivity Issue Logging**: Comprehensive logging for network and provider communication issues
+- **Validation Improvements**: Enhanced request validation with custom attributes and flexible identifier support
+
+#### **Response Model Consistency**
+- **Unified Structure**: All surcharge operations (auth, sale, refund, cancel) follow consistent response patterns
+- **Fee Information**: Standardized fee reporting across all transaction types
+- **Provider Details**: Consistent provider information in all responses
+- **Error Handling**: Unified error response structure with proper error codes and messages
+
+### **4. 📚 Documentation & Examples**
+
+#### **Comprehensive Documentation**
+- **New Endpoint Docs**: `Docs/Endpoints/SurchargeRefundEndpoint.txt` with complete workflow documentation
+- **Updated Examples**: `FeeNominalService.http` updated with refund request/response examples
+- **Mermaid Diagrams**: Visual workflow representations for complex refund scenarios
+- **Usage Scenarios**: Multiple refund scenarios documented (single refund, multiple refunds, partial refunds)
+
+#### **Postman Integration**
+- **Pre-request Scripts**: Updated signature generation for refund endpoint authentication
+- **Request Examples**: Complete JSON payloads for all refund scenarios
+- **Response Examples**: Detailed response structures with fee information and error handling
+
+### **5. 🔒 Security & Compliance**
+
+#### **Authentication & Authorization**
+- **Standard API Key Auth**: Refund endpoint uses same authentication as other surcharge operations
+- **Merchant Isolation**: Proper merchant validation and transaction ownership verification
+- **Audit Trail**: Complete audit logging for all refund operations with actor tracking
+
+#### **Data Protection**
+- **Sensitive Data Masking**: Proper logging sanitization for transaction IDs and amounts
+- **Error Message Sanitization**: Secure error message handling without exposing sensitive information
+- **Provider Communication**: Secure InterPayments API communication with proper credential handling
+
+### **6. 🎯 Key Benefits Achieved**
+
+#### **Operational Excellence**
+- **Complete Refund Support**: Full end-to-end refund processing with InterPayments integration
+- **Parallel Processing**: Significantly improved bulk sale performance with controlled concurrency
+- **Error Resilience**: Robust error handling with detailed error reporting and logging
+- **Audit Compliance**: Complete audit trail for all refund and bulk sale operations
+
+#### **Developer Experience**
+- **Consistent APIs**: Unified response structures across all surcharge operations
+- **Comprehensive Documentation**: Complete endpoint documentation with examples and workflows
+- **Flexible Integration**: Support for both merchant-scoped and admin-scoped operations
+- **Debugging Support**: Enhanced logging and error reporting for troubleshooting
+
+#### **Business Value**
+- **Multi-Refund Support**: Handle complex refund scenarios with proper fee tracking
+- **Bulk Processing**: Efficient processing of large sale batches with parallel execution
+- **Cross-Merchant Operations**: Admin capabilities for managing multiple merchants
+- **Fee Transparency**: Complete fee visibility for compliance and reporting
+
+### **7. 📁 Files Modified/Created**
+
+#### **New Files:**
+- `Models/Surcharge/Requests/SurchargeRefundRequest.cs`
+- `Models/Surcharge/Responses/SurchargeRefundResponse.cs`
+- `Models/Surcharge/Responses/RefundErrorDetails.cs`
+- `Docs/Endpoints/SurchargeRefundEndpoint.txt`
+
+#### **Major Updates:**
+- `Services/SurchargeTransactionService.cs` - Complete refund implementation and bulk sale parallelization
+- `Services/Adapters/InterPayments/InterPaymentsAdapter.cs` - Refund endpoint integration
+- `Controllers/V1/SurchargeController.cs` - Refund endpoint controller implementation
+- `FeeNominalService.http` - Updated examples and documentation
+- `Repositories/SurchargeTransactionRepository.cs` - New refund tracking methods
+
+#### **Supporting Updates:**
+- `Services/ISurchargeTransactionService.cs` - Updated interface for refund support
+- `Services/ISurchargeProviderAdapter.cs` - Added refund method signature
+- `Repositories/ISurchargeTransactionRepository.cs` - Added refund repository methods
+
+### **8. 🚀 Performance Impact**
+
+#### **Bulk Sale Performance**
+- **Before**: Serial processing of sales (N sequential API calls)
+- **After**: Parallel processing with controlled concurrency (N concurrent API calls with semaphore control)
+- **Expected Improvement**: 5-10x performance improvement for large batches
+- **Resource Management**: Controlled concurrency prevents provider overload
+
+#### **Refund Processing**
+- **Transaction Chain Lookup**: Efficient database queries for original sale resolution
+- **Fee Calculation**: Optimized fee extraction from InterPayments responses
+- **Warning Detection**: Asynchronous warning logging without impacting response times
+
+### **9. 🔮 Future Considerations**
+
+#### **Potential Enhancements**
+- **Refund Limits**: Configurable refund limits per transaction or merchant
+- **Partial Refund Support**: Enhanced support for partial refund scenarios
+- **Refund Approval Workflow**: Optional approval workflow for large refunds
+- **Advanced Fee Tracking**: More granular fee breakdown and reporting
+
+#### **Monitoring & Alerting**
+- **Refund Volume Monitoring**: Track refund patterns and volumes
+- **Fee Anomaly Detection**: Alert on unusual fee patterns or refund amounts
+- **Performance Metrics**: Monitor bulk sale performance and concurrency effectiveness
+
+**The FeeNominalService now provides complete, production-ready support for refund operations and enhanced bulk sale processing with significant performance improvements and comprehensive error handling!**

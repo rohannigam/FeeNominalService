@@ -568,12 +568,24 @@ namespace FeeNominalService.Services.AWS
 
         private string? ExtractApiKeyFromSecretName(string secretName)
         {
-            // Expected format: feenominal/merchants/{merchantId}/apikeys/{apiKey}
+            // Expected formats:
+            // Merchant: feenominal/merchants/{merchantId}/apikeys/{apiKey}
+            // Admin: feenominal/admin/apikeys/{serviceName}-admin-api-key-secret
+            
             var parts = secretName.Split('/');
+            
+            // Handle merchant secrets
             if (parts.Length >= 5 && parts[0] == "feenominal" && parts[1] == "merchants" && parts[3] == "apikeys")
             {
                 return parts[4];
             }
+            
+            // Handle admin secrets
+            if (parts.Length >= 4 && parts[0] == "feenominal" && parts[1] == "admin" && parts[2] == "apikeys")
+            {
+                return parts[3]; // Return the full service name with suffix
+            }
+            
             return null;
         }
     }
