@@ -27,7 +27,7 @@ public class TestInterPaymentsAdapter : InterPaymentsAdapter
         return (true, null);
     }
 
-    public async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, SurchargeProviderConfig providerConfig)
+    public override async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, SurchargeProviderConfig providerConfig)
     {
         await Task.CompletedTask;
         return new SurchargeAuthResponse
@@ -45,7 +45,7 @@ public class TestInterPaymentsAdapter : InterPaymentsAdapter
         };
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessSaleAsync(
+    public override async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessSaleAsync(
         SurchargeTransaction transaction, 
         SurchargeProviderConfig providerConfig, 
         SurchargeSaleRequest saleRequest)
@@ -54,7 +54,7 @@ public class TestInterPaymentsAdapter : InterPaymentsAdapter
         return _mockResponse;
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(
+    public override async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(
         List<SurchargeSaleRequest> sales, 
         SurchargeProviderConfig providerConfig)
     {
@@ -62,7 +62,7 @@ public class TestInterPaymentsAdapter : InterPaymentsAdapter
         return _mockResponse;
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
+    public override async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
         string sTxId,
         SurchargeProviderConfig providerConfig,
         string? mTxId = null,
@@ -75,7 +75,7 @@ public class TestInterPaymentsAdapter : InterPaymentsAdapter
         return _mockResponse;
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessRefundAsync(
+    public override async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessRefundAsync(
         string sTxId,
         SurchargeProviderConfig providerConfig,
         decimal amount,
