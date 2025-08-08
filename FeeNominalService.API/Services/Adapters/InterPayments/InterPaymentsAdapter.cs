@@ -77,7 +77,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         throw new SurchargeException("Provider baseUrl is not configured. Please set a valid baseUrl in the provider configuration.");
     }
 
-    public async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, SurchargeProviderConfig providerConfig)
+    public virtual async Task<SurchargeAuthResponse> CalculateSurchargeAsync(SurchargeAuthRequest request, SurchargeProviderConfig providerConfig)
     {
         var httpClient = _httpClientFactory.CreateClient();
 
@@ -189,7 +189,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         };
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessSaleAsync(SurchargeTransaction saleTransaction, SurchargeProviderConfig providerConfig, SurchargeSaleRequest saleRequest)
+    public virtual async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessSaleAsync(SurchargeTransaction saleTransaction, SurchargeProviderConfig providerConfig, SurchargeSaleRequest saleRequest)
     {
         var httpClient = _httpClientFactory.CreateClient();
         // Extract JWT token and token type from provider config credentials
@@ -255,7 +255,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         return (true, doc, null);
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, SurchargeProviderConfig providerConfig)
+    public virtual async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessBulkSaleAsync(List<SurchargeSaleRequest> sales, SurchargeProviderConfig providerConfig)
     {
         var httpClient = _httpClientFactory.CreateClient();
         
@@ -309,7 +309,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         return (true, doc, null);
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
+    public virtual async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessCancelAsync(
         string sTxId,
         SurchargeProviderConfig providerConfig,
         string? mTxId = null,
