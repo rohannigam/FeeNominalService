@@ -44,7 +44,7 @@ namespace FeeNominalService.Services
             }
         }
 
-        private async Task CheckAndUpdateExpiredKeysAsync()
+        protected async Task CheckAndUpdateExpiredKeysAsync()
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

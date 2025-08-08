@@ -28,6 +28,8 @@ public class SurchargeProviderAdapterFactory : ISurchargeProviderAdapterFactory
         if (config.Provider == null)
             throw new ArgumentNullException(nameof(config.Provider), "Provider cannot be null in provider config");
         var type = config.Provider.ProviderType;
+        if (string.IsNullOrWhiteSpace(type))
+            throw new NotSupportedException($"No adapter registered for provider type: {type}");
         if (_adapters.TryGetValue(type, out var adapter))
             return adapter;
         throw new NotSupportedException($"No adapter registered for provider type: {type}");
