@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
+using FeeNominalService.Models.SurchargeProvider;
 using FeeNominalService.Models;
 
 namespace FeeNominalService.Tests.Services
@@ -36,6 +37,7 @@ namespace FeeNominalService.Tests.Services
             // Ignore JSON payloads that the InMemory provider cannot map
             modelBuilder.Entity<SurchargeTransaction>().Ignore(e => e.RequestPayload);
             modelBuilder.Entity<SurchargeTransaction>().Ignore(e => e.ResponsePayload);
+            modelBuilder.Entity<SurchargeProvider>().Ignore(e => e.CredentialsSchema);
         }
     }
 
