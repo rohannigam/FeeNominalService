@@ -374,7 +374,7 @@ public class InterPaymentsAdapter : ISurchargeProviderAdapter
         return (true, doc, null);
     }
 
-    public async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessRefundAsync(
+    public virtual async Task<(bool IsSuccess, JsonDocument? ResponsePayload, string? ErrorMessage)> ProcessRefundAsync(
         string sTxId,
         SurchargeProviderConfig providerConfig,
         decimal amount,

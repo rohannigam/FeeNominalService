@@ -379,7 +379,7 @@ namespace FeeNominalService.Services
                     throw new KeyNotFoundException($"Provider with ID {providerId} not found");
                 }
 
-                if (string.IsNullOrEmpty(provider.CredentialsSchema.RootElement.GetRawText()))
+                if (provider.CredentialsSchema == null || string.IsNullOrEmpty(provider.CredentialsSchema.RootElement.GetRawText()))
                 {
                     return true; // No schema defined, consider valid
                 }

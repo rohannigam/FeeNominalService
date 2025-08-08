@@ -631,7 +631,7 @@ namespace FeeNominalService.Services
         }
 
         /// <inheritdoc />
-        public async Task<ApiKeyInfo> GetApiKeyInfoAsync(string apiKey)
+        public async Task<ApiKeyInfo?> GetApiKeyInfoAsync(string apiKey)
         {
             // All sensitive data is properly sanitized using LogSanitizer. 
             // The API key returned in the response is the public API key identifier, not the secret.
@@ -643,7 +643,7 @@ namespace FeeNominalService.Services
             var apiKeyEntity = await _apiKeyRepository.GetByKeyAsync(apiKey);
             if (apiKeyEntity == null)
             {
-                throw new KeyNotFoundException($"API key {apiKey} not found");
+                return null;
             }
 
             // For admin API keys, there's no merchant to look up

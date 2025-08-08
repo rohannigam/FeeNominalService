@@ -13,7 +13,7 @@ namespace FeeNominalService.Services
         Task<GenerateApiKeyResponse> GenerateApiKeyAsync(GenerateApiKeyRequest request);
         Task<bool> RevokeApiKeyAsync(RevokeApiKeyRequest request);
         Task<IEnumerable<ApiKeyInfo>> GetMerchantApiKeysAsync(string merchantId);
-        Task<ApiKeyInfo> GetApiKeyInfoAsync(string apiKey);
+        Task<ApiKeyInfo?> GetApiKeyInfoAsync(string apiKey);
         Task<bool> ValidateApiKeyAsync(string merchantId, string apiKey, string timestamp, string nonce, string signature, string serviceName);
         Task<ApiKeyInfo> GetApiKeyAsync(string merchantId);
         Task<ApiKeyInfo> UpdateApiKeyAsync(UpdateApiKeyRequest request, OnboardingMetadata onboardingMetadata);
